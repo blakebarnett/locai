@@ -1,0 +1,3 @@
+# Rustfmt configuration
+unstable_features = true
+edition = "2024" 

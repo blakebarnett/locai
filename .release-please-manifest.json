@@ -1,0 +1,7 @@
+{
+  ".": "0.1.0-alpha.1",
+  "locai": "0.1.0-alpha.1", 
+  "locai-server": "0.1.0-alpha.1",
+  "locai-cli": "0.1.0-alpha.1",
+  "examples/entity_extraction/modernbert": "0.1.0"
+} 

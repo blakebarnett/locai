@@ -1,0 +1,117 @@
+[package]
+name = "locai"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "A memory palace for your AI projects"
+homepage = "https://github.com/blakebarnett/loci"
+documentation = "https://docs.rs/locai"
+keywords = ["memory", "ai", "search", "embeddings", "graph"]
+categories = ["data-structures", "database", "text-processing"]
+readme = "README.md"
+exclude = [
+    "tests/fixtures/*",
+    "benches/*",
+    ".github/*"
+]
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
+
+# Add missing dependencies with direct versions
+futures = "0.3"
+anyhow = "1.0.85"
+async-stream = "0.3"
+dirs = "6.0.0"
+
+# Logging dependencies
+time = { version = "0.3.31", features = ["formatting", "macros", "local-offset"] }
+tracing-appender = "0.2"
+console-subscriber = { version = "0.4.1", optional = true }
+axum = { version = "0.8.4", optional = true }
+tower = { version = "0.5.2", optional = true }
+tower-http = { version = "0.6.4", features = ["trace"], optional = true }
+tower-service = { version = "0.3.2", optional = true }
+
+# Configuration dependencies
+figment = { version = "0.10.12", features = ["env", "toml", "yaml", "json"] }
+config = { version = "0.15.11", features = ["json", "yaml", "toml"] }
+directories = "6.0.0"
+
+# Storage dependencies
+async-trait = "0.1.77"
+chrono = { version = "0.4.39", features = ["serde"] }
+uuid = { version = "1.7.0", features = ["v4", "v5", "serde"] }
+humantime-serde = "1.1.1"
+rocksdb = { version = "0.23.0", default-features = false }
+sha2 = "0.10.8"
+
+# SurrealDB dependencies
+surrealdb = { version = "2.3.3", optional = true, default-features = false, features = ["allocator"] }
+
+# Entity extraction dependencies
+regex = "1.10.2"
+lazy_static = "1.4.0"
+
+# WebSocket dependencies for remote messaging
+tokio-tungstenite = "0.26.2"
+
+[dev-dependencies]
+tempfile = "3.10.0"
+mockall = "0.13.1"
+tokio-test = "0.4.3"
+tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+
+[features]
+default = ["surrealdb-embedded"]
+
+# HTTP API server features
+http = ["dep:axum", "dep:tower", "dep:tower-http", "dep:tower-service"]
+
+# Development and debugging features
+tokio-console = ["dep:console-subscriber"]
+dynamic-logging = []
+
+# SurrealDB storage features
+surrealdb-embedded = ["dep:surrealdb", "surrealdb?/kv-mem", "surrealdb?/kv-rocksdb", "surrealdb?/allocator"]
+surrealdb-remote = ["dep:surrealdb", "surrealdb?/protocol-ws", "surrealdb?/protocol-http", "surrealdb?/allocator"]
+
+[[example]]
+name = "byoe_openai_embeddings"
+path = "examples/byoe_openai_embeddings.rs"
+
+[[example]]
+name = "byoe_cohere_embeddings"
+path = "examples/byoe_cohere_embeddings.rs"
+
+[[example]]
+name = "hybrid_search_local"
+path = "examples/hybrid_search_local.rs"
+
+[[example]]
+name = "search_mode_comparison"
+path = "examples/search_mode_comparison.rs"
+
+[[example]]
+name = "embedded_messaging"
+path = "examples/embedded_messaging.rs"
+required-features = ["surrealdb-embedded"]
+
+[[example]]
+name = "embedded_messaging_advanced"
+path = "examples/embedded_messaging_advanced.rs"
+required-features = ["surrealdb-embedded"]
+
+
+
+
+
+

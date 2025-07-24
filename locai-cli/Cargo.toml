@@ -1,0 +1,32 @@
+[package]
+name = "locai-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Command-line interface for Locai memory management system"
+homepage = "https://github.com/blakebarnett/loci"
+documentation = "https://docs.rs/locai-cli"
+readme = "../README.md"
+keywords = ["ai", "memory", "cli", "command-line", "tool"]
+categories = ["command-line-utilities", "database", "science"]
+exclude = [
+    "tests/fixtures/*",
+    ".github/*"
+]
+
+[[bin]]
+name = "locai-cli"
+path = "src/main.rs"
+
+[dependencies]
+locai = { path = "../locai", default-features = false, features = ["surrealdb-embedded"] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { version = "4.5.1", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { version = "0.4.39", features = ["serde"] } 

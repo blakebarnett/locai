@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      locai_released: ${{ steps.release.outputs['locai--release_created'] }}
+      locai_server_released: ${{ steps.release.outputs['locai-server--release_created'] }}
+      locai_cli_released: ${{ steps.release.outputs['locai-cli--release_created'] }}
+    steps:
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish-crates:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [
+          { name: "locai", path: "locai", released: "${{ needs.release-please.outputs.locai_released }}" },
+          { name: "locai-server", path: "locai-server", released: "${{ needs.release-please.outputs.locai_server_released }}" },
+          { name: "locai-cli", path: "locai-cli", released: "${{ needs.release-please.outputs.locai_cli_released }}" }
+        ]
+    steps:
+      - name: Checkout code
+        if: ${{ matrix.package.released }}
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        if: ${{ matrix.package.released }}
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        if: ${{ matrix.package.released }}
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify package builds
+        if: ${{ matrix.package.released }}
+        run: |
+          cd ${{ matrix.package.path }}
+          cargo check
+          cargo test
+
+      - name: Publish to crates.io
+        if: ${{ matrix.package.released }}
+        run: |
+          cd ${{ matrix.package.path }}
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        continue-on-error: true
+
+  # Separate job for the main locai crate since other crates depend on it
+  publish-locai:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.locai_released }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify locai package builds
+        run: |
+          cd locai
+          cargo check --all-features
+          cargo test
+
+      - name: Publish locai to crates.io
+        run: |
+          cd locai
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # Wait a bit for crates.io to process, then publish dependent crates
+      - name: Wait for crates.io to process
+        run: sleep 60
+
+      - name: Publish locai-server
+        if: ${{ needs.release-please.outputs.locai_server_released }}
+        run: |
+          cd locai-server
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish locai-cli
+        if: ${{ needs.release-please.outputs.locai_cli_released }}
+        run: |
+          cd locai-cli
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        continue-on-error: true 

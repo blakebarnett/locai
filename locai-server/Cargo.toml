@@ -1,0 +1,55 @@
+[package]
+name = "locai-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "HTTP server for Locai memory management system"
+homepage = "https://github.com/blakebarnett/locai"
+documentation = "https://docs.rs/locai-server"
+
+[[bin]]
+name = "locai-server"
+path = "src/main.rs"
+
+[dependencies]
+locai = { path = "../locai", features = ["surrealdb-embedded"] }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+axum = { version = "0.8.4", features = ["ws", "macros"] }
+tower = { version = "0.5.1", features = ["full"] }
+tower-http = { version = "0.6.4", features = ["trace", "cors", "auth", "limit"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { version = "1.10.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.38", features = ["serde"] }
+thiserror = "2.0.3"
+anyhow = "1.0.93"
+async-trait = "0.1.77"
+futures = "0.3.31"
+tokio-tungstenite = "0.27.0"
+utoipa = { version = "5.1.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+headers = "0.4.0"
+http = "1.1.0"
+dashmap = "6.1.0"
+# JWT and Authentication dependencies
+jsonwebtoken = "9.3.0"
+bcrypt = "0.17.0"
+rand = "0.9.1"
+# SurrealDB for direct client access
+surrealdb = { version = "2.1.2", features = ["kv-mem", "kv-rocksdb"] }
+clap = { version = "4.5.21", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4.4"
+axum-test = "17.3.0"
+serde_json = { workspace = true }
+tempfile = "3.19.1"
+
+[features]
+default = ["live-queries"]
+live-queries = [] 

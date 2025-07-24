@@ -1,0 +1,157 @@
+# Hybrid Entity Extraction Configuration Example - 2025 State-of-the-Art Models
+# This configuration demonstrates the hybrid approach using rule-based extraction
+# combined with ModernBERT (2025) transformer models for robust entity extraction
+
+[entity_extraction]
+enabled = true
+confidence_threshold = 0.7
+max_entities_per_memory = 50
+deduplicate_entities = true
+relationship_type = "mentions"
+
+# ===== RECOMMENDED: Hybrid Approach =====
+# Combines rule-based + ModernBERT (2025) intelligently with automatic fallbacks
+[[entity_extraction.extractors]]
+name = "hybrid-primary"
+enabled = true
+priority = 200  # High priority
+entity_types = [
+    # Structured data (handled by basic extractor)
+    "Email", "Url", "PhoneNumber", "Date", "Time", "Money",
+    # Named entities (handled by ModernBERT transformer extractor)  
+    "Person", "Organization", "Location"
+]
+extractor_type = { Hybrid = { config = { 
+    enable_basic = true,
+    enable_transformers = true,  # Enable ModernBERT transformers
+    transformer_model = "answerdotai/ModernBERT-base",  # State-of-the-art 2025 model
+    enable_deduplication = true,
+    confidence_threshold = 0.7,
+    fallback_to_basic = true
+} } }
+
+# ===== ADVANCED: Pipeline Approach =====
+# Tries multiple extractors until target confidence is reached
+[[entity_extraction.extractors]]
+name = "pipeline-advanced"
+enabled = false  # Enable to try pipeline approach instead of hybrid
+priority = 250  # Highest priority
+entity_types = ["Person", "Organization", "Location", "Email", "Url", "Date", "Time", "Money"]
+extractor_type = { Pipeline = { 
+    extractors = [
+        # 1. Fast basic extractor first
+        {
+            name = "basic-fast",
+            extractor_type = "Regex",
+            enabled = true,
+            priority = 100,
+            entity_types = ["Email", "Url", "PhoneNumber", "Date", "Time", "Money"]
+        },
+        # 2. ModernBERT for named entities (state-of-the-art 2025)
+        {
+            name = "modernbert-ner", 
+            extractor_type = { HuggingFace = { model = "answerdotai/ModernBERT-base" } },
+            enabled = true,
+            priority = 200,
+            entity_types = ["Person", "Organization", "Location"]
+        },
+        # 3. BioClinical ModernBERT as specialized fallback (2025)
+        {
+            name = "bioclinical-modernbert-fallback",
+            extractor_type = { HuggingFace = { model = "lindvalllab/BioClinical-ModernBERT-base" } },
+            enabled = true,
+            priority = 300,
+            entity_types = ["Person", "Organization", "Location"]
+        }
+    ],
+    min_confidence = 0.9  # Stop when this confidence is reached
+} }
+
+# ===== FALLBACK: Basic Extractor =====
+# Always available as ultimate fallback
+[[entity_extraction.extractors]]
+name = "basic-fallback"
+enabled = true
+priority = 100  # Lowest priority
+entity_types = ["Email", "Url", "PhoneNumber", "Date", "Time", "Money"]
+extractor_type = "Regex"
+
+# ===== PERFORMANCE CONFIGURATIONS =====
+
+# Fast configuration (for high-throughput scenarios) - 2025 State-of-the-Art
+# [[entity_extraction.extractors]]
+# name = "fast-only"
+# enabled = false  # Enable for speed-optimized extraction
+# priority = 150
+# entity_types = ["Person", "Organization", "Location"]
+# extractor_type = { HuggingFace = { model = "elastic/distilbert-base-cased-finetuned-conll03-english" } }
+
+# Accuracy configuration (for precision-critical scenarios) - 2025 State-of-the-Art  
+# [[entity_extraction.extractors]]
+# name = "accuracy-focused"
+# enabled = false  # Enable for accuracy-optimized extraction
+# priority = 300
+# entity_types = ["Person", "Organization", "Location"]
+# extractor_type = { HuggingFace = { model = "answerdotai/ModernBERT-large" } }
+
+# ===== DOMAIN-SPECIFIC CONFIGURATIONS =====
+
+# Biomedical domain - State-of-the-Art 2025
+# [[entity_extraction.extractors]]
+# name = "biomedical"
+# enabled = false  # Enable for biomedical text
+# priority = 250
+# entity_types = ["Person", "Organization", "Location"]
+# extractor_type = { HuggingFace = { model = "lindvalllab/BioClinical-ModernBERT-base" } }
+
+# Clinical domain - State-of-the-Art 2025
+# [[entity_extraction.extractors]]  
+# name = "clinical"
+# enabled = false  # Enable for clinical text
+# priority = 250
+# entity_types = ["Person", "Organization", "Location"]
+# extractor_type = { HuggingFace = { model = "Simonlee711/Clinical_ModernBERT" } }
+
+# High-performance general domain - 2025
+# [[entity_extraction.extractors]]  
+# name = "high-performance"
+# enabled = false  # Enable for high-performance extraction
+# priority = 250
+# entity_types = ["Person", "Organization", "Location"]
+# extractor_type = { HuggingFace = { model = "dslim/bert-large-NER" } }
+
+# ===== PHASE 2: Entity Resolution and Disambiguation =====
+[entity_extraction.resolution]
+enabled = true
+merge_strategy = "Balanced"
+similarity_threshold = 0.8
+min_confidence_for_merge = 0.75
+
+[entity_extraction.resolution.disambiguation]
+enabled = true
+min_confidence_for_merge = 0.75
+context_window = 100
+check_unique_identifiers = true
+check_cooccurrence = true  
+check_temporal_proximity = true
+
+[entity_extraction.resolution.disambiguation.weights]
+identifiers = 0.4
+context = 0.3
+cooccurrence = 0.2
+temporal = 0.1
+
+# ===== PHASE 2: Automatic Relationships =====
+[entity_extraction.automatic_relationships]
+enabled = true
+min_confidence = 0.7
+max_relationships_per_memory = 10
+
+[[entity_extraction.automatic_relationships.methods]]
+type = "EntityCoreference"
+min_entity_confidence = 0.8
+
+[[entity_extraction.automatic_relationships.methods]]
+type = "TemporalProximity" 
+max_time_gap_seconds = 300
+same_source_only = true 

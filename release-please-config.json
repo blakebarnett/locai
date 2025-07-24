@@ -1,0 +1,52 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "rust",
+  "packages": {
+    ".": {
+      "package-name": "locai-workspace",
+      "release-type": "rust",
+      "component": "locai"
+    },
+    "locai": {
+      "package-name": "locai",
+      "release-type": "rust",
+      "component": "locai-core"
+    },
+    "locai-server": {
+      "package-name": "locai-server", 
+      "release-type": "rust",
+      "component": "locai-server"
+    },
+    "locai-cli": {
+      "package-name": "locai-cli",
+      "release-type": "rust",
+      "component": "locai-cli"
+    },
+    "examples/entity_extraction/modernbert": {
+      "package-name": "locai_modernbert_extractor",
+      "release-type": "rust",
+      "component": "modernbert"
+    }
+  },
+  "changelog-sections": [
+    {"type": "feat", "section": "Features"},
+    {"type": "fix", "section": "Bug Fixes"},
+    {"type": "perf", "section": "Performance Improvements"},
+    {"type": "deps", "section": "Dependencies"},
+    {"type": "revert", "section": "Reverts"},
+    {"type": "docs", "section": "Documentation"},
+    {"type": "style", "section": "Styles", "hidden": true},
+    {"type": "chore", "section": "Miscellaneous Chores", "hidden": true},
+    {"type": "refactor", "section": "Code Refactoring", "hidden": true},
+    {"type": "test", "section": "Tests", "hidden": true},
+    {"type": "build", "section": "Build System", "hidden": true},
+    {"type": "ci", "section": "Continuous Integration", "hidden": true}
+  ],
+  "extra-files": [
+    "README.md"
+  ],
+  "separate-pull-requests": true,
+  "group-pull-request-title-pattern": "chore: release ${version}",
+  "release-search-depth": 400,
+  "commit-search-depth": 500
+} 

@@ -1,0 +1,123 @@
+# Locai Configuration Example
+# This file demonstrates all configuration options available for Locai
+
+[storage]
+# Base directory for all storage
+data_dir = "./locai_data"
+
+[storage.graph]
+# Graph storage type (SurrealDB, Memory, etc.)
+storage_type = "SurrealDB"
+
+[storage.vector]
+# Vector storage type (SurrealDB, Memory, etc.)
+storage_type = "SurrealDB"
+
+[ml]
+# Model cache directory
+model_cache_dir = "./model_cache"
+
+[ml.embedding]
+# Embedding model configuration (BYOE approach)
+model_type = "OpenAI"
+model_name = "text-embedding-3-small"
+service_type = "Remote"
+service_url = "https://api.openai.com/v1"
+
+[logging]
+# Logging configuration
+level = "Info"
+format = "Pretty"
+# file = "./logs/locai.log"  # Uncomment to enable file logging
+
+[entity_extraction]
+# Entity extraction configuration
+enabled = true
+confidence_threshold = 0.7
+max_entities_per_memory = 50
+deduplicate_entities = true
+relationship_type = "mentions"
+
+# Default hybrid extractor
+[[entity_extraction.extractors]]
+name = "hybrid-default"
+enabled = true
+priority = 200
+entity_types = [
+    # Structured data
+    "Email", "Url", "PhoneNumber", "Date", "Time", "Money",
+    # Named entities
+    "Person", "Organization", "Location"
+]
+extractor_type = { Hybrid = { config = { 
+    enable_basic = true,
+    enable_transformers = false,  # Set to true if you have ML models
+    transformer_model = "elastic/distilbert-base-uncased-finetuned-conll03-english",
+    enable_deduplication = true,
+    confidence_threshold = 0.7,
+    fallback_to_basic = true
+} } }
+
+# Basic extractor fallback
+[[entity_extraction.extractors]]
+name = "basic-fallback"
+enabled = true
+priority = 100
+entity_types = ["Email", "Url", "PhoneNumber", "Date", "Time", "Money"]
+extractor_type = "Regex"
+
+# Entity resolution configuration
+[entity_extraction.resolution]
+enabled = true
+merge_strategy = "Balanced"
+similarity_threshold = 0.8
+min_confidence_for_merge = 0.75
+
+[entity_extraction.resolution.disambiguation]
+enabled = true
+min_confidence_for_merge = 0.75
+context_window = 100
+check_unique_identifiers = true
+check_cooccurrence = true
+check_temporal_proximity = true
+
+[entity_extraction.resolution.disambiguation.weights]
+identifiers = 0.4
+context = 0.3
+cooccurrence = 0.2
+temporal = 0.1
+
+# Automatic relationships
+[entity_extraction.automatic_relationships]
+enabled = true
+min_confidence = 0.7
+max_relationships_per_memory = 10
+
+[[entity_extraction.automatic_relationships.methods]]
+type = "EntityCoreference"
+min_entity_confidence = 0.8
+
+# ML extraction configuration
+[entity_extraction.ml]
+enabled = false  # Set to true if you want to use ML models
+default_model = "distilbert-ner"
+
+[entity_extraction.ml.models.distilbert-ner]
+model_id = "elastic/distilbert-base-uncased-finetuned-conll03-english"
+backend = "Candle"
+device = "auto"
+max_length = 512
+batch_size = 8
+confidence_threshold = 0.15
+cache_results = true
+
+[entity_extraction.ml.routing]
+enabled = false
+rules = []
+
+[entity_extraction.ml.optimization]
+enable_caching = true
+cache_size = 1000
+enable_batching = true
+max_batch_size = 16
+enable_quantization = false 
