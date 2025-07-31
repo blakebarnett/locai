@@ -12,6 +12,7 @@ documentation = "https://docs.rs/locai"
 keywords = ["memory", "ai", "search", "embeddings", "graph"]
 categories = ["data-structures", "database", "text-processing"]
 readme = "README.md"
+build = "build.rs"
 exclude = [
     "tests/fixtures/*",
     "benches/*",
@@ -63,6 +64,9 @@ lazy_static = "1.4.0"
 
 # WebSocket dependencies for remote messaging
 tokio-tungstenite = "0.26.2"
+
+[build-dependencies]
+which = "6.0.3"
 
 [dev-dependencies]
 tempfile = "3.10.0"

@@ -9,10 +9,14 @@ rust-version.workspace = true
 description = "HTTP server for Locai memory management system"
 homepage = "https://github.com/blakebarnett/locai"
 documentation = "https://docs.rs/locai-server"
+build = "build.rs"
 
 [[bin]]
 name = "locai-server"
 path = "src/main.rs"
+
+[build-dependencies]
+which = "6.0.3"
 
 [dependencies]
 locai = { path = "../locai", features = ["surrealdb-embedded"] }
