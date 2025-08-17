@@ -358,8 +358,15 @@ where
 
         #[derive(serde::Deserialize)]
         struct BM25SearchResult {
-            #[serde(flatten)]
-            memory: SurrealMemory,
+            id: RecordId,
+            content: String,
+            metadata: Value,
+            embedding: Option<Vec<f32>>,
+            importance: Option<f32>,
+            owner: RecordId,
+            shared_with: Option<Vec<RecordId>>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
             bm25_score: f32,
             highlighted_content: String,
         }
@@ -371,11 +378,25 @@ where
         if query.contains("nonexistent") {
             tracing::debug!("BM25 search for '{}' found {} results", query, results.len());
             for result in &results {
-                tracing::debug!("BM25 result: {} (score: {})", result.memory.id, result.bm25_score);
+                tracing::debug!("BM25 result: {} (score: {})", result.id, result.bm25_score);
             }
         }
 
-        Ok(results.into_iter().map(|r| (Memory::from(r.memory), r.bm25_score, r.highlighted_content)).collect())
+        // Convert BM25SearchResult to SurrealMemory then to Memory
+        Ok(results.into_iter().map(|r| {
+            let surreal_memory = SurrealMemory {
+                id: r.id,
+                content: r.content,
+                metadata: r.metadata,
+                embedding: r.embedding,
+                importance: r.importance,
+                owner: r.owner,
+                shared_with: r.shared_with,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            };
+            (Memory::from(surreal_memory), r.bm25_score, r.highlighted_content)
+        }).collect())
     }
     
     /// Fuzzy search for typo tolerance
@@ -491,8 +512,15 @@ where
 
         #[derive(serde::Deserialize)]
         struct BM25SearchResult {
-            #[serde(flatten)]
-            memory: SurrealMemory,
+            id: RecordId,
+            content: String,
+            metadata: Value,
+            embedding: Option<Vec<f32>>,
+            importance: Option<f32>,
+            owner: RecordId,
+            shared_with: Option<Vec<RecordId>>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
             bm25_score: f32,
             highlighted_content: String,
         }
@@ -504,11 +532,25 @@ where
         if query.contains("nonexistent") {
             tracing::debug!("BM25 search for '{}' found {} results", query, results.len());
             for result in &results {
-                tracing::debug!("BM25 result: {} (score: {})", result.memory.id, result.bm25_score);
+                tracing::debug!("BM25 result: {} (score: {})", result.id, result.bm25_score);
             }
         }
 
-        Ok(results.into_iter().map(|r| (Memory::from(r.memory), r.bm25_score, r.highlighted_content)).collect())
+        // Convert BM25SearchResult to SurrealMemory then to Memory
+        Ok(results.into_iter().map(|r| {
+            let surreal_memory = SurrealMemory {
+                id: r.id,
+                content: r.content,
+                metadata: r.metadata,
+                embedding: r.embedding,
+                importance: r.importance,
+                owner: r.owner,
+                shared_with: r.shared_with,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            };
+            (Memory::from(surreal_memory), r.bm25_score, r.highlighted_content)
+        }).collect())
     }
 
     /// Fuzzy search for typo tolerance
