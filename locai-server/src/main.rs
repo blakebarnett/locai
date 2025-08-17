@@ -59,8 +59,6 @@ async fn main() -> Result<()> {
                 match loader.extract() {
                     Ok(config) => {
                         info!("✅ Successfully loaded configuration from {}", config_file.display());
-                        info!("🔍 Entity extraction enabled: {}", config.entity_extraction.enabled);
-                        info!("🔍 Entity extraction confidence threshold: {}", config.entity_extraction.confidence_threshold);
                         config
                     },
                     Err(e) => {
@@ -95,13 +93,7 @@ async fn main() -> Result<()> {
     info!("Locai memory manager initialized");
     
     // Additional config verification
-    let config = memory_manager.config();
-    if !config.entity_extraction.enabled {
-        warn!("❌ Entity extraction is disabled - this may cause missing entity-memory relationships");
-    }
-    if memory_manager.has_ml_service() {
-        info!("🤖 ML service available for enhanced entity extraction");
-    }
+    let _ = memory_manager.config();
 
     // Create application state
     let mut app_state = AppState::new(memory_manager, server_config.clone());

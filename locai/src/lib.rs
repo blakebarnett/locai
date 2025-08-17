@@ -267,9 +267,6 @@ pub async fn init(config: config::LocaiConfig) -> Result<core::MemoryManager> {
     let _ = logging::init(&config.logging);
     
     // Entity extraction is now handled via examples - no auto-initialization needed
-    if config.entity_extraction.enabled {
-        tracing::info!("🤖 Entity extraction is enabled (models are provided by examples)");
-    }
     
     // Create storage service
     // Note: Explicitly mapping StorageError to LocaiError
@@ -277,14 +274,9 @@ pub async fn init(config: config::LocaiConfig) -> Result<core::MemoryManager> {
         .map_err(|e| LocaiError::Storage(e.to_string()))?;
     let storage = std::sync::Arc::from(storage);
     
-    // Create ML service for BYOE approach (simplified)
-    let ml_service = if true {
-        let embedding_manager = ml::model_manager::EmbeddingManagerBuilder::new()
-            .build();
-        Some(std::sync::Arc::new(embedding_manager))
-    } else {
-        None
-    };
+    // Don't create ML service by default - users must explicitly configure it
+    // Having URLs/defaults configured doesn't mean it will actually work without API keys, etc.
+    let ml_service = None;
     
     // Create MemoryManager with ML extractors initialized
     let memory_manager = core::MemoryManager::new_with_ml(storage, ml_service, config.clone()).await?;

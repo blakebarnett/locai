@@ -120,83 +120,43 @@ impl MemoryOperations {
             return Ok(());
         }
 
-        tracing::debug!("🔍 Starting ML extractor initialization with {} existing extractors", self.entity_extractors.len());
-
-        let mut ml_extractors_added = 0;
-        
         // If no extractors are configured, add default extractors
         if self.config.entity_extraction.extractors.is_empty() {
-            tracing::info!("🤖 No extractors configured, adding default extractors");
-            
             // Add basic extractor for structured data
             let basic_extractor = crate::entity_extraction::BasicEntityExtractor::new();
             self.entity_extractors.push(Arc::new(basic_extractor) as Arc<dyn EntityExtractor>);
-            ml_extractors_added += 1;
-            tracing::info!("🔧 Initialized Basic entity extractor");
-            
-            // Note: Advanced model-specific extractors available in examples
-            tracing::info!("ℹ️ Advanced model-specific extractors (ModernBERT) available in examples/entity_extraction/");
-            tracing::info!("   Add custom model extractors using the pipeline architecture");
         } else {
             // Process configured extractors
             for extractor_config in &self.config.entity_extraction.extractors {
-                tracing::debug!("🔍 Checking extractor config: {} (enabled: {})", extractor_config.name, extractor_config.enabled);
                 if extractor_config.enabled {
                     match &extractor_config.extractor_type {
                         ExtractorType::Hybrid { config: hybrid_config } => {
                             // Initialize basic extractor first if enabled
                             if hybrid_config.enable_basic {
-                                tracing::debug!("🔧 Initializing Basic extractor for hybrid approach");
                                 let basic_extractor = crate::entity_extraction::BasicEntityExtractor::new();
                                 self.entity_extractors.push(Arc::new(basic_extractor) as Arc<dyn EntityExtractor>);
-                                ml_extractors_added += 1;
-                                tracing::info!("🔧 Initialized Basic entity extractor (hybrid)");
-                            }
-                            
-                            // Initialize transformer extractor if enabled
-                            if hybrid_config.enable_transformers {
-                                tracing::debug!("🤖 Attempting to initialize transformer extractor with model: {}", hybrid_config.transformer_model);
-                                
-                                // Note: Advanced transformer extractors available in examples
-                                tracing::info!("ℹ️ Advanced transformer extractors require additional setup");
-                                tracing::info!("   See examples/entity_extraction/ for model-specific extractors");
-                                tracing::info!("   Use the pipeline architecture to add custom model extractors");
-                                
-                                // Advanced transformer extractors are available in examples
-                                if hybrid_config.fallback_to_basic {
-                                    tracing::info!("📌 Using basic extractor for entity extraction");
-                                }
                             }
                         }
                         ExtractorType::Regex => {
-                            tracing::debug!("🔧 Initializing Basic (regex) extractor");
                             let basic_extractor = crate::entity_extraction::BasicEntityExtractor::new();
                             self.entity_extractors.push(Arc::new(basic_extractor) as Arc<dyn EntityExtractor>);
-                            ml_extractors_added += 1;
-                            tracing::info!("🔧 Initialized Basic entity extractor");
                         }
-                        ExtractorType::HuggingFace { model } => {
-                            tracing::debug!("🤖 Attempting to initialize transformer extractor with model: {}", model);
-                            
-                            tracing::info!("ℹ️ HuggingFace transformer extractors require additional setup");
-                            tracing::info!("   See examples/entity_extraction/ for model-specific extractors");
-                            tracing::info!("   Use the pipeline architecture to add custom model extractors");
+                        ExtractorType::HuggingFace { model: _model } => {
+                            // HuggingFace extractors not included in default build
                         }
                         ExtractorType::Pipeline { extractors: _pipeline_extractors, min_confidence: _min_confidence } => {
-                            tracing::info!("ℹ️ Pipeline extractors coming soon, skipping for now");
+                            // Pipeline extractors not included in default build
                         }
                         ExtractorType::Spacy { model: _model } => {
-                            tracing::info!("ℹ️ SpaCy extractors not supported, consider using ModernBERT from examples");
+                            // SpaCy extractors not included in default build
                         }
                         ExtractorType::Llm { provider: _provider, model: _model } => {
-                            tracing::info!("ℹ️ LLM extractors coming soon, skipping for now");
+                            // LLM extractors not included in default build
                         }
                     }
                 }
             }
         }
-        
-        tracing::debug!("🔍 Added {} ML extractors, total extractors now: {}", ml_extractors_added, self.entity_extractors.len());
 
         Ok(())
     }
@@ -248,17 +208,12 @@ impl MemoryOperations {
         
         // Extract entities if entity extraction is enabled
         if self.config.entity_extraction.enabled && !self.entity_extractors.is_empty() {
-            tracing::debug!("🔍 Running entity extraction with {} extractors for memory {}", 
-                           self.entity_extractors.len(), created.id);
-            
             let mut all_extracted_entities = Vec::new();
             
             // Run all extractors and collect results
             for extractor in &self.entity_extractors {
                 match extractor.extract_entities(&created.content).await {
                     Ok(extracted_entities) => {
-                        tracing::debug!("Extractor '{}' extracted {} entities from memory {}", 
-                                       extractor.name(), extracted_entities.len(), created.id);
                         all_extracted_entities.extend(extracted_entities);
                     },
                     Err(e) => {
@@ -268,8 +223,6 @@ impl MemoryOperations {
                     }
                 }
             }
-            
-            tracing::debug!("Total {} entities extracted from memory {}", all_extracted_entities.len(), created.id);
             
             // Process each extracted entity with Phase 2 resolution
             for extracted in all_extracted_entities {

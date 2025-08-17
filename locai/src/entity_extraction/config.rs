@@ -72,7 +72,7 @@ impl Default for EntityExtractionConfig {
         let extractors = vec![hybrid_extractor, basic_fallback];
         
         Self {
-            enabled: true, // Enable by default for rich graph creation
+            enabled: false, // Disabled by default - users must explicitly configure
             extractors,
             confidence_threshold: 0.15, // Lower default for better entity capture
             max_entities_per_memory: Some(50),

@@ -3,6 +3,8 @@
 use std::sync::Arc;
 
 use axum::{
+    extract::State,
+    response::Json,
     middleware,
     routing::{get, post, put, delete},
     Router,
@@ -99,7 +101,7 @@ use auth::auth_middleware;
     tags(
         (name = "auth", description = "Authentication and user management endpoints"),
         (name = "memories", description = "Memory management endpoints"),
-        (name = "entities", description = "Entity management endpoints"),
+        (name = "entities", description = "Manual entity management endpoints (CRUD operations)"),
         (name = "relationships", description = "Relationship management endpoints"),
         (name = "versions", description = "Version management endpoints"),
         (name = "graph", description = "Graph operations and traversal endpoints"),
@@ -108,7 +110,7 @@ use auth::auth_middleware;
     info(
                     title = "Locai Memory Service API",
             version = "1.0.0",
-            description = "RESTful API for the Locai memory management service with graph-centric design",
+            description = "RESTful API for the Locai memory management service with graph-centric design. Provides text search by default, with vector/hybrid search available when ML service is configured.",
             contact(
                 name = "Locai Team",
             url = "https://locai.dev"
@@ -174,9 +176,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/entities/{id}/related_entities", get(graph::get_related_entities))
         .route("/entities/central", get(graph::get_central_entities))
         
-        // WebSocket endpoints
+        // WebSocket endpoints  
         .route("/ws", get(websocket_handler))
         .route("/messaging/ws", get(messaging_websocket_handler))
+        
+        // Health check endpoint (with capability reporting)
+        .route("/health", get(health_check))
         
         // Add authentication middleware if enabled
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
@@ -188,12 +193,46 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .nest("/api", api_router)
         .merge(swagger_router)
-        .route("/health", get(health_check))
 }
 
-/// Health check endpoint
-async fn health_check() -> &'static str {
-    "OK"
+/// Health check endpoint with capability reporting
+#[utoipa::path(
+    get,
+    path = "/api/health",
+    tag = "health",
+    responses(
+        (status = 200, description = "Service health and capabilities", body = serde_json::Value)
+    )
+)]
+async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let capabilities = serde_json::json!({
+        "status": "OK",
+        "capabilities": {
+            "text_search": true,
+            "vector_search": state.memory_manager.has_ml_service(),
+            "hybrid_search": state.memory_manager.has_ml_service(),
+            "entity_extraction": {
+                "basic": state.memory_manager.config().entity_extraction.enabled,
+                "ml_based": false  // Advanced ML entity extraction moved to examples
+            },
+            "entity_management": true,  // Manual CRUD operations for entities via API
+            "memory_management": true,  // CRUD operations for memories
+            "relationship_management": true,  // CRUD operations for relationships between memories/entities
+            "graph_operations": true,
+            "messaging": state.messaging_server.is_some(),
+            "authentication": state.config.enable_auth
+        },
+        "search_modes": {
+            "available": if state.memory_manager.has_ml_service() {
+                vec!["text", "vector", "hybrid"]
+            } else {
+                vec!["text"]
+            },
+            "default": "text"
+        }
+    });
+    
+    Json(capabilities)
 }
 
 /// Messaging WebSocket handler

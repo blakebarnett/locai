@@ -63,23 +63,9 @@ pub async fn create_memory(
     // Store the memory
     let memory_id = state.memory_manager.store_memory(memory.clone()).await?;
     
-    // Debug: Check if entity extraction happened
-    tracing::debug!("🔍 Memory stored with ID: {}, checking for entity extraction...", memory_id);
+
     
-    // Wait a moment and check for entities related to this memory
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    let entities = state.memory_manager.list_entities(None, Some(10), None).await.unwrap_or_default();
-    tracing::debug!("🔍 Total entities in system after memory creation: {}", entities.len());
-    
-    // Check for relationships containing this memory
-    use locai::storage::filters::RelationshipFilter;
-    let rel_filter = RelationshipFilter {
-        source_id: Some(memory_id.clone()),
-        relationship_type: Some("contains".to_string()),
-        ..Default::default()
-    };
-    let relationships = state.memory_manager.list_relationships(Some(rel_filter), Some(10), None).await.unwrap_or_default();
-    tracing::debug!("🔍 Found {} 'contains' relationships for memory {}", relationships.len(), memory_id);
+
     
     // Get the stored memory to return with proper ID
     let stored_memory = state.memory_manager.get_memory(&memory_id).await?
@@ -368,11 +354,25 @@ pub async fn search_memories(
     let limit = params.limit.unwrap_or(50);
     let mode = params.mode.unwrap_or(SearchMode::Text);
     
-    // Convert search mode
+    // Validate search mode against available capabilities
     let locai_mode = match mode {
         SearchMode::Text => LocaiSearchMode::Text,
-        SearchMode::Vector => LocaiSearchMode::Vector,
-        SearchMode::Hybrid => LocaiSearchMode::Hybrid,
+        SearchMode::Vector => {
+            if !state.memory_manager.has_ml_service() {
+                return Err(ServerError::BadRequest(
+                    "Vector search requires ML service to be configured. Only 'text' search mode is available by default.".to_string()
+                ));
+            }
+            LocaiSearchMode::Vector
+        },
+        SearchMode::Hybrid => {
+            if !state.memory_manager.has_ml_service() {
+                return Err(ServerError::BadRequest(
+                    "Hybrid search requires ML service to be configured. Only 'text' search mode is available by default.".to_string()
+                ));
+            }
+            LocaiSearchMode::Hybrid
+        },
     };
     
     // Build filter

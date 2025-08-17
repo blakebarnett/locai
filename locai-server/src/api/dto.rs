@@ -407,8 +407,11 @@ fn default_limit() -> usize {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchMode {
+    /// BM25 full-text search (always available)
     Text,
+    /// Vector similarity search (requires ML service configuration)
     Vector,
+    /// Hybrid BM25 + vector search (requires ML service configuration)
     Hybrid,
 }
 
