@@ -1,9 +1,9 @@
 //! Error handling for the Locai server
 
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -23,45 +23,45 @@ pub enum ServerError {
     /// Locai library error
     #[error("Locai error: {0}")]
     Locai(#[from] locai::LocaiError),
-    
+
     /// Authentication error
     #[error("Authentication failed: {0}")]
     Auth(String),
-    
+
     /// Database error
     #[error("Database error: {0}")]
     Database(String),
-    
+
     /// Validation error
     #[error("Validation error: {0}")]
     Validation(String),
-    
+
     /// Not found error
     #[error("Resource not found: {0}")]
     NotFound(String),
-    
+
     /// Bad request error
     #[error("Bad request: {0}")]
     BadRequest(String),
-    
+
     /// Internal server error
     #[error("Internal server error: {0}")]
     Internal(String),
-    
+
     /// Rate limit exceeded
     #[error("Rate limit exceeded")]
     #[allow(dead_code)]
     RateLimit,
-    
+
     /// WebSocket error
     #[error("WebSocket error: {0}")]
     #[allow(dead_code)]
     WebSocket(String),
-    
+
     /// Serialization error
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
-    
+
     /// Generic error
     #[error("{0}")]
     #[allow(dead_code)]
@@ -77,11 +77,13 @@ impl ServerError {
             ServerError::Validation(_) | ServerError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ServerError::NotFound(_) => StatusCode::NOT_FOUND,
             ServerError::RateLimit => StatusCode::TOO_MANY_REQUESTS,
-            ServerError::Locai(locai::LocaiError::MLNotConfigured) => StatusCode::SERVICE_UNAVAILABLE,
+            ServerError::Locai(locai::LocaiError::MLNotConfigured) => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
-    
+
     /// Get the error type string
     pub fn error_type(&self) -> &'static str {
         match self {
@@ -108,7 +110,7 @@ impl IntoResponse for ServerError {
             message: self.to_string(),
             details: None,
         };
-        
+
         (status, Json(error_response)).into_response()
     }
 }
@@ -130,4 +132,4 @@ pub fn validation_error(message: &str) -> ServerError {
 /// Helper function to create a bad request error
 pub fn bad_request(message: &str) -> ServerError {
     ServerError::BadRequest(message.to_string())
-} 
+}

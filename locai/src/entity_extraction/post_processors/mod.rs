@@ -2,4 +2,4 @@
 
 pub mod deduplicator;
 
-pub use deduplicator::EntityDeduplicator; 
+pub use deduplicator::EntityDeduplicator;

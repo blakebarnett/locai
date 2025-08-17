@@ -5,11 +5,11 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use surrealdb::{Connection, RecordId};
 
-use crate::storage::errors::StorageError;
-use crate::storage::traits::EntityStore;
-use crate::storage::models::Entity;
-use crate::storage::filters::EntityFilter;
 use super::base::SharedStorage;
+use crate::storage::errors::StorageError;
+use crate::storage::filters::EntityFilter;
+use crate::storage::models::Entity;
+use crate::storage::traits::EntityStore;
 
 /// Internal representation of an Entity record for SurrealDB
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -33,7 +33,7 @@ struct CreateEntity {
 impl From<Entity> for SurrealEntity {
     fn from(entity: Entity) -> Self {
         Self {
-            id: RecordId::from(("entity", entity.id.as_str())).into(),
+            id: RecordId::from(("entity", entity.id.as_str())),
             entity_type: entity.entity_type,
             properties: entity.properties,
             owner: RecordId::from(("user", "system")),
@@ -64,49 +64,51 @@ where
     async fn create_entity(&self, entity: Entity) -> Result<Entity, StorageError> {
         // First ensure system user exists
         self.ensure_system_user().await?;
-        
+
         // Create a struct for creation (timestamps handled by SurrealDB)
         let create_entity = CreateEntity {
             entity_type: entity.entity_type.clone(),
             properties: entity.properties.clone(),
             owner: RecordId::from(("user", "system")),
         };
-        
+
         println!("DEBUG: Creating entity, letting SurrealDB generate ID");
-        
+
         // Let SurrealDB auto-generate the ID by not specifying one
-        let created: Option<SurrealEntity> = self.client
+        let created: Option<SurrealEntity> = self
+            .client
             .create("entity")
             .content(create_entity)
             .await
             .map_err(|e| StorageError::Query(format!("Failed to create entity: {}", e)))?;
-        
+
         println!("DEBUG: Created entity: {:?}", created);
-        
+
         created
             .map(Entity::from)
             .ok_or_else(|| StorageError::Internal("No entity created".to_string()))
     }
-    
+
     /// Get an entity by its ID
     async fn get_entity(&self, id: &str) -> Result<Option<Entity>, StorageError> {
         println!("DEBUG: Getting entity with ID: {}", id);
-        
+
         // Use the SDK's select method
-        let entity: Option<SurrealEntity> = self.client
+        let entity: Option<SurrealEntity> = self
+            .client
             .select(("entity", id))
             .await
             .map_err(|e| StorageError::Query(format!("Failed to get entity: {}", e)))?;
-        
+
         println!("DEBUG: Retrieved entity: {:?}", entity);
-        
+
         Ok(entity.map(Entity::from))
     }
-    
+
     /// Update an existing entity
     async fn update_entity(&self, entity: Entity) -> Result<Entity, StorageError> {
         println!("DEBUG: Updating entity with ID: {}", entity.id);
-        
+
         // Use MERGE to update specific fields while preserving created_at
         let merge_query = r#"
             UPDATE $record_id MERGE {
@@ -116,8 +118,9 @@ where
                 updated_at: time::now()
             }
         "#;
-        
-        let mut response = self.client
+
+        let mut response = self
+            .client
             .query(merge_query)
             .bind(("record_id", RecordId::from(("entity", entity.id.as_str()))))
             .bind(("entity_type", entity.entity_type.clone()))
@@ -125,34 +128,35 @@ where
             .bind(("owner", RecordId::from(("user", "system"))))
             .await
             .map_err(|e| StorageError::Query(format!("Failed to update entity: {}", e)))?;
-        
+
         let updated: Option<SurrealEntity> = response
             .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract updated entity: {}", e)))?;
-        
+
         println!("DEBUG: Updated entity: {:?}", updated);
-        
-        updated
-            .map(Entity::from)
-            .ok_or_else(|| StorageError::NotFound(format!("Entity with id {} not found", entity.id)))
+
+        updated.map(Entity::from).ok_or_else(|| {
+            StorageError::NotFound(format!("Entity with id {} not found", entity.id))
+        })
     }
-    
+
     /// Delete an entity by its ID
     async fn delete_entity(&self, id: &str) -> Result<bool, StorageError> {
         println!("DEBUG: Deleting entity with ID: {}", id);
-        
+
         // Use the SDK's delete method for the entity record
         // Note: SurrealDB will handle cascade deletion of related records automatically if configured
-        let deleted: Option<SurrealEntity> = self.client
+        let deleted: Option<SurrealEntity> = self
+            .client
             .delete(("entity", id))
             .await
             .map_err(|e| StorageError::Query(format!("Failed to delete entity: {}", e)))?;
-        
+
         println!("DEBUG: Delete result: {:?}", deleted);
-        
+
         Ok(deleted.is_some())
     }
-    
+
     /// List entities with optional filtering
     async fn list_entities(
         &self,
@@ -162,50 +166,52 @@ where
     ) -> Result<Vec<Entity>, StorageError> {
         // If no filters, use simple SDK select
         if filter.is_none() && limit.is_none() && offset.is_none() {
-            let entities: Vec<SurrealEntity> = self.client
+            let entities: Vec<SurrealEntity> = self
+                .client
                 .select("entity")
                 .await
                 .map_err(|e| StorageError::Query(format!("Failed to list entities: {}", e)))?;
-            
+
             return Ok(entities.into_iter().map(Entity::from).collect());
         }
-        
+
         // For complex filtering, still use raw queries but with better syntax
         let mut query = "SELECT * FROM entity".to_string();
         let mut conditions = Vec::new();
-        
+
         // Add filter conditions
         if let Some(f) = &filter {
             if let Some(ids) = &f.ids {
                 if !ids.is_empty() {
-                    let id_list = ids.iter()
+                    let id_list = ids
+                        .iter()
                         .map(|id| format!("entity:{}", id))
                         .collect::<Vec<_>>()
                         .join(", ");
                     conditions.push(format!("id IN [{}]", id_list));
                 }
             }
-            
+
             if let Some(entity_type) = &f.entity_type {
                 conditions.push(format!("entity_type = '{}'", entity_type));
             }
-            
+
             if let Some(created_after) = &f.created_after {
                 conditions.push(format!("created_at > d'{}'", created_after.to_rfc3339()));
             }
-            
+
             if let Some(created_before) = &f.created_before {
                 conditions.push(format!("created_at < d'{}'", created_before.to_rfc3339()));
             }
-            
+
             if let Some(updated_after) = &f.updated_after {
                 conditions.push(format!("updated_at > d'{}'", updated_after.to_rfc3339()));
             }
-            
+
             if let Some(updated_before) = &f.updated_before {
                 conditions.push(format!("updated_at < d'{}'", updated_before.to_rfc3339()));
             }
-            
+
             // Handle property filtering
             if let Some(properties) = &f.properties {
                 for (key, value) in properties {
@@ -226,38 +232,39 @@ where
                 }
             }
         }
-        
+
         if !conditions.is_empty() {
             query.push_str(" WHERE ");
             query.push_str(&conditions.join(" AND "));
         }
-        
+
         query.push_str(" ORDER BY created_at DESC");
-        
+
         if let Some(limit) = limit {
             query.push_str(&format!(" LIMIT {}", limit));
         }
-        
+
         if let Some(offset) = offset {
             query.push_str(&format!(" START {}", offset));
         }
-        
-        let mut result = self.client
+
+        let mut result = self
+            .client
             .query(&query)
             .await
             .map_err(|e| StorageError::Query(format!("Failed to list entities: {}", e)))?;
-        
+
         let entities: Vec<SurrealEntity> = result
             .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract entities: {}", e)))?;
-        
+
         Ok(entities.into_iter().map(Entity::from).collect())
     }
-    
+
     /// Count entities with optional filtering
     async fn count_entities(&self, filter: Option<EntityFilter>) -> Result<usize, StorageError> {
         // Simple approach: get all entities matching the filter and count them
         let entities = self.list_entities(filter, None, None).await?;
         Ok(entities.len())
     }
-} 
+}

@@ -1,68 +1,68 @@
 //! Error types for storage operations
 
-use std::fmt;
 use std::error::Error;
+use std::fmt;
 
 /// Error type for storage operations
 #[derive(Debug)]
 pub enum StorageError {
     /// Configuration error
     Configuration(String),
-    
+
     /// Connection error
     Connection(String),
-    
+
     /// Operation error
     Operation(String),
-    
+
     /// Query error
     Query(String),
-    
+
     /// Transaction error
     Transaction(String),
-    
+
     /// Internal error
     Internal(String),
-    
+
     /// Validation error
     Validation(String),
-    
+
     /// Data not found
     NotFound(String),
-    
+
     /// Item already exists
     AlreadyExists(String),
-    
+
     /// Backend-specific error
     Backend(String),
-    
+
     /// Serialization/deserialization error
     Serialization(String),
-    
+
     /// Data conversion error
     Conversion(String),
-    
+
     /// Type mismatch error
     TypeMismatch(String),
-    
+
     /// Unsupported storage type
     UnsupportedStorageType,
-    
+
     /// Storage timeout error
     Timeout(String),
-    
+
     /// Authentication error
     Authentication(String),
-    
+
     /// Authorization error
     Authorization(String),
-    
+
     /// Temporary/transient error
     Temporary(String),
-    
+
     /// Multiple errors occurred
     Multiple(Vec<Box<StorageError>>),
-    
+
     /// Other error
     Other(String),
 }
@@ -99,7 +99,7 @@ impl fmt::Display for StorageError {
                     write!(f, "{}", err)?;
                 }
                 Ok(())
-            },
+            }
             StorageError::Other(msg) => write!(f, "Other error: {}", msg),
         }
     }
@@ -132,16 +132,28 @@ impl From<crate::LocaiError> for StorageError {
             crate::LocaiError::Entity(s) => StorageError::Other(s),
             crate::LocaiError::Relationship(s) => StorageError::Other(s),
             crate::LocaiError::Version(s) => StorageError::Other(s),
-            crate::LocaiError::MLNotConfigured => StorageError::Configuration("ML service not configured".to_string()),
-            crate::LocaiError::StorageNotAccessible { path } => StorageError::Configuration(format!("Storage not accessible: {}", path)),
-            crate::LocaiError::InvalidEmbeddingModel { model } => StorageError::Configuration(format!("Invalid embedding model: {}", model)),
+            crate::LocaiError::MLNotConfigured => {
+                StorageError::Configuration("ML service not configured".to_string())
+            }
+            crate::LocaiError::StorageNotAccessible { path } => {
+                StorageError::Configuration(format!("Storage not accessible: {}", path))
+            }
+            crate::LocaiError::InvalidEmbeddingModel { model } => {
+                StorageError::Configuration(format!("Invalid embedding model: {}", model))
+            }
             crate::LocaiError::Connection(s) => StorageError::Other(s),
             crate::LocaiError::Authentication(s) => StorageError::Other(s),
             crate::LocaiError::Protocol(s) => StorageError::Other(s),
             crate::LocaiError::Timeout(s) => StorageError::Timeout(s),
-            crate::LocaiError::EmptySearchQuery => StorageError::Other("Empty search query".to_string()),
-            crate::LocaiError::NoMemoriesFound => StorageError::Other("No memories found".to_string()),
-            crate::LocaiError::FeatureNotEnabled { feature } => StorageError::Configuration(format!("Feature not enabled: {}", feature)),
+            crate::LocaiError::EmptySearchQuery => {
+                StorageError::Other("Empty search query".to_string())
+            }
+            crate::LocaiError::NoMemoriesFound => {
+                StorageError::Other("No memories found".to_string())
+            }
+            crate::LocaiError::FeatureNotEnabled { feature } => {
+                StorageError::Configuration(format!("Feature not enabled: {}", feature))
+            }
             crate::LocaiError::Other(s) => StorageError::Other(s),
             crate::LocaiError::Logging(_) => StorageError::Other("Logging error".to_string()),
         }
@@ -153,4 +165,4 @@ impl From<StorageError> for crate::LocaiError {
     fn from(err: StorageError) -> Self {
         crate::LocaiError::Storage(err.to_string())
     }
-} 
+}

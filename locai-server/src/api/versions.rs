@@ -10,7 +10,7 @@ use axum::{
 
 use crate::{
     api::dto::{CheckoutVersionRequest, CreateVersionRequest, VersionDto},
-    error::{not_found, ServerError, ServerResult},
+    error::{ServerError, ServerResult, not_found},
     state::AppState,
 };
 
@@ -66,4 +66,4 @@ pub async fn checkout_version(
     Json(_request): Json<CheckoutVersionRequest>,
 ) -> ServerResult<StatusCode> {
     Err(not_found("Version", &id))
-} 
+}

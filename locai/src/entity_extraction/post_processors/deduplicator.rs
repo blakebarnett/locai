@@ -47,9 +47,9 @@ impl EntityDeduplicator {
     /// Create a key for deduplication
     fn create_key(&self, entity: &RawEntity) -> String {
         format!(
-            "{}:{}",
+            "{}:{:?}",
             self.normalize_text(&entity.text),
-            format!("{:?}", entity.entity_type)
+            entity.entity_type
         )
     }
 }
@@ -67,7 +67,7 @@ impl EntityPostProcessor for EntityDeduplicator {
 
         for entity in entities {
             let key = self.create_key(&entity);
-            
+
             if !seen.contains(&key) {
                 seen.insert(key);
                 result.push(entity);
@@ -80,4 +80,4 @@ impl EntityPostProcessor for EntityDeduplicator {
     fn name(&self) -> &str {
         &self.name
     }
-} 
+}

@@ -8,7 +8,8 @@ use locai::prelude::*;
 #[tokio::test]
 async fn test_simple_initialization() {
     // Test the dead simple initialization
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai for testing");
 
     // Verify it's working
@@ -17,59 +18,68 @@ async fn test_simple_initialization() {
 
 #[tokio::test]
 async fn test_simple_memory_operations() {
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai");
 
     // Test simple memory storage
-    let memory_id = locai.remember("I learned something important today")
+    let memory_id = locai
+        .remember("I learned something important today")
         .await
         .expect("Failed to store memory");
-    
+
     assert!(!memory_id.is_empty());
 
     // Test fact storage
-    let fact_id = locai.remember_fact("The capital of France is Paris")
+    let fact_id = locai
+        .remember_fact("The capital of France is Paris")
         .await
         .expect("Failed to store fact");
-    
+
     assert!(!fact_id.is_empty());
 
     // Test conversation storage
-    let conversation_id = locai.remember_conversation("User: Hello\nBot: Hi there!")
+    let conversation_id = locai
+        .remember_conversation("User: Hello\nBot: Hi there!")
         .await
         .expect("Failed to store conversation");
-    
+
     assert!(!conversation_id.is_empty());
 }
 
 #[tokio::test]
 async fn test_advanced_memory_builder() {
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai");
 
     // Test the advanced memory builder
-    let memory_id = locai.remember_with("Important scientific discovery")
+    let memory_id = locai
+        .remember_with("Important scientific discovery")
         .as_fact()
         .with_priority(MemoryPriority::High)
         .with_tags(&["science", "breakthrough"])
         .save()
         .await
         .expect("Failed to save memory with options");
-    
+
     assert!(!memory_id.is_empty());
 }
 
 #[tokio::test]
 async fn test_search_operations() {
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai");
 
     // Add some memories to search
-    locai.remember_fact("The sky is blue due to Rayleigh scattering")
+    locai
+        .remember_fact("The sky is blue due to Rayleigh scattering")
         .await
         .expect("Failed to add fact");
-    
-    locai.remember_fact("Water boils at 100 degrees Celsius")
+
+    locai
+        .remember_fact("Water boils at 100 degrees Celsius")
         .await
         .expect("Failed to add fact");
 
@@ -77,7 +87,7 @@ async fn test_search_operations() {
     let result = locai.search("").await;
     assert!(result.is_err());
     match result.unwrap_err() {
-        LocaiError::EmptySearchQuery => {}, // Expected
+        LocaiError::EmptySearchQuery => {} // Expected
         _ => panic!("Expected EmptySearchQuery error"),
     }
 
@@ -98,73 +108,97 @@ async fn test_builder_pattern() {
         .await
         .expect("Failed to build Locai with builder");
 
-    let memory_id = locai.remember("Builder pattern works!")
+    let memory_id = locai
+        .remember("Builder pattern works!")
         .await
         .expect("Failed to store memory");
-    
+
     assert!(!memory_id.is_empty());
 }
 
 #[tokio::test]
 async fn test_recent_memories() {
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai");
 
     // Add a few memories
-    locai.remember("First memory").await.expect("Failed to add memory");
-    locai.remember("Second memory").await.expect("Failed to add memory");
-    locai.remember("Third memory").await.expect("Failed to add memory");
+    locai
+        .remember("First memory")
+        .await
+        .expect("Failed to add memory");
+    locai
+        .remember("Second memory")
+        .await
+        .expect("Failed to add memory");
+    locai
+        .remember("Third memory")
+        .await
+        .expect("Failed to add memory");
 
     // Get recent memories
-    let recent = locai.recent_memories(Some(2)).await
+    let recent = locai
+        .recent_memories(Some(2))
+        .await
         .expect("Failed to get recent memories");
-    
+
     // Should have at most 2 memories
     assert!(recent.len() <= 2);
 }
 
 #[tokio::test]
 async fn test_clear_all() {
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai");
 
     // Add a memory
-    locai.remember("Test memory to be cleared")
+    locai
+        .remember("Test memory to be cleared")
         .await
         .expect("Failed to add memory");
 
     // Clear all data
-    locai.clear_all().await
-        .expect("Failed to clear all data");
+    locai.clear_all().await.expect("Failed to clear all data");
 
     // Get recent memories should return empty
-    let recent = locai.recent_memories(Some(10)).await
+    let recent = locai
+        .recent_memories(Some(10))
+        .await
         .expect("Failed to get recent memories");
-    
+
     assert!(recent.is_empty());
 }
 
 #[tokio::test]
 async fn test_parallel_testing_isolation() {
     // Test that demonstrates isolated instances for parallel testing
-    let locai1 = Locai::for_testing_isolated().await
+    let locai1 = Locai::for_testing_isolated()
+        .await
         .expect("Failed to initialize Locai 1");
-    let locai2 = Locai::for_testing_isolated().await
+    let locai2 = Locai::for_testing_isolated()
+        .await
         .expect("Failed to initialize Locai 2");
 
     // Add different memories to each instance
-    let memory1_id = locai1.remember("Memory for instance 1")
+    let memory1_id = locai1
+        .remember("Memory for instance 1")
         .await
         .expect("Failed to add memory to instance 1");
-    
-    let memory2_id = locai2.remember("Memory for instance 2")
+
+    let memory2_id = locai2
+        .remember("Memory for instance 2")
         .await
         .expect("Failed to add memory to instance 2");
 
     // Verify each instance only sees its own memories
-    let recent1 = locai1.recent_memories(Some(10)).await
+    let recent1 = locai1
+        .recent_memories(Some(10))
+        .await
         .expect("Failed to get recent memories from instance 1");
-    let recent2 = locai2.recent_memories(Some(10)).await
+    let recent2 = locai2
+        .recent_memories(Some(10))
+        .await
         .expect("Failed to get recent memories from instance 2");
 
     assert_eq!(recent1.len(), 1);
@@ -177,21 +211,31 @@ async fn test_parallel_testing_isolation() {
 #[tokio::test]
 async fn test_custom_id_testing() {
     // Test the for_testing_with_id method
-    let locai1 = Locai::for_testing_with_id("test_suite_1").await
+    let locai1 = Locai::for_testing_with_id("test_suite_1")
+        .await
         .expect("Failed to initialize Locai with custom ID 1");
-    let locai2 = Locai::for_testing_with_id("test_suite_2").await
+    let locai2 = Locai::for_testing_with_id("test_suite_2")
+        .await
         .expect("Failed to initialize Locai with custom ID 2");
 
     // Add memories to each
-    locai1.remember("Custom ID test 1").await
+    locai1
+        .remember("Custom ID test 1")
+        .await
         .expect("Failed to add memory to custom ID instance 1");
-    locai2.remember("Custom ID test 2").await
+    locai2
+        .remember("Custom ID test 2")
+        .await
         .expect("Failed to add memory to custom ID instance 2");
 
     // Verify isolation
-    let recent1 = locai1.recent_memories(Some(10)).await
+    let recent1 = locai1
+        .recent_memories(Some(10))
+        .await
         .expect("Failed to get recent memories from custom ID instance 1");
-    let recent2 = locai2.recent_memories(Some(10)).await
+    let recent2 = locai2
+        .recent_memories(Some(10))
+        .await
         .expect("Failed to get recent memories from custom ID instance 2");
 
     assert_eq!(recent1.len(), 1);
@@ -204,7 +248,7 @@ async fn test_parallel_testing_stress() {
     // Stress test with multiple concurrent instances
     use std::sync::Arc;
     use tokio::sync::Mutex;
-    
+
     let results = Arc::new(Mutex::new(Vec::new()));
     let mut handles = Vec::new();
 
@@ -212,21 +256,29 @@ async fn test_parallel_testing_stress() {
     for i in 0..5 {
         let results = Arc::clone(&results);
         let handle = tokio::spawn(async move {
-            let locai = Locai::for_testing_isolated().await
+            let locai = Locai::for_testing_isolated()
+                .await
                 .expect("Failed to initialize Locai in concurrent test");
 
             let memory_content = format!("Concurrent test memory {}", i);
-            let memory_id = locai.remember(&memory_content).await
+            let memory_id = locai
+                .remember(&memory_content)
+                .await
                 .expect("Failed to add memory in concurrent test");
 
-            let recent = locai.recent_memories(Some(10)).await
+            let recent = locai
+                .recent_memories(Some(10))
+                .await
                 .expect("Failed to get recent memories in concurrent test");
 
             // Each instance should only see its own memory
             assert_eq!(recent.len(), 1);
             assert_eq!(recent[0].content, memory_content);
 
-            results.lock().await.push((i, memory_id, recent[0].content.clone()));
+            results
+                .lock()
+                .await
+                .push((i, memory_id, recent[0].content.clone()));
         });
         handles.push(handle);
     }
@@ -242,24 +294,31 @@ async fn test_parallel_testing_stress() {
     // Verify all results are unique
     for i in 0..5 {
         let expected_content = format!("Concurrent test memory {}", i);
-        assert!(results.iter().any(|(idx, _, content)| *idx == i && *content == expected_content));
+        assert!(
+            results
+                .iter()
+                .any(|(idx, _, content)| *idx == i && *content == expected_content)
+        );
     }
 }
 
 #[tokio::test]
 async fn test_advanced_search_builder() {
-    let locai = Locai::for_testing().await
+    let locai = Locai::for_testing()
+        .await
         .expect("Failed to initialize Locai");
 
     // Add some memories with different types and tags
-    locai.remember_with("Physics discovery")
+    locai
+        .remember_with("Physics discovery")
         .as_fact()
         .with_tags(&["science", "physics"])
         .save()
         .await
         .expect("Failed to save physics fact");
 
-    locai.remember_with("Biology lesson")
+    locai
+        .remember_with("Biology lesson")
         .as_fact()
         .with_tags(&["science", "biology"])
         .save()
@@ -267,13 +326,14 @@ async fn test_advanced_search_builder() {
         .expect("Failed to save biology fact");
 
     // Test advanced search builder
-    let results = locai.search_for("science")
+    let results = locai
+        .search_for("science")
         .limit(5)
         .of_type(MemoryType::Fact)
         .with_tags(&["science"])
         .execute()
         .await;
-    
+
     // This might fail if the search implementation isn't complete, but shouldn't crash
     println!("Advanced search results: {:?}", results);
-} 
+}

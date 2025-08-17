@@ -3,9 +3,9 @@
 //! This module provides a composable pipeline architecture for entity extraction
 //! that separates generic extraction logic from domain-specific validation and processing.
 
-use async_trait::async_trait;
+use super::{EntityType, ExtractedEntity};
 use crate::Result;
-use super::{ExtractedEntity, EntityType};
+use async_trait::async_trait;
 use std::collections::HashMap;
 
 /// Raw entity extracted by a model before validation and post-processing
@@ -76,6 +76,7 @@ impl GenericEntityType {
     }
 
     /// Create from string representation
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_uppercase().as_str() {
             "PERSON" | "PER" => Some(GenericEntityType::Person),
@@ -189,7 +190,7 @@ impl EntityExtractionPipeline {
     pub async fn extract(&self, text: &str) -> Result<Vec<ExtractedEntity>> {
         // Step 1: Extract raw entities
         let raw_entities = self.extractor.extract_raw(text).await?;
-        
+
         if raw_entities.is_empty() {
             return Ok(Vec::new());
         }
@@ -199,14 +200,15 @@ impl EntityExtractionPipeline {
             .into_iter()
             .filter(|entity| {
                 let context = ValidationContext::new(text);
-                self.validators.iter().all(|validator| {
-                    validator.validate(entity, &context)
-                })
+                self.validators
+                    .iter()
+                    .all(|validator| validator.validate(entity, &context))
             })
             .collect();
 
         // Step 3: Post-process entities
-        let processed_entities = self.post_processors
+        let processed_entities = self
+            .post_processors
             .iter()
             .fold(validated_entities, |entities, processor| {
                 processor.process(entities)
@@ -287,4 +289,4 @@ impl Default for PipelineBuilder {
     fn default() -> Self {
         Self::new()
     }
-} 
+}

@@ -7,5 +7,5 @@ pub mod state;
 pub mod websocket;
 
 pub use api::create_router;
+pub use error::ServerError;
 pub use state::AppState;
-pub use error::ServerError; 

@@ -7,9 +7,9 @@
 mod builder;
 mod loader;
 mod models;
-mod validation;
 #[cfg(test)]
 mod tests;
+mod validation;
 
 pub use builder::ConfigBuilder;
 pub use loader::ConfigLoader;
@@ -55,4 +55,4 @@ pub enum ConfigError {
 }
 
 /// Result type for configuration operations
-pub type Result<T> = std::result::Result<T, ConfigError>; 
+pub type Result<T> = std::result::Result<T, ConfigError>;

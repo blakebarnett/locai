@@ -1,17 +1,14 @@
 //! Remote messaging implementation using WebSocket connections to locai-server
 
 use crate::Result;
-use std::{collections::HashMap, sync::Arc};
 use crate::Result as LocaiResult;
 use crate::messaging::{
-    types::{Message, MessageFilter, MessageId},
     stream::MessageStream,
+    types::{Message, MessageFilter, MessageId},
 };
+use std::{collections::HashMap, sync::Arc};
 
-use super::{
-    stream::{from_broadcast_receiver},
-    websocket::WebSocketClient,
-};
+use super::{stream::from_broadcast_receiver, websocket::WebSocketClient};
 
 /// Remote messaging interface (exported for compatibility)
 pub struct RemoteMessaging;
@@ -25,7 +22,7 @@ pub async fn send_message(
     content: serde_json::Value,
 ) -> Result<MessageId> {
     let full_topic = format!("{}.{}", namespace, topic);
-    
+
     client.send_message(&full_topic, topic, content, None).await
 }
 
@@ -39,13 +36,10 @@ pub async fn send_complete_message(
     } else {
         Some(message.headers.clone())
     };
-    
-    client.send_message(
-        &message.topic,
-        &message.topic,
-        message.content,
-        headers,
-    ).await
+
+    client
+        .send_message(&message.topic, &message.topic, message.content, headers)
+        .await
 }
 
 /// Send a cross-app message via WebSocket
@@ -57,18 +51,15 @@ pub async fn send_cross_app_message(
     content: serde_json::Value,
 ) -> Result<MessageId> {
     let cross_app_topic = format!("app:{}:{}", target_app, topic);
-    
+
     let mut headers = HashMap::new();
     headers.insert("source_app".to_string(), source_app.to_string());
     headers.insert("target_app".to_string(), target_app.to_string());
     headers.insert("cross_app".to_string(), "true".to_string());
-    
-    client.send_message(
-        &cross_app_topic,
-        topic,
-        content,
-        Some(headers),
-    ).await
+
+    client
+        .send_message(&cross_app_topic, topic, content, Some(headers))
+        .await
 }
 
 /// Subscribe to filtered messages via WebSocket
@@ -106,4 +97,4 @@ mod tests {
         let _source_app = "dnd_campaign";
         // ... rest of the test ...
     }
-} 
+}

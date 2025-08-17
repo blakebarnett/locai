@@ -3,19 +3,16 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::State,
-    response::Json,
-    middleware,
-    routing::{get, post, put, delete},
     Router,
+    extract::State,
+    middleware,
+    response::Json,
+    routing::{delete, get, post, put},
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{
-    state::AppState,
-    websocket::websocket_handler,
-};
+use crate::{state::AppState, websocket::websocket_handler};
 
 pub mod auth;
 pub mod auth_endpoints;
@@ -136,7 +133,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/auth/users/{id}", get(auth_endpoints::get_user))
         .route("/auth/users/{id}", put(auth_endpoints::update_user))
         .route("/auth/users/{id}", delete(auth_endpoints::delete_user))
-        
         // Memory endpoints
         .route("/memories", post(memories::create_memory))
         .route("/memories", get(memories::list_memories))
@@ -144,55 +140,67 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/memories/{id}", put(memories::update_memory))
         .route("/memories/{id}", delete(memories::delete_memory))
         .route("/memories/search", get(memories::search_memories))
-        
         // Entity endpoints
         .route("/entities", get(entities::list_entities))
         .route("/entities/{id}", get(entities::get_entity))
         .route("/entities", post(entities::create_entity))
         .route("/entities/{id}", put(entities::update_entity))
         .route("/entities/{id}", delete(entities::delete_entity))
-        .route("/entities/{id}/memories", get(entities::get_entity_memories))
-        
+        .route(
+            "/entities/{id}/memories",
+            get(entities::get_entity_memories),
+        )
         // Relationship endpoints
         .route("/relationships", get(relationships::list_relationships))
         .route("/relationships", post(relationships::create_relationship))
         .route("/relationships/{id}", get(relationships::get_relationship))
-        .route("/relationships/{id}", put(relationships::update_relationship))
-        .route("/relationships/{id}", delete(relationships::delete_relationship))
-        .route("/relationships/{id}/related", get(relationships::find_related_entities))
-        
+        .route(
+            "/relationships/{id}",
+            put(relationships::update_relationship),
+        )
+        .route(
+            "/relationships/{id}",
+            delete(relationships::delete_relationship),
+        )
+        .route(
+            "/relationships/{id}/related",
+            get(relationships::find_related_entities),
+        )
         // Version endpoints
         .route("/versions", get(versions::list_versions))
         .route("/versions", post(versions::create_version))
         .route("/versions/{id}/checkout", put(versions::checkout_version))
-        
         // Graph operation endpoints
         .route("/memories/{id}/graph", get(graph::get_memory_graph))
         .route("/entities/{id}/graph", get(graph::get_entity_graph))
         .route("/graph/paths", get(graph::find_paths))
         .route("/graph/query", post(graph::query_graph))
         .route("/graph/metrics", get(graph::get_graph_metrics))
-        .route("/graph/similar_structures", get(graph::find_similar_structures))
-        .route("/entities/{id}/related_entities", get(graph::get_related_entities))
+        .route(
+            "/graph/similar_structures",
+            get(graph::find_similar_structures),
+        )
+        .route(
+            "/entities/{id}/related_entities",
+            get(graph::get_related_entities),
+        )
         .route("/entities/central", get(graph::get_central_entities))
-        
-        // WebSocket endpoints  
+        // WebSocket endpoints
         .route("/ws", get(websocket_handler))
         .route("/messaging/ws", get(messaging_websocket_handler))
-        
         // Health check endpoint (with capability reporting)
         .route("/health", get(health_check))
-        
         // Add authentication middleware if enabled
-        .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .with_state(state);
 
     // Main router with API prefix and documentation
     let swagger_router = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
-    
-    Router::new()
-        .nest("/api", api_router)
-        .merge(swagger_router)
+
+    Router::new().nest("/api", api_router).merge(swagger_router)
 }
 
 /// Health check endpoint with capability reporting
@@ -231,7 +239,7 @@ async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Va
             "default": "text"
         }
     });
-    
+
     Json(capabilities)
 }
 
@@ -252,4 +260,4 @@ async fn messaging_websocket_handler(
             .body("Messaging service not available".into())
             .unwrap()
     }
-} 
+}

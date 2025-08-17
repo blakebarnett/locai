@@ -4,10 +4,10 @@
 //! native full-text search, fuzzy matching, and analysis capabilities.
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use surrealdb::{Connection, Surreal};
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use surrealdb::{Connection, Surreal};
 use uuid::Uuid;
 
 use crate::storage::errors::StorageError;
@@ -44,10 +44,10 @@ pub struct TemporalExpression {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TemporalType {
-    Absolute,    // "2023-01-01"
-    Relative,    // "last week", "yesterday"
-    Duration,    // "for 3 hours"
-    Frequency,   // "daily", "weekly"
+    Absolute,  // "2023-01-01"
+    Relative,  // "last week", "yesterday"
+    Duration,  // "for 3 hours"
+    Frequency, // "daily", "weekly"
 }
 
 /// Query intent classification
@@ -257,7 +257,8 @@ where
         "#;
 
         let query_string = query.to_string();
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(analyze_query)
             .bind(("query", query_string))
             .await
@@ -269,7 +270,8 @@ where
             entity_tokens: Vec<String>,
         }
 
-        let analysis: Option<AnalysisResult> = result.take(0)
+        let analysis: Option<AnalysisResult> = result
+            .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract analysis: {}", e)))?;
 
         let analysis = analysis.unwrap_or(AnalysisResult {
@@ -280,12 +282,16 @@ where
         // Detect entities and temporal expressions
         let entities = self.detect_entities(query, &analysis.entity_tokens).await?;
         let temporal_expressions = self.detect_temporal_expressions(query).await?;
-        
+
         // Classify query intent
-        let intent = self.classify_query_intent(query, &entities, &temporal_expressions).await?;
-        
+        let intent = self
+            .classify_query_intent(query, &entities, &temporal_expressions)
+            .await?;
+
         // Suggest search strategy
-        let strategy = self.suggest_search_strategy(&intent, &entities, &temporal_expressions).await?;
+        let strategy = self
+            .suggest_search_strategy(&intent, &entities, &temporal_expressions)
+            .await?;
 
         Ok(QueryAnalysis {
             query: query.to_string(),
@@ -320,14 +326,22 @@ where
     }
 
     /// Update session with new query
-    pub async fn update_session(&mut self, session_id: &str, analysis: QueryAnalysis) -> Result<(), StorageError> {
+    pub async fn update_session(
+        &mut self,
+        session_id: &str,
+        analysis: QueryAnalysis,
+    ) -> Result<(), StorageError> {
         if let Some(session) = self.sessions.get_mut(session_id) {
             session.query_history.push(analysis.clone());
             session.last_activity = Utc::now();
 
             // Update context
             for entity in &analysis.entities {
-                *session.context.entities.entry(entity.clone()).or_insert(0.0) += 1.0;
+                *session
+                    .context
+                    .entities
+                    .entry(entity.clone())
+                    .or_insert(0.0) += 1.0;
             }
 
             if let Some(temporal) = analysis.temporal_expressions.first() {
@@ -366,51 +380,67 @@ where
     }
 
     /// Generate search suggestions
-    pub async fn generate_suggestions(&self, partial_query: &str, session_context: Option<&SearchContext>) -> Result<Vec<SearchSuggestion>, StorageError> {
+    pub async fn generate_suggestions(
+        &self,
+        partial_query: &str,
+        session_context: Option<&SearchContext>,
+    ) -> Result<Vec<SearchSuggestion>, StorageError> {
         let mut suggestions = Vec::new();
 
         // Auto-complete from entity names
         suggestions.extend(self.entity_autocompletion(partial_query).await?);
-        
+
         // Spelling corrections using fuzzy matching
         suggestions.extend(self.spelling_corrections(partial_query).await?);
-        
+
         // Query expansion based on context
         if let Some(context) = session_context {
             suggestions.extend(self.context_expansion(partial_query, context).await?);
         }
 
         // Sort by confidence and limit
-        suggestions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        suggestions.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         suggestions.truncate(10);
 
         Ok(suggestions)
     }
 
     /// Explain search results with detailed reasoning
-    pub async fn explain_results(&self, results: &[IntelligentSearchResult]) -> Result<String, StorageError> {
+    pub async fn explain_results(
+        &self,
+        results: &[IntelligentSearchResult],
+    ) -> Result<String, StorageError> {
         let mut explanation = String::new();
-        
+
         explanation.push_str(&format!("Found {} results:\n\n", results.len()));
-        
+
         for (i, result) in results.iter().enumerate() {
-            explanation.push_str(&format!("{}. {} (score: {:.2})\n", 
-                i + 1, result.explanation.primary_reason, result.score));
-            
+            explanation.push_str(&format!(
+                "{}. {} (score: {:.2})\n",
+                i + 1,
+                result.explanation.primary_reason,
+                result.score
+            ));
+
             if !result.explanation.details.is_empty() {
                 explanation.push_str("   Details:\n");
                 for detail in &result.explanation.details {
                     explanation.push_str(&format!("   - {}\n", detail));
                 }
             }
-            
+
             if !result.explanation.highlights.is_empty() {
                 explanation.push_str("   Highlights:\n");
                 for highlight in &result.explanation.highlights {
-                    explanation.push_str(&format!("   - {}: {}\n", highlight.field, highlight.text));
+                    explanation
+                        .push_str(&format!("   - {}: {}\n", highlight.field, highlight.text));
                 }
             }
-            
+
             explanation.push('\n');
         }
 
@@ -418,8 +448,12 @@ where
     }
 
     // Private helper methods
-    
-    async fn detect_entities(&self, query: &str, _entity_tokens: &[String]) -> Result<Vec<String>, StorageError> {
+
+    async fn detect_entities(
+        &self,
+        query: &str,
+        _entity_tokens: &[String],
+    ) -> Result<Vec<String>, StorageError> {
         // Use entity tokens and fuzzy matching to find existing entities
         let entity_search_query = r#"
             SELECT id, properties.name as name, properties.text as text 
@@ -431,7 +465,8 @@ where
         "#;
 
         let query_string = query.to_string();
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(entity_search_query)
             .bind(("query", query_string))
             .await
@@ -446,13 +481,17 @@ where
             text: Option<String>,
         }
 
-        let entities: Vec<EntityMatch> = result.take(0)
+        let entities: Vec<EntityMatch> = result
+            .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract entities: {}", e)))?;
 
         Ok(entities.into_iter().map(|e| e.id).collect())
     }
 
-    async fn detect_temporal_expressions(&self, query: &str) -> Result<Vec<TemporalExpression>, StorageError> {
+    async fn detect_temporal_expressions(
+        &self,
+        query: &str,
+    ) -> Result<Vec<TemporalExpression>, StorageError> {
         // Simple temporal expression detection
         let temporal_patterns = [
             ("yesterday", TemporalType::Relative),
@@ -481,7 +520,12 @@ where
         Ok(expressions)
     }
 
-    async fn classify_query_intent(&self, query: &str, _entities: &[String], temporal: &[TemporalExpression]) -> Result<QueryIntent, StorageError> {
+    async fn classify_query_intent(
+        &self,
+        query: &str,
+        _entities: &[String],
+        temporal: &[TemporalExpression],
+    ) -> Result<QueryIntent, StorageError> {
         let query_lower = query.to_lowercase();
 
         // Simple intent classification
@@ -489,26 +533,43 @@ where
             return Ok(QueryIntent::Temporal);
         }
 
-        if query_lower.contains("how") || query_lower.contains("what") || query_lower.contains("why") {
+        if query_lower.contains("how")
+            || query_lower.contains("what")
+            || query_lower.contains("why")
+        {
             return Ok(QueryIntent::Factual);
         }
 
-        if query_lower.contains("relationship") || query_lower.contains("connection") || query_lower.contains("related") {
+        if query_lower.contains("relationship")
+            || query_lower.contains("connection")
+            || query_lower.contains("related")
+        {
             return Ok(QueryIntent::Relational);
         }
 
-        if query_lower.contains("compare") || query_lower.contains("vs") || query_lower.contains("difference") {
+        if query_lower.contains("compare")
+            || query_lower.contains("vs")
+            || query_lower.contains("difference")
+        {
             return Ok(QueryIntent::Comparative);
         }
 
-        if query_lower.contains("step") || query_lower.contains("process") || query_lower.contains("procedure") {
+        if query_lower.contains("step")
+            || query_lower.contains("process")
+            || query_lower.contains("procedure")
+        {
             return Ok(QueryIntent::Procedural);
         }
 
         Ok(QueryIntent::Exploratory)
     }
 
-    async fn suggest_search_strategy(&self, intent: &QueryIntent, entities: &[String], temporal: &[TemporalExpression]) -> Result<SearchStrategy, StorageError> {
+    async fn suggest_search_strategy(
+        &self,
+        intent: &QueryIntent,
+        entities: &[String],
+        temporal: &[TemporalExpression],
+    ) -> Result<SearchStrategy, StorageError> {
         match intent {
             QueryIntent::Relational if !entities.is_empty() => Ok(SearchStrategy::Graph),
             QueryIntent::Temporal if !temporal.is_empty() => Ok(SearchStrategy::FullText),
@@ -518,7 +579,11 @@ where
         }
     }
 
-    async fn bm25_search(&self, analysis: &QueryAnalysis, limit: usize) -> Result<Vec<IntelligentSearchResult>, StorageError> {
+    async fn bm25_search(
+        &self,
+        analysis: &QueryAnalysis,
+        limit: usize,
+    ) -> Result<Vec<IntelligentSearchResult>, StorageError> {
         let search_query = r#"
             SELECT *, 
                    search::score(0) AS bm25_score,
@@ -530,7 +595,8 @@ where
         "#;
 
         let query_string = analysis.query.clone();
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(search_query)
             .bind(("query", query_string))
             .bind(("limit", limit))
@@ -545,54 +611,66 @@ where
             highlighted_content: String,
         }
 
-        let results: Vec<BM25Result> = result.take(0)
+        let results: Vec<BM25Result> = result
+            .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract BM25 results: {}", e)))?;
 
-        Ok(results.into_iter().map(|r| IntelligentSearchResult {
-            id: r.id,
-            result_type: "memory".to_string(),
-            content: serde_json::json!({ "content": r.content }),
-            score: r.bm25_score,
-            score_breakdown: ScoreBreakdown {
-                bm25_score: Some(r.bm25_score),
-                vector_score: None,
-                graph_score: None,
-                temporal_score: None,
-                preference_score: None,
-                combined_score: r.bm25_score,
-            },
-            explanation: MatchExplanation {
-                primary_reason: "BM25 text match".to_string(),
-                details: vec!["Found using full-text search with BM25 scoring".to_string()],
-                highlights: vec![Highlight {
-                    text: r.highlighted_content,
-                    field: "content".to_string(),
-                    position: None,
-                }],
-                match_path: None,
-                analyzer_info: Some(AnalyzerInfo {
-                    analyzer: "memory_analyzer".to_string(),
-                    tokens: analysis.tokens.clone(),
-                    stems: vec![], // Note: Stem extraction from analyzer not exposed by SurrealDB
-                    mappings: HashMap::new(),
-                }),
-            },
-            context: ResultContext {
-                related_entities: vec![],
-                related_memories: vec![],
-                relationships: vec![],
-                temporal_context: None,
-            },
-        }).collect())
+        Ok(results
+            .into_iter()
+            .map(|r| IntelligentSearchResult {
+                id: r.id,
+                result_type: "memory".to_string(),
+                content: serde_json::json!({ "content": r.content }),
+                score: r.bm25_score,
+                score_breakdown: ScoreBreakdown {
+                    bm25_score: Some(r.bm25_score),
+                    vector_score: None,
+                    graph_score: None,
+                    temporal_score: None,
+                    preference_score: None,
+                    combined_score: r.bm25_score,
+                },
+                explanation: MatchExplanation {
+                    primary_reason: "BM25 text match".to_string(),
+                    details: vec!["Found using full-text search with BM25 scoring".to_string()],
+                    highlights: vec![Highlight {
+                        text: r.highlighted_content,
+                        field: "content".to_string(),
+                        position: None,
+                    }],
+                    match_path: None,
+                    analyzer_info: Some(AnalyzerInfo {
+                        analyzer: "memory_analyzer".to_string(),
+                        tokens: analysis.tokens.clone(),
+                        stems: vec![], // Note: Stem extraction from analyzer not exposed by SurrealDB
+                        mappings: HashMap::new(),
+                    }),
+                },
+                context: ResultContext {
+                    related_entities: vec![],
+                    related_memories: vec![],
+                    relationships: vec![],
+                    temporal_context: None,
+                },
+            })
+            .collect())
     }
 
-    async fn semantic_search(&self, analysis: &QueryAnalysis, limit: usize) -> Result<Vec<IntelligentSearchResult>, StorageError> {
+    async fn semantic_search(
+        &self,
+        analysis: &QueryAnalysis,
+        limit: usize,
+    ) -> Result<Vec<IntelligentSearchResult>, StorageError> {
         // Note: Vector-based semantic search not yet implemented
         // Using BM25 full-text search which provides excellent results for most queries
         self.bm25_search(analysis, limit).await
     }
 
-    async fn fuzzy_search(&self, analysis: &QueryAnalysis, limit: usize) -> Result<Vec<IntelligentSearchResult>, StorageError> {
+    async fn fuzzy_search(
+        &self,
+        analysis: &QueryAnalysis,
+        limit: usize,
+    ) -> Result<Vec<IntelligentSearchResult>, StorageError> {
         let fuzzy_query = r#"
             SELECT *, 
                    string::similarity::fuzzy(content, $query) AS fuzzy_score
@@ -603,7 +681,8 @@ where
         "#;
 
         let query_string = analysis.query.clone();
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(fuzzy_query)
             .bind(("query", query_string))
             .bind(("limit", limit))
@@ -617,51 +696,70 @@ where
             fuzzy_score: f32,
         }
 
-        let results: Vec<FuzzyResult> = result.take(0)
+        let results: Vec<FuzzyResult> = result
+            .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract fuzzy results: {}", e)))?;
 
-        Ok(results.into_iter().map(|r| IntelligentSearchResult {
-            id: r.id,
-            result_type: "memory".to_string(),
-            content: serde_json::json!({ "content": r.content }),
-            score: r.fuzzy_score,
-            score_breakdown: ScoreBreakdown {
-                bm25_score: None,
-                vector_score: None,
-                graph_score: None,
-                temporal_score: None,
-                preference_score: None,
-                combined_score: r.fuzzy_score,
-            },
-            explanation: MatchExplanation {
-                primary_reason: "Fuzzy text match".to_string(),
-                details: vec!["Found using fuzzy string matching for typo tolerance".to_string()],
-                highlights: vec![],
-                match_path: None,
-                analyzer_info: None,
-            },
-            context: ResultContext {
-                related_entities: vec![],
-                related_memories: vec![],
-                relationships: vec![],
-                temporal_context: None,
-            },
-        }).collect())
+        Ok(results
+            .into_iter()
+            .map(|r| IntelligentSearchResult {
+                id: r.id,
+                result_type: "memory".to_string(),
+                content: serde_json::json!({ "content": r.content }),
+                score: r.fuzzy_score,
+                score_breakdown: ScoreBreakdown {
+                    bm25_score: None,
+                    vector_score: None,
+                    graph_score: None,
+                    temporal_score: None,
+                    preference_score: None,
+                    combined_score: r.fuzzy_score,
+                },
+                explanation: MatchExplanation {
+                    primary_reason: "Fuzzy text match".to_string(),
+                    details: vec![
+                        "Found using fuzzy string matching for typo tolerance".to_string(),
+                    ],
+                    highlights: vec![],
+                    match_path: None,
+                    analyzer_info: None,
+                },
+                context: ResultContext {
+                    related_entities: vec![],
+                    related_memories: vec![],
+                    relationships: vec![],
+                    temporal_context: None,
+                },
+            })
+            .collect())
     }
 
-    async fn graph_search(&self, analysis: &QueryAnalysis, _session_context: Option<&SearchContext>, limit: usize) -> Result<Vec<IntelligentSearchResult>, StorageError> {
+    async fn graph_search(
+        &self,
+        analysis: &QueryAnalysis,
+        _session_context: Option<&SearchContext>,
+        limit: usize,
+    ) -> Result<Vec<IntelligentSearchResult>, StorageError> {
         // Note: Graph-based search not yet implemented
         // Using BM25 full-text search as the primary search method
         self.bm25_search(analysis, limit).await
     }
 
-    async fn combined_search(&self, analysis: &QueryAnalysis, _session_context: Option<&SearchContext>, limit: usize) -> Result<Vec<IntelligentSearchResult>, StorageError> {
+    async fn combined_search(
+        &self,
+        analysis: &QueryAnalysis,
+        _session_context: Option<&SearchContext>,
+        limit: usize,
+    ) -> Result<Vec<IntelligentSearchResult>, StorageError> {
         // Note: Multi-signal hybrid search not yet implemented
         // BM25 provides sophisticated full-text search with relevance ranking
         self.bm25_search(analysis, limit).await
     }
 
-    async fn entity_autocompletion(&self, partial_query: &str) -> Result<Vec<SearchSuggestion>, StorageError> {
+    async fn entity_autocompletion(
+        &self,
+        partial_query: &str,
+    ) -> Result<Vec<SearchSuggestion>, StorageError> {
         let completion_query = r#"
             SELECT properties.name as name, entity_type 
             FROM entity 
@@ -669,7 +767,8 @@ where
             LIMIT 5
         "#;
 
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(completion_query)
             .bind(("partial", format!("{}*", partial_query)))
             .await
@@ -681,26 +780,37 @@ where
             entity_type: String,
         }
 
-        let results: Vec<CompletionResult> = result.take(0)
+        let results: Vec<CompletionResult> = result
+            .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract completions: {}", e)))?;
 
-        Ok(results.into_iter().filter_map(|r| {
-            r.name.map(|name| SearchSuggestion {
-                suggestion: name.clone(),
-                suggestion_type: SuggestionType::Completion,
-                confidence: 0.8,
-                explanation: format!("Entity name completion from type '{}'", r.entity_type),
+        Ok(results
+            .into_iter()
+            .filter_map(|r| {
+                r.name.map(|name| SearchSuggestion {
+                    suggestion: name.clone(),
+                    suggestion_type: SuggestionType::Completion,
+                    confidence: 0.8,
+                    explanation: format!("Entity name completion from type '{}'", r.entity_type),
+                })
             })
-        }).collect())
+            .collect())
     }
 
-    async fn spelling_corrections(&self, _query: &str) -> Result<Vec<SearchSuggestion>, StorageError> {
+    async fn spelling_corrections(
+        &self,
+        _query: &str,
+    ) -> Result<Vec<SearchSuggestion>, StorageError> {
         // Note: Dedicated spelling correction not implemented
         // Fuzzy search provides typo tolerance for queries
         Ok(vec![])
     }
 
-    async fn context_expansion(&self, query: &str, context: &SearchContext) -> Result<Vec<SearchSuggestion>, StorageError> {
+    async fn context_expansion(
+        &self,
+        query: &str,
+        context: &SearchContext,
+    ) -> Result<Vec<SearchSuggestion>, StorageError> {
         let mut suggestions = Vec::new();
 
         // Suggest adding high-relevance entities from context
@@ -724,13 +834,22 @@ where
 pub trait IntelligentSearch {
     /// Analyze a query for intent and strategy
     async fn analyze_query(&self, query: &str) -> Result<QueryAnalysis, StorageError>;
-    
+
     /// Perform intelligent search with context
-    async fn intelligent_search(&self, query: &str, session_id: Option<&str>, limit: Option<usize>) -> Result<Vec<IntelligentSearchResult>, StorageError>;
-    
+    async fn intelligent_search(
+        &self,
+        query: &str,
+        session_id: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<IntelligentSearchResult>, StorageError>;
+
     /// Generate search suggestions
-    async fn suggest(&self, partial_query: &str, session_id: Option<&str>) -> Result<Vec<SearchSuggestion>, StorageError>;
-    
+    async fn suggest(
+        &self,
+        partial_query: &str,
+        session_id: Option<&str>,
+    ) -> Result<Vec<SearchSuggestion>, StorageError>;
+
     /// Explain search results
     async fn explain(&self, results: &[IntelligentSearchResult]) -> Result<String, StorageError>;
-} 
+}

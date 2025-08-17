@@ -42,4 +42,4 @@ impl EntityValidator for ConfidenceValidator {
     fn name(&self) -> &str {
         &self.name
     }
-} 
+}

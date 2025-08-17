@@ -115,10 +115,10 @@ impl ExtractedEntity {
     pub fn format(&self) -> String {
         format!(
             "{} [{}] (confidence: {:.2}, source: {})",
-            self.text, 
-            self.entity_type.as_str(), 
-            self.confidence, 
+            self.text,
+            self.entity_type.as_str(),
+            self.confidence,
             self.extractor_source
         )
     }
-} 
+}

@@ -1,17 +1,17 @@
 //! Example demonstrating SharedStorage's unified graph and vector storage capabilities
-//! 
+//!
 //! This example shows how to use the new SharedStorage implementation that provides
 //! a consistent API across different SurrealDB connection types, demonstrating
 //! entity operations, relationship management, and vector similarity search.
 
+use chrono::Utc;
 use locai::storage::{
-    shared_storage::{SharedStorage, SharedStorageConfig},
-    traits::{VectorStore, EntityStore, RelationshipStore, BaseStore},
-    models::{Vector, Entity, Relationship, VectorSearchParams, DistanceMetric},
     filters::{EntityFilter, RelationshipFilter, VectorFilter},
+    models::{DistanceMetric, Entity, Relationship, Vector, VectorSearchParams},
+    shared_storage::{SharedStorage, SharedStorageConfig},
+    traits::{BaseStore, EntityStore, RelationshipStore, VectorStore},
 };
 use serde_json::json;
-use chrono::Utc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,13 +25,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Create a SurrealDB client with embedded RocksDB engine
-    let client = surrealdb::Surreal::new::<surrealdb::engine::local::RocksDb>("./shared_storage_demo.db").await?;
-    
+    let client =
+        surrealdb::Surreal::new::<surrealdb::engine::local::RocksDb>("./shared_storage_demo.db")
+            .await?;
+
     // Create SharedStorage instance
     let storage = SharedStorage::new(client, config).await?;
 
     println!("✅ Created SharedStorage with embedded RocksDB");
-    
+
     // Clear any existing data from previous runs
     println!("🧹 Clearing any existing data...");
     storage.clear().await?;
@@ -83,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let author_entity = storage.create_entity(author).await?;
     let paper_entity = storage.create_entity(paper).await?;
     let topic_entity = storage.create_entity(topic).await?;
-    
+
     println!("📝 Created author: {}", author_entity.properties["name"]);
     println!("📄 Created paper: {}", paper_entity.properties["title"]);
     println!("🏷️  Created topic: {}", topic_entity.properties["name"]);
@@ -143,16 +145,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_rel = storage.create_relationship(authorship).await?;
     let topic_rel = storage.create_relationship(topic_relation).await?;
     let expertise_rel = storage.create_relationship(expertise_relation).await?;
-    
-    println!("📝 Created authorship: {} -> {} ({})", 
-             auth_rel.source_id, auth_rel.target_id, auth_rel.relationship_type);
-    println!("📄 Created topic relation: {} -> {} ({})",
-             topic_rel.source_id, topic_rel.target_id, topic_rel.relationship_type);
-    println!("🧠 Created expertise relation: {} -> {} ({})",
-             expertise_rel.source_id, expertise_rel.target_id, expertise_rel.relationship_type);
+
+    println!(
+        "📝 Created authorship: {} -> {} ({})",
+        auth_rel.source_id, auth_rel.target_id, auth_rel.relationship_type
+    );
+    println!(
+        "📄 Created topic relation: {} -> {} ({})",
+        topic_rel.source_id, topic_rel.target_id, topic_rel.relationship_type
+    );
+    println!(
+        "🧠 Created expertise relation: {} -> {} ({})",
+        expertise_rel.source_id, expertise_rel.target_id, expertise_rel.relationship_type
+    );
 
     // Test relationship queries
-    let author_papers = storage.find_related_entities(&author_entity.id, Some("authored".to_string()), Some("outgoing".to_string())).await?;
+    let author_papers = storage
+        .find_related_entities(
+            &author_entity.id,
+            Some("authored".to_string()),
+            Some("outgoing".to_string()),
+        )
+        .await?;
     println!("📚 Author has written {} papers", author_papers.len());
 
     // Test 3: Vector Operations
@@ -181,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dimension: 1024,
             metadata: json!({
                 "document_id": "paper_002",
-                "document_type": "research_paper", 
+                "document_type": "research_paper",
                 "title": "Quantum Computing Fundamentals",
                 "author": "Dr. Alex Kim"
             }),
@@ -193,7 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             vector: vec![0.7; 1024], // Deep learning paper (similar to neural networks)
             dimension: 1024,
             metadata: json!({
-                "document_id": "paper_003", 
+                "document_id": "paper_003",
                 "document_type": "research_paper",
                 "title": "Deep Learning Applications",
                 "author": "Dr. Maria Rodriguez"
@@ -206,7 +220,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add vectors to the store
     for vector in vectors {
         let added = storage.add_vector(vector).await?;
-        println!("📊 Added vector: {} - {}", added.id, added.metadata["title"]);
+        println!(
+            "📊 Added vector: {} - {}",
+            added.id, added.metadata["title"]
+        );
     }
 
     // Test vector similarity search
@@ -222,10 +239,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n🔍 Searching for similar vectors to neural network content...");
     let results = storage.search_vectors(&query_vector, search_params).await?;
-    
+
     for (i, (vector, score)) in results.iter().enumerate() {
-        println!("  {}. {} (distance: {:.3}) - {}", 
-                 i + 1, vector.id, score, vector.metadata["title"]);
+        println!(
+            "  {}. {} (distance: {:.3}) - {}",
+            i + 1,
+            vector.id,
+            score,
+            vector.metadata["title"]
+        );
     }
 
     // Test 4: Advanced Filtering
@@ -237,7 +259,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         entity_type: Some("Author".to_string()),
         ..Default::default()
     };
-    let authors = storage.list_entities(Some(entity_filter), None, None).await?;
+    let authors = storage
+        .list_entities(Some(entity_filter), None, None)
+        .await?;
     println!("👥 Found {} authors", authors.len());
 
     // Filter relationships by type
@@ -245,7 +269,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         relationship_type: Some("authored".to_string()),
         ..Default::default()
     };
-    let authorships = storage.list_relationships(Some(rel_filter), None, None).await?;
+    let authorships = storage
+        .list_relationships(Some(rel_filter), None, None)
+        .await?;
     println!("📝 Found {} authorship relationships", authorships.len());
 
     // Filter vectors by metadata
@@ -285,20 +311,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut updated_author = author_entity.clone();
     updated_author.properties["publications"] = json!(48);
     updated_author.updated_at = Utc::now();
-    
+
     let updated = storage.update_entity(updated_author).await?;
-    println!("📝 Updated author publications: {}", updated.properties["publications"]);
+    println!(
+        "📝 Updated author publications: {}",
+        updated.properties["publications"]
+    );
 
     // Update vector metadata - use the first vector's ID
     let first_vector_id = format!("vec_001_{}", timestamp);
-    let updated_vector = storage.update_vector_metadata(&first_vector_id, json!({
-        "document_id": "paper_001",
-        "document_type": "research_paper",
-        "title": "Advanced Neural Network Architectures (Revised)",
-        "author": "Dr. Sarah Chen",
-        "revision": 2
-    })).await?;
-    println!("📊 Updated vector metadata: {}", updated_vector.metadata["title"]);
+    let updated_vector = storage
+        .update_vector_metadata(
+            &first_vector_id,
+            json!({
+                "document_id": "paper_001",
+                "document_type": "research_paper",
+                "title": "Advanced Neural Network Architectures (Revised)",
+                "author": "Dr. Sarah Chen",
+                "revision": 2
+            }),
+        )
+        .await?;
+    println!(
+        "📊 Updated vector metadata: {}",
+        updated_vector.metadata["title"]
+    );
 
     println!("\n🎉 Example completed successfully!");
     println!("\n💡 Key Features Demonstrated:");
@@ -314,4 +351,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = std::fs::remove_dir_all("./shared_storage_demo.db");
 
     Ok(())
-} 
+}

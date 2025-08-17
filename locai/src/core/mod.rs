@@ -5,7 +5,10 @@ pub mod search;
 pub mod util;
 
 pub use memory_manager::MemoryManager;
-pub use search::{SearchResult, SearchOptions, SearchStrategy, SearchTypeFilter, SearchContent, MatchInfo, SearchContext, SearchMetadata};
-pub use util::{enabled_features, is_feature_enabled, has_embedding_support, has_http_capability};
+pub use search::{
+    MatchInfo, SearchContent, SearchContext, SearchMetadata, SearchOptions, SearchResult,
+    SearchStrategy, SearchTypeFilter,
+};
+pub use util::{enabled_features, has_embedding_support, has_http_capability, is_feature_enabled};
 
-// Placeholder for future implementation 
+// Placeholder for future implementation

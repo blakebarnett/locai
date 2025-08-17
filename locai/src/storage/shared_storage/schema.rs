@@ -1,7 +1,7 @@
 //! Schema initialization and management for SharedStorage
 
-use surrealdb::{Connection, Surreal};
 use crate::storage::errors::StorageError;
+use surrealdb::{Connection, Surreal};
 
 /// Initialize the SharedStorage schema with tables and relationships for Locai
 pub async fn initialize_schema<C>(client: &Surreal<C>) -> Result<(), StorageError>
@@ -107,7 +107,7 @@ where
 
     // Create vector indexes for efficient similarity search
     // We'll create only a 1024-dimensional index for BGE-M3 model compatibility
-    let vector_index_queries = vec![
+    let vector_index_queries = [
         // HNSW index for 1024-dimensional vectors (BGE-M3 model)
         r#"DEFINE INDEX vector_hnsw_1024_idx ON vector FIELDS vector HNSW DIMENSION 1024 DIST COSINE EFC 150 M 12;"#,
     ];
@@ -266,9 +266,16 @@ where
     execute_schema_query(client, version_table_query, "version table").await?;
     execute_schema_query(client, memory_entity_edge_query, "memory-entity edge").await?;
     execute_schema_query(client, entity_relationship_edge_query, "entity-entity edge").await?;
-    execute_schema_query(client, memory_relationship_edge_query, "memory-relationship edge").await?;
+    execute_schema_query(
+        client,
+        memory_relationship_edge_query,
+        "memory-relationship edge",
+    )
+    .await?;
 
-    tracing::info!("SharedStorage schema with full-text search capabilities initialized successfully");
+    tracing::info!(
+        "SharedStorage schema with full-text search capabilities initialized successfully"
+    );
     Ok(())
 }
 
@@ -285,7 +292,7 @@ where
         .query(query)
         .await
         .map_err(|e| StorageError::Query(format!("Failed to create {}: {}", description, e)))?;
-    
+
     tracing::debug!("Created {} successfully", description);
     Ok(())
 }
@@ -297,7 +304,7 @@ where
 {
     let drop_queries = vec![
         "REMOVE TABLE IF EXISTS references;",
-        "REMOVE TABLE IF EXISTS relates;", 
+        "REMOVE TABLE IF EXISTS relates;",
         "REMOVE TABLE IF EXISTS contains;",
         "REMOVE TABLE IF EXISTS version;",
         "REMOVE TABLE IF EXISTS relationship;",
@@ -326,4 +333,4 @@ where
     let check_query = "SELECT VALUE count() FROM memory LIMIT 1;";
     let check_result = client.query(check_query).await;
     Ok(check_result.is_ok())
-} 
+}

@@ -3,11 +3,11 @@
 //! This module provides generic memory consolidation capabilities including
 //! pattern detection, wisdom extraction, and memory connection analysis.
 
-use crate::models::{Memory, MemoryType};
 use crate::core::MemoryManager;
+use crate::models::{Memory, MemoryType};
 use anyhow::Result;
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
-use chrono::{Utc, Duration};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -113,6 +113,12 @@ pub struct MemoryConsolidator {
     connection_analyzer: Arc<ConnectionAnalyzer>,
 }
 
+impl Default for MemoryConsolidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryConsolidator {
     pub fn new() -> Self {
         Self {
@@ -121,7 +127,7 @@ impl MemoryConsolidator {
             connection_analyzer: Arc::new(ConnectionAnalyzer::new()),
         }
     }
-    
+
     /// Consolidate memories using the provided configuration
     pub async fn consolidate_memories(
         &self,
@@ -129,28 +135,36 @@ impl MemoryConsolidator {
         config: &ConsolidationConfig,
     ) -> Result<ConsolidationResult> {
         // Get recent memories that might need consolidation
-        let recent_memories = memory_manager
-            .search_memories("", Some(1000))
-            .await?;
+        let recent_memories = memory_manager.search_memories("", Some(1000)).await?;
 
         // Filter memories created after cutoff date
         let cutoff_date = Utc::now() - Duration::days(config.max_memory_age_days);
-        let filtered_memories: Vec<_> = recent_memories.into_iter()
+        let filtered_memories: Vec<_> = recent_memories
+            .into_iter()
             .filter(|memory| memory.created_at >= cutoff_date)
             .collect();
-        
+
         // Detect patterns
-        let patterns = self.pattern_detector.detect_patterns(&filtered_memories, config).await?;
-        
+        let patterns = self
+            .pattern_detector
+            .detect_patterns(&filtered_memories, config)
+            .await?;
+
         // Extract wisdom from patterns
-        let wisdom = self.wisdom_extractor.extract_wisdom(&patterns, &filtered_memories, config).await?;
-        
+        let wisdom = self
+            .wisdom_extractor
+            .extract_wisdom(&patterns, &filtered_memories, config)
+            .await?;
+
         // Analyze connections
-        let connections = self.connection_analyzer.analyze_connections(&filtered_memories, config).await?;
-        
+        let connections = self
+            .connection_analyzer
+            .analyze_connections(&filtered_memories, config)
+            .await?;
+
         // Calculate efficiency improvement
         let efficiency_improvement = self.calculate_efficiency_improvement(&patterns, &connections);
-        
+
         Ok(ConsolidationResult {
             patterns_found: patterns,
             wisdom_extracted: wisdom,
@@ -159,57 +173,70 @@ impl MemoryConsolidator {
             efficiency_improvement,
         })
     }
-    
-    fn calculate_efficiency_improvement(&self, patterns: &[MemoryPattern], connections: &[MemoryConnection]) -> f32 {
+
+    fn calculate_efficiency_improvement(
+        &self,
+        patterns: &[MemoryPattern],
+        connections: &[MemoryConnection],
+    ) -> f32 {
         let pattern_efficiency = patterns.len() as f32 * 0.1;
         let connection_efficiency = connections.len() as f32 * 0.05;
         (pattern_efficiency + connection_efficiency).min(1.0)
     }
-    
+
     fn generate_summary(&self, memories: &[Memory]) -> String {
-        format!("Consolidated {} memories, identifying patterns and extracting insights", memories.len())
+        format!(
+            "Consolidated {} memories, identifying patterns and extracting insights",
+            memories.len()
+        )
     }
 }
 
 /// Pattern detection system
 pub struct PatternDetector;
 
+impl Default for PatternDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PatternDetector {
     pub fn new() -> Self {
         Self
     }
-    
+
     pub async fn detect_patterns(
         &self,
         memories: &[Memory],
         config: &ConsolidationConfig,
     ) -> Result<Vec<MemoryPattern>> {
         let mut patterns = Vec::new();
-        
+
         // Detect different types of patterns
         patterns.extend(self.detect_recurring_patterns(memories, config).await?);
         patterns.extend(self.detect_temporal_patterns(memories, config).await?);
         patterns.extend(self.detect_thematic_patterns(memories, config).await?);
-        
+
         Ok(patterns)
     }
-    
+
     async fn detect_recurring_patterns(
         &self,
         memories: &[Memory],
         config: &ConsolidationConfig,
     ) -> Result<Vec<MemoryPattern>> {
         let mut patterns = Vec::new();
-        
+
         // Group memories by similar content/tags
         let mut content_groups: HashMap<String, Vec<&Memory>> = HashMap::new();
-        
+
         for memory in memories {
             for tag in &memory.tags {
                 content_groups.entry(tag.clone()).or_default().push(memory);
             }
         }
-        
+
         // Find groups with enough memories to form patterns
         for (theme, group_memories) in content_groups {
             if group_memories.len() >= config.min_memories_for_pattern {
@@ -223,21 +250,21 @@ impl PatternDetector {
                 });
             }
         }
-        
+
         Ok(patterns)
     }
-    
+
     async fn detect_temporal_patterns(
         &self,
         memories: &[Memory],
         _config: &ConsolidationConfig,
     ) -> Result<Vec<MemoryPattern>> {
         let mut patterns = Vec::new();
-        
+
         // Sort memories by creation time
         let mut sorted_memories = memories.to_vec();
         sorted_memories.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-        
+
         // Look for temporal sequences
         // This is a simplified implementation - real system would be more sophisticated
         if sorted_memories.len() >= 3 {
@@ -250,24 +277,27 @@ impl PatternDetector {
                 significance: 0.5,
             });
         }
-        
+
         Ok(patterns)
     }
-    
+
     async fn detect_thematic_patterns(
         &self,
         memories: &[Memory],
         config: &ConsolidationConfig,
     ) -> Result<Vec<MemoryPattern>> {
         let mut patterns = Vec::new();
-        
+
         // Group by memory type
         let mut type_groups: HashMap<MemoryType, Vec<&Memory>> = HashMap::new();
-        
+
         for memory in memories {
-            type_groups.entry(memory.memory_type.clone()).or_default().push(memory);
+            type_groups
+                .entry(memory.memory_type.clone())
+                .or_default()
+                .push(memory);
         }
-        
+
         for (memory_type, group_memories) in type_groups {
             if group_memories.len() >= config.min_memories_for_pattern {
                 patterns.push(MemoryPattern {
@@ -280,7 +310,7 @@ impl PatternDetector {
                 });
             }
         }
-        
+
         Ok(patterns)
     }
 }
@@ -288,11 +318,17 @@ impl PatternDetector {
 /// Wisdom extraction system
 pub struct WisdomExtractor;
 
+impl Default for WisdomExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WisdomExtractor {
     pub fn new() -> Self {
         Self
     }
-    
+
     pub async fn extract_wisdom(
         &self,
         patterns: &[MemoryPattern],
@@ -300,23 +336,23 @@ impl WisdomExtractor {
         config: &ConsolidationConfig,
     ) -> Result<Vec<WisdomInsight>> {
         let mut wisdom = Vec::new();
-        
+
         for pattern in patterns {
             if pattern.confidence >= config.wisdom_extraction_threshold {
                 wisdom.extend(self.extract_pattern_wisdom(pattern, memories).await?);
             }
         }
-        
+
         Ok(wisdom)
     }
-    
+
     async fn extract_pattern_wisdom(
         &self,
         pattern: &MemoryPattern,
         _memories: &[Memory],
     ) -> Result<Vec<WisdomInsight>> {
         let mut wisdom = Vec::new();
-        
+
         match pattern.pattern_type {
             PatternType::Recurring => {
                 wisdom.push(WisdomInsight {
@@ -350,7 +386,7 @@ impl WisdomExtractor {
             }
             _ => {}
         }
-        
+
         Ok(wisdom)
     }
 }
@@ -358,18 +394,24 @@ impl WisdomExtractor {
 /// Connection analysis system
 pub struct ConnectionAnalyzer;
 
+impl Default for ConnectionAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectionAnalyzer {
     pub fn new() -> Self {
         Self
     }
-    
+
     pub async fn analyze_connections(
         &self,
         memories: &[Memory],
         _config: &ConsolidationConfig,
     ) -> Result<Vec<MemoryConnection>> {
         let mut connections = Vec::new();
-        
+
         // Analyze connections between memories
         for (i, memory_a) in memories.iter().enumerate() {
             for memory_b in memories.iter().skip(i + 1) {
@@ -378,10 +420,10 @@ impl ConnectionAnalyzer {
                 }
             }
         }
-        
+
         Ok(connections)
     }
-    
+
     async fn analyze_memory_pair(
         &self,
         memory_a: &Memory,
@@ -393,18 +435,26 @@ impl ConnectionAnalyzer {
             .iter()
             .filter(|tag| memory_b.tags.contains(tag))
             .collect();
-        
+
         if !shared_tags.is_empty() {
             return Ok(Some(MemoryConnection {
                 connection_id: uuid::Uuid::new_v4().to_string(),
                 memory_a_id: memory_a.id.clone(),
                 memory_b_id: memory_b.id.clone(),
                 connection_type: ConnectionType::Thematic,
-                strength: shared_tags.len() as f32 / memory_a.tags.len().max(memory_b.tags.len()) as f32,
-                description: format!("Shared themes: {}", shared_tags.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")),
+                strength: shared_tags.len() as f32
+                    / memory_a.tags.len().max(memory_b.tags.len()) as f32,
+                description: format!(
+                    "Shared themes: {}",
+                    shared_tags
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
             }));
         }
-        
+
         // Check for temporal connection (memories created close in time)
         let time_diff = (memory_a.created_at - memory_b.created_at).abs();
         if time_diff < Duration::hours(1) {
@@ -417,7 +467,7 @@ impl ConnectionAnalyzer {
                 description: "Created in close temporal proximity".to_string(),
             }));
         }
-        
+
         Ok(None)
     }
-} 
+}

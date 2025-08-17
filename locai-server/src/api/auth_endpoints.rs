@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -99,30 +99,32 @@ pub async fn signup(
     if request.username.trim().is_empty() {
         return Err(bad_request("Username cannot be empty"));
     }
-    
+
     if request.password.len() < 8 {
         return Err(bad_request("Password must be at least 8 characters"));
     }
 
     // Get auth service
-    let auth_service = state.auth_service.as_ref()
+    let auth_service = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| ServerError::Internal("Authentication service not available".to_string()))?;
 
     // Create user with viewer role by default
-    let user = auth_service.create_user(
-        &state.memory_manager,
-        &request.username,
-        &request.password,
-        "viewer",
-        request.email,
-    ).await?;
+    let user = auth_service
+        .create_user(
+            &state.memory_manager,
+            &request.username,
+            &request.password,
+            "viewer",
+            request.email,
+        )
+        .await?;
 
     // Authenticate the new user to get a token
-    let (token, _user, expires_at) = auth_service.authenticate(
-        &state.memory_manager,
-        &request.username,
-        &request.password,
-    ).await?;
+    let (token, _user, expires_at) = auth_service
+        .authenticate(&state.memory_manager, &request.username, &request.password)
+        .await?;
 
     // Return authentication response
     let auth_response = AuthResponse {
@@ -155,19 +157,21 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>, ServerError> {
     // Validate input
     if request.username.trim().is_empty() || request.password.is_empty() {
-        return Err(ServerError::Auth("Username and password are required".to_string()));
+        return Err(ServerError::Auth(
+            "Username and password are required".to_string(),
+        ));
     }
 
     // Get auth service
-    let auth_service = state.auth_service.as_ref()
+    let auth_service = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| ServerError::Internal("Authentication service not available".to_string()))?;
 
     // Authenticate user
-    let (token, user, expires_at) = auth_service.authenticate(
-        &state.memory_manager,
-        &request.username,
-        &request.password,
-    ).await?;
+    let (token, user, expires_at) = auth_service
+        .authenticate(&state.memory_manager, &request.username, &request.password)
+        .await?;
 
     let auth_response = AuthResponse {
         token,
@@ -195,7 +199,9 @@ pub async fn list_users(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<UserDto>>, ServerError> {
     // Get auth service
-    let auth_service = state.auth_service.as_ref()
+    let auth_service = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| ServerError::Internal("Authentication service not available".to_string()))?;
 
     // Get all users
@@ -230,11 +236,15 @@ pub async fn get_user(
         .map_err(|_| ServerError::BadRequest(format!("Invalid user ID: {}", user_id)))?;
 
     // Get auth service
-    let auth_service = state.auth_service.as_ref()
+    let auth_service = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| ServerError::Internal("Authentication service not available".to_string()))?;
 
     // Get user by ID
-    let user = auth_service.get_user_by_id(&state.memory_manager, &user_uuid).await?
+    let user = auth_service
+        .get_user_by_id(&state.memory_manager, &user_uuid)
+        .await?
         .ok_or_else(|| ServerError::NotFound(format!("User with ID '{}' not found", user_id)))?;
 
     let user_dto = UserDto::from(user);
@@ -269,26 +279,32 @@ pub async fn update_user(
         .map_err(|_| bad_request(&format!("Invalid user ID: {}", user_id)))?;
 
     // Get auth service
-    let auth_service = state.auth_service.as_ref()
+    let auth_service = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| ServerError::Internal("Authentication service not available".to_string()))?;
 
     // Get existing user
-    let mut user = auth_service.get_user_by_id(&state.memory_manager, &user_uuid).await?
+    let mut user = auth_service
+        .get_user_by_id(&state.memory_manager, &user_uuid)
+        .await?
         .ok_or_else(|| ServerError::NotFound(format!("User with ID '{}' not found", user_id)))?;
 
     // Apply updates
     if let Some(email) = request.email {
         user.email = Some(email);
     }
-    
+
     if let Some(role) = request.role {
         user.role = role;
     }
-    
+
     user.updated_at = chrono::Utc::now();
 
     // Update user
-    let updated_user = auth_service.update_user(&state.memory_manager, user).await?;
+    let updated_user = auth_service
+        .update_user(&state.memory_manager, user)
+        .await?;
 
     let user_dto = UserDto::from(updated_user);
     Ok(Json(user_dto))
@@ -318,19 +334,25 @@ pub async fn delete_user(
         .map_err(|_| bad_request(&format!("Invalid user ID: {}", user_id)))?;
 
     // Get auth service
-    let auth_service = state.auth_service.as_ref()
+    let auth_service = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| ServerError::Internal("Authentication service not available".to_string()))?;
 
     // Check if user exists
-    let _user = auth_service.get_user_by_id(&state.memory_manager, &user_uuid).await?
+    let _user = auth_service
+        .get_user_by_id(&state.memory_manager, &user_uuid)
+        .await?
         .ok_or_else(|| ServerError::NotFound(format!("User with ID '{}' not found", user_id)))?;
 
     // Delete user
-    let deleted = auth_service.delete_user(&state.memory_manager, &user_uuid).await?;
-    
+    let deleted = auth_service
+        .delete_user(&state.memory_manager, &user_uuid)
+        .await?;
+
     if !deleted {
         return Err(ServerError::Internal("Failed to delete user".to_string()));
     }
 
     Ok(axum::http::StatusCode::NO_CONTENT)
-} 
+}

@@ -1,8 +1,8 @@
 //! Configuration for entity extraction functionality.
 
+use super::{AutomaticRelationshipConfig, EntityResolutionConfig, EntityType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{EntityType, EntityResolutionConfig, AutomaticRelationshipConfig};
 
 /// Configuration for entity extraction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +52,7 @@ impl Default for EntityExtractionConfig {
                 EntityType::Location,
             ],
         };
-        
+
         // Keep basic extractor as fallback
         let basic_fallback = ExtractorConfig {
             name: "basic-fallback".to_string(),
@@ -68,9 +68,9 @@ impl Default for EntityExtractionConfig {
                 EntityType::Money,
             ],
         };
-        
+
         let extractors = vec![hybrid_extractor, basic_fallback];
-        
+
         Self {
             enabled: false, // Disabled by default - users must explicitly configure
             extractors,
@@ -104,23 +104,29 @@ pub struct MLExtractionConfig {
 impl Default for MLExtractionConfig {
     fn default() -> Self {
         let mut models = HashMap::new();
-        
+
         // Add default DistilBERT NER configuration - better generic performance
-        models.insert("distilbert-ner".to_string(), MLModelConfig {
-            model_id: "elastic/distilbert-base-uncased-finetuned-conll03-english".to_string(),
-            backend: MLBackend::Candle,
-            device: "auto".to_string(),
-            max_length: 512,
-            batch_size: 8,
-            confidence_threshold: 0.15, // Lower threshold for better recall
-            cache_results: true,
-        });
-        
+        models.insert(
+            "distilbert-ner".to_string(),
+            MLModelConfig {
+                model_id: "elastic/distilbert-base-uncased-finetuned-conll03-english".to_string(),
+                backend: MLBackend::Candle,
+                device: "auto".to_string(),
+                max_length: 512,
+                batch_size: 8,
+                confidence_threshold: 0.15, // Lower threshold for better recall
+                cache_results: true,
+            },
+        );
+
         Self {
             enabled: true,
             default_model: "distilbert-ner".to_string(), // Use DistilBERT as default
             models,
-            routing: MLRoutingConfig { enabled: false, rules: vec![] }, // Disable routing
+            routing: MLRoutingConfig {
+                enabled: false,
+                rules: vec![],
+            }, // Disable routing
             optimization: MLOptimizationConfig::default(),
         }
     }
@@ -254,7 +260,8 @@ impl Default for HybridExtractorConfig {
         Self {
             enable_basic: true,
             enable_transformers: true, // Enable by default with Candle infrastructure
-            transformer_model: "elastic/distilbert-base-uncased-finetuned-conll03-english".to_string(), // Use DistilBERT for better generic NER performance
+            transformer_model: "elastic/distilbert-base-uncased-finetuned-conll03-english"
+                .to_string(), // Use DistilBERT for better generic NER performance
             enable_deduplication: true,
             confidence_threshold: 0.3, // Lower threshold for better recall
             fallback_to_basic: true,
@@ -366,4 +373,4 @@ pub enum ExtractorType {
 /// Suitable for extracting persons, locations, organizations, and miscellaneous entities
 pub fn distilbert_ner_base() -> EntityExtractionConfig {
     EntityExtractionConfig::default()
-} 
+}

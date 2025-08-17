@@ -3,13 +3,13 @@
 //! This module provides the simplified, user-friendly interface to Locai that makes
 //! 90% of use cases require only 1-2 lines of code.
 
+use crate::Result;
 use crate::config::{ConfigBuilder, LogLevel};
 use crate::core::memory_manager::MemoryManager;
-use crate::models::memory::{Memory, MemoryBuilder, MemoryType, MemoryPriority};
+use crate::memory::search_extensions::SearchMode;
+use crate::models::memory::{Memory, MemoryBuilder, MemoryPriority, MemoryType};
 use crate::storage::filters::SemanticSearchFilter;
 use crate::storage::filters::helpers;
-use crate::memory::search_extensions::SearchMode;
-use crate::Result;
 use std::path::Path;
 
 /// Simplified Locai interface for easy memory management
@@ -42,8 +42,8 @@ pub struct Locai {
 }
 
 impl Locai {
-        /// Create a new Locai instance with sensible defaults
-    /// 
+    /// Create a new Locai instance with sensible defaults
+    ///
     /// This initializes Locai with:
     /// - Persistent storage in the user's data directory
     /// - Default ML configuration with local embeddings
@@ -134,23 +134,23 @@ impl Locai {
     /// }
     /// ```
     pub async fn for_testing_isolated() -> Result<Self> {
-        use std::sync::atomic::{AtomicU64, Ordering};
         use crate::storage::config::{SurrealDBConfig, SurrealDBEngine};
-        
+        use std::sync::atomic::{AtomicU64, Ordering};
+
         // Global counter to ensure unique database identifiers across all test instances
         static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
-        
+
         let test_id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
         let unique_namespace = format!("test_ns_{}", test_id);
         let unique_database = format!("test_db_{}", test_id);
-        
+
         let mut config = ConfigBuilder::new()
             .with_data_dir(format!("./test_data_{}", test_id))
             .with_model_cache_dir(format!("./test_cache_{}", test_id))
             .with_default_ml()
             .with_log_level(LogLevel::Debug)
             .build()?;
-        
+
         // Explicitly configure for true in-memory isolation
         config.storage.graph.surrealdb = SurrealDBConfig {
             engine: SurrealDBEngine::Memory,
@@ -160,7 +160,7 @@ impl Locai {
             auth: None,
             settings: None,
         };
-        
+
         let manager = crate::init(config).await?;
         Ok(Self { manager })
     }
@@ -187,17 +187,17 @@ impl Locai {
     /// ```
     pub async fn for_testing_with_id(test_id: &str) -> Result<Self> {
         use crate::storage::config::{SurrealDBConfig, SurrealDBEngine};
-        
+
         let unique_namespace = format!("test_ns_{}", test_id);
         let unique_database = format!("test_db_{}", test_id);
-        
+
         let mut config = ConfigBuilder::new()
             .with_data_dir(format!("./test_data_{}", test_id))
             .with_model_cache_dir(format!("./test_cache_{}", test_id))
             .with_default_ml()
             .with_log_level(LogLevel::Debug)
             .build()?;
-        
+
         // Explicitly configure for true in-memory isolation
         config.storage.graph.surrealdb = SurrealDBConfig {
             engine: SurrealDBEngine::Memory,
@@ -207,7 +207,7 @@ impl Locai {
             auth: None,
             settings: None,
         };
-        
+
         let manager = crate::init(config).await?;
         Ok(Self { manager })
     }
@@ -316,7 +316,8 @@ impl Locai {
     /// }
     /// ```
     pub async fn search(&self, query: &str) -> Result<Vec<crate::core::SearchResult>> {
-        self.search_with_options(query, crate::core::SearchOptions::default()).await
+        self.search_with_options(query, crate::core::SearchOptions::default())
+            .await
     }
 
     /// Search with customization options
@@ -332,7 +333,7 @@ impl Locai {
     ///
     /// ```rust
     /// use locai::prelude::*;
-    /// 
+    ///
     /// let locai = Locai::new().await?;
     /// let options = SearchOptions {
     ///     limit: 5,
@@ -342,10 +343,14 @@ impl Locai {
     /// };
     /// let results = locai.search_with_options("physics", options).await?;
     /// ```
-    pub async fn search_with_options(&self, query: &str, options: crate::core::SearchOptions) -> Result<Vec<crate::core::SearchResult>> {
-        use crate::memory::search_extensions::{UniversalSearchOptions, SearchMode};
+    pub async fn search_with_options(
+        &self,
+        query: &str,
+        options: crate::core::SearchOptions,
+    ) -> Result<Vec<crate::core::SearchResult>> {
+        use crate::memory::search_extensions::{SearchMode, UniversalSearchOptions};
         use crate::storage::filters::SemanticSearchFilter;
-        
+
         // Convert SearchOptions to UniversalSearchOptions
         let universal_options = UniversalSearchOptions {
             include_memories: options.include_types.memories,
@@ -362,8 +367,10 @@ impl Locai {
         let results = match options.strategy {
             crate::core::SearchStrategy::Auto => {
                 // Use universal search which automatically determines the best approach
-                self.manager.universal_search(query, Some(options.limit), Some(universal_options)).await?
-            },
+                self.manager
+                    .universal_search(query, Some(options.limit), Some(universal_options))
+                    .await?
+            }
             crate::core::SearchStrategy::Semantic => {
                 // Force vector search mode (for backward compatibility)
                 if options.include_types.memories {
@@ -371,17 +378,27 @@ impl Locai {
                         similarity_threshold: options.min_score,
                         memory_filter: None,
                     };
-                    let search_results = self.manager.search(query, Some(options.limit), Some(filter), SearchMode::Vector).await?;
-                    search_results.into_iter().map(|sr| crate::memory::search_extensions::UniversalSearchResult::Memory {
-                        memory: sr.memory,
-                        score: sr.score,
-                        match_reason: "vector search".to_string(),
-                    }).collect()
+                    let search_results = self
+                        .manager
+                        .search(query, Some(options.limit), Some(filter), SearchMode::Vector)
+                        .await?;
+                    search_results
+                        .into_iter()
+                        .map(
+                            |sr| crate::memory::search_extensions::UniversalSearchResult::Memory {
+                                memory: sr.memory,
+                                score: sr.score,
+                                match_reason: "vector search".to_string(),
+                            },
+                        )
+                        .collect()
                 } else {
                     // If not including memories, fall back to universal search
-                    self.manager.universal_search(query, Some(options.limit), Some(universal_options)).await?
+                    self.manager
+                        .universal_search(query, Some(options.limit), Some(universal_options))
+                        .await?
                 }
-            },
+            }
             crate::core::SearchStrategy::Keyword => {
                 // Force text search mode
                 if options.include_types.memories {
@@ -389,41 +406,58 @@ impl Locai {
                         similarity_threshold: options.min_score,
                         memory_filter: None,
                     };
-                    let search_results = self.manager.search(query, Some(options.limit), Some(filter), SearchMode::Text).await?;
-                    search_results.into_iter().map(|sr| crate::memory::search_extensions::UniversalSearchResult::Memory {
-                        memory: sr.memory,
-                        score: sr.score,
-                        match_reason: "keyword search".to_string(),
-                    }).collect()
+                    let search_results = self
+                        .manager
+                        .search(query, Some(options.limit), Some(filter), SearchMode::Text)
+                        .await?;
+                    search_results
+                        .into_iter()
+                        .map(
+                            |sr| crate::memory::search_extensions::UniversalSearchResult::Memory {
+                                memory: sr.memory,
+                                score: sr.score,
+                                match_reason: "keyword search".to_string(),
+                            },
+                        )
+                        .collect()
                 } else {
                     // If not including memories, fall back to universal search
-                    self.manager.universal_search(query, Some(options.limit), Some(universal_options)).await?
+                    self.manager
+                        .universal_search(query, Some(options.limit), Some(universal_options))
+                        .await?
                 }
-            },
+            }
             crate::core::SearchStrategy::Graph => {
                 // Force graph-centric search
                 let mut graph_options = universal_options.clone();
                 graph_options.include_graphs = true;
                 graph_options.graph_depth = options.graph_depth.max(2); // Ensure meaningful graph depth
-                self.manager.universal_search(query, Some(options.limit), Some(graph_options)).await?
-            },
+                self.manager
+                    .universal_search(query, Some(options.limit), Some(graph_options))
+                    .await?
+            }
             crate::core::SearchStrategy::Hybrid => {
                 // Use all search methods and merge results
                 let mut hybrid_options = universal_options.clone();
                 hybrid_options.include_memories = true;
                 hybrid_options.include_entities = true;
                 hybrid_options.include_graphs = options.include_types.graphs;
-                self.manager.universal_search(query, Some(options.limit), Some(hybrid_options)).await?
-            },
+                self.manager
+                    .universal_search(query, Some(options.limit), Some(hybrid_options))
+                    .await?
+            }
         };
 
         // Convert UniversalSearchResult to SearchResult
-        Ok(results.into_iter().map(|r| crate::core::SearchResult::from_universal(r)).collect())
+        Ok(results
+            .into_iter()
+            .map(crate::core::SearchResult::from_universal)
+            .collect())
     }
 
     /// Search only memories (legacy compatibility)
     ///
-    /// This method is deprecated. Use `search()` for universal search or 
+    /// This method is deprecated. Use `search()` for universal search or
     /// `search_with_options()` with `SearchTypeFilter::memories_only()` for memory-only search.
     ///
     /// # Arguments
@@ -438,7 +472,9 @@ impl Locai {
     ///     println!("Found: {}", result.content);
     /// }
     /// ```
-    #[deprecated(note = "Use search() for universal search or search_with_options() with SearchTypeFilter::memories_only()")]
+    #[deprecated(
+        note = "Use search() for universal search or search_with_options() with SearchTypeFilter::memories_only()"
+    )]
     pub async fn search_memories(&self, query: &str) -> Result<Vec<Memory>> {
         // Use enhanced search that doesn't restrict to fact-only memories
         self.manager.enhanced_search(query, Some(10)).await
@@ -494,12 +530,12 @@ impl Locai {
     }
 
     /// Check if vector search is available (BYOE approach)
-    /// 
+    ///
     /// In the BYOE approach, vector search is available when memories have embeddings.
     /// Users need to provide their own embeddings via the Memory.with_embedding() method.
     pub fn has_semantic_search(&self) -> bool {
         // For BYOE approach, vector search depends on memories having embeddings,
-        // not on having an ML service. Return false to encourage users to use 
+        // not on having an ML service. Return false to encourage users to use
         // the new SearchMode::Vector explicitly.
         false
     }
@@ -560,7 +596,8 @@ impl LocaiBuilder {
 
     /// Use default production settings
     pub fn with_defaults(mut self) -> Self {
-        self.config_builder = self.config_builder
+        self.config_builder = self
+            .config_builder
             .with_default_storage()
             .with_default_ml()
             .with_default_logging();
@@ -569,7 +606,8 @@ impl LocaiBuilder {
 
     /// Build the Locai instance
     pub async fn build(self) -> Result<Locai> {
-        let config = self.config_builder
+        let config = self
+            .config_builder
             .with_default_storage()
             .with_default_ml()
             .build()?;
@@ -644,18 +682,25 @@ impl<'a> RememberBuilder<'a> {
     pub async fn save(&self) -> Result<String> {
         if !self.tags.is_empty() {
             // Use add_memory_with_options for complex cases
-            self.manager.add_memory_with_options(&self.content, |builder| {
-                let mut builder = builder
-                    .memory_type(self.memory_type.clone().unwrap_or(MemoryType::Episodic))
-                    .priority(self.priority.clone().unwrap_or(MemoryPriority::Normal));
-                
-                let tag_refs: Vec<&str> = self.tags.iter().map(|s| s.as_str()).collect();
-                builder = builder.tags(tag_refs);
-                builder
-            }).await
+            self.manager
+                .add_memory_with_options(&self.content, |builder| {
+                    let mut builder = builder
+                        .memory_type(self.memory_type.clone().unwrap_or(MemoryType::Episodic))
+                        .priority(self.priority.unwrap_or(MemoryPriority::Normal));
+
+                    let tag_refs: Vec<&str> = self.tags.iter().map(|s| s.as_str()).collect();
+                    builder = builder.tags(tag_refs);
+                    builder
+                })
+                .await
         } else {
             // Use simple add_memory for basic cases
-            self.manager.add_memory(&self.content, self.memory_type.clone().unwrap_or(MemoryType::Episodic)).await
+            self.manager
+                .add_memory(
+                    &self.content,
+                    self.memory_type.clone().unwrap_or(MemoryType::Episodic),
+                )
+                .await
         }
     }
 }
@@ -717,15 +762,15 @@ impl<'a> SearchBuilder<'a> {
     }
 
     /// Provide a query embedding for vector or hybrid search (BYOE approach)
-    /// 
+    ///
     /// When using SearchMode::Vector or SearchMode::Hybrid, you must provide
     /// a query embedding generated by your embedding provider (OpenAI, Cohere, etc.).
-    /// 
+    ///
     /// # Arguments
     /// * `embedding` - The query embedding vector from your provider
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// // With OpenAI embeddings
     /// let query_embedding = openai_client.embed("search query").await?;
@@ -743,7 +788,7 @@ impl<'a> SearchBuilder<'a> {
     pub async fn execute(&self) -> Result<Vec<Memory>> {
         let query = self.query.clone();
         let limit = self.limit.unwrap_or(10);
-        
+
         // Create filter using helper function
         let mut filter = helpers::memory_by_type("fact");
         if let Some(tags) = &self.tags {
@@ -752,34 +797,38 @@ impl<'a> SearchBuilder<'a> {
         if let Some(since) = &self.since {
             filter.created_after = Some(*since);
         }
-        
+
         // For vector and hybrid search, pass the query embedding if provided
         let results = match self.mode {
             SearchMode::Vector | SearchMode::Hybrid => {
-                self.manager.search_with_embedding(
-                    &query,
-                    self.query_embedding.as_deref(),
-                    Some(limit),
-                    Some(SemanticSearchFilter {
-                        memory_filter: Some(filter),
-                        similarity_threshold: None,
-                    }),
-                    self.mode
-                ).await?
+                self.manager
+                    .search_with_embedding(
+                        &query,
+                        self.query_embedding.as_deref(),
+                        Some(limit),
+                        Some(SemanticSearchFilter {
+                            memory_filter: Some(filter),
+                            similarity_threshold: None,
+                        }),
+                        self.mode,
+                    )
+                    .await?
             }
             SearchMode::Text => {
-                self.manager.search(
-                    &query,
-                    Some(limit),
-                    Some(SemanticSearchFilter {
-                        memory_filter: Some(filter),
-                        similarity_threshold: None,
-                    }),
-                    self.mode
-                ).await?
+                self.manager
+                    .search(
+                        &query,
+                        Some(limit),
+                        Some(SemanticSearchFilter {
+                            memory_filter: Some(filter),
+                            similarity_threshold: None,
+                        }),
+                        self.mode,
+                    )
+                    .await?
             }
         };
-        
+
         Ok(results.into_iter().map(|r| r.memory).collect())
     }
-} 
+}

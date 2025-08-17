@@ -2,38 +2,27 @@
 //!
 //! This module contains the configuration structures for all Locai components.
 
+use crate::storage::config::SurrealDBConfig;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::fmt;
-use crate::storage::config::SurrealDBConfig;
 
 /// Main configuration structure for Locai.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct LocaiConfig {
     /// Storage configuration
     pub storage: StorageConfig,
-    
+
     /// Machine learning configuration
     pub ml: MLConfig,
-    
+
     /// Logging configuration
     pub logging: LoggingConfig,
-    
+
     /// Entity extraction configuration
     pub entity_extraction: crate::entity_extraction::EntityExtractionConfig,
-}
-
-impl Default for LocaiConfig {
-    fn default() -> Self {
-        Self {
-            storage: StorageConfig::default(),
-            ml: MLConfig::default(),
-            logging: LoggingConfig::default(),
-            entity_extraction: crate::entity_extraction::EntityExtractionConfig::default(),
-        }
-    }
 }
 
 /// Configuration for storage components.
@@ -42,10 +31,10 @@ impl Default for LocaiConfig {
 pub struct StorageConfig {
     /// Base directory for storage
     pub data_dir: PathBuf,
-    
+
     /// Graph storage configuration
     pub graph: GraphStorageConfig,
-    
+
     /// Vector storage configuration
     pub vector: VectorStorageConfig,
 }
@@ -55,7 +44,7 @@ impl Default for StorageConfig {
         let data_dir = directories::ProjectDirs::from("org", "locai", "locai")
             .map(|dirs| dirs.data_dir().to_path_buf())
             .unwrap_or_else(|| PathBuf::from("./data"));
-            
+
         Self {
             data_dir,
             graph: GraphStorageConfig::default(),
@@ -70,10 +59,10 @@ impl Default for StorageConfig {
 pub struct GraphStorageConfig {
     /// Type of graph storage to use
     pub storage_type: GraphStorageType,
-    
+
     /// Path to store graph data (relative to data_dir)
     pub path: PathBuf,
-    
+
     /// SurrealDB-specific configuration
     pub surrealdb: SurrealDBConfig,
 }
@@ -94,7 +83,7 @@ impl Default for GraphStorageConfig {
 pub struct VectorStorageConfig {
     /// Type of vector storage to use
     pub storage_type: VectorStorageType,
-    
+
     /// Path to store vector data (relative to data_dir)
     pub path: PathBuf,
 }
@@ -122,7 +111,7 @@ pub enum GraphStorageType {
 pub enum VectorStorageType {
     /// SurrealDB vector database (unified graph and vector storage)
     SurrealDB,
-    
+
     /// In-memory vector storage
     Memory,
 }
@@ -133,7 +122,7 @@ pub enum VectorStorageType {
 pub struct MLConfig {
     /// Embedding model configuration
     pub embedding: EmbeddingConfig,
-    
+
     /// Directory to cache models
     pub model_cache_dir: PathBuf,
 }
@@ -143,7 +132,7 @@ impl Default for MLConfig {
         let cache_dir = directories::ProjectDirs::from("org", "locai", "locai")
             .map(|dirs| dirs.cache_dir().to_path_buf())
             .unwrap_or_else(|| PathBuf::from("./cache"));
-            
+
         Self {
             embedding: EmbeddingConfig::default(),
             model_cache_dir: cache_dir,
@@ -157,13 +146,13 @@ impl Default for MLConfig {
 pub struct EmbeddingConfig {
     /// Model type for embeddings
     pub model_type: EmbeddingModelType,
-    
+
     /// Model name or path
     pub model_name: String,
-    
+
     /// Local or remote embedding service
     pub service_type: EmbeddingServiceType,
-    
+
     /// Remote service URL (if using remote)
     pub service_url: Option<String>,
 }
@@ -185,10 +174,10 @@ impl Default for EmbeddingConfig {
 pub enum EmbeddingModelType {
     /// OpenAI compatible API
     OpenAI,
-    
+
     /// Cohere API
     Cohere,
-    
+
     /// Custom model/provider
     Custom,
 }
@@ -199,7 +188,7 @@ pub enum EmbeddingModelType {
 pub enum EmbeddingServiceType {
     /// Local embedding service
     Local,
-    
+
     /// Remote embedding service
     Remote,
 }
@@ -210,13 +199,13 @@ pub enum EmbeddingServiceType {
 pub struct LoggingConfig {
     /// Log level
     pub level: LogLevel,
-    
+
     /// Log format
     pub format: LogFormat,
-    
+
     /// File to log to (if any)
     pub file: Option<PathBuf>,
-    
+
     /// Whether to log to stdout
     pub stdout: bool,
 }
@@ -238,16 +227,16 @@ impl Default for LoggingConfig {
 pub enum LogLevel {
     /// Trace level
     Trace,
-    
+
     /// Debug level
     Debug,
-    
+
     /// Info level
     Info,
-    
+
     /// Warn level
     Warn,
-    
+
     /// Error level
     Error,
 }
@@ -287,13 +276,13 @@ impl FromStr for LogLevel {
 pub enum LogFormat {
     /// Default format
     Default,
-    
+
     /// JSON format
     Json,
-    
+
     /// Compact format
     Compact,
-    
+
     /// Pretty format
     Pretty,
-} 
+}
