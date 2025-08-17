@@ -6,7 +6,7 @@ use locai::storage::filters::{SemanticSearchFilter, EntityFilter, RelationshipFi
 use locai::storage::models::{Entity, Relationship, MemoryGraph, MemoryPath};
 use locai::config::ConfigBuilder;
 use locai::LocaiError;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 // Define a shared structure for commands that need a MemoryManager
 struct LocaiCliContext {
@@ -31,6 +31,20 @@ impl LocaiCliContext {
     }
 }
 
+// Helper function to output errors in the appropriate format
+fn output_error(error_msg: &str, output_format: &str) {
+    if output_format == "json" {
+        let error_response = json!({
+            "error": true,
+            "message": error_msg,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+        println!("{}", serde_json::to_string_pretty(&error_response).unwrap_or_else(|_| "{}".to_string()));
+    } else {
+        error!("{}", error_msg);
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "locai-cli")]
 #[command(about = "Locai memory service CLI", long_about = None)]
@@ -40,13 +54,21 @@ struct Cli {
     #[arg(long, short, global = true)]
     data_dir: Option<String>,
 
-    /// Output format (table, json)
+    /// Output format (table, json) - use json for tool integration
     #[arg(long, short, default_value = "table", global = true)]
     output: String,
 
-    /// Verbose output
+    /// Use machine-readable output (alias for --output json)
+    #[arg(long, global = true)]
+    machine: bool,
+
+    /// Verbose output (debug level logging)
     #[arg(long, short, global = true)]
     verbose: bool,
+
+    /// Quiet mode (suppress all logging output)
+    #[arg(long, short, global = true)]
+    quiet: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -83,15 +105,18 @@ enum Commands {
 #[derive(Subcommand)]
 enum MemoryCommands {
     /// Add a new memory
+    #[command(alias = "remember")]
     Add(AddMemoryArgs),
     
     /// Get a memory by ID
     Get(GetMemoryArgs),
     
     /// Search for memories
+    #[command(alias = "recall")]
     Search(SearchArgs),
     
     /// Delete a memory by ID
+    #[command(alias = "forget")]
     Delete(DeleteMemoryArgs),
     
     /// List memories with optional filters
@@ -192,8 +217,8 @@ struct SearchArgs {
     #[arg(short, long, default_value_t = 10)]
     limit: usize,
     
-    /// Search mode (semantic, keyword)
-    #[arg(long, short, default_value = "semantic")]
+    /// Search mode (text, vector, hybrid, keyword, bm25)
+    #[arg(long, short, default_value = "text")]
     mode: String,
     
     /// Similarity threshold (0.0 to 1.0)
@@ -407,8 +432,28 @@ struct ConnectedArgs {
 async fn main() -> locai::Result<()> {
     let cli_args = Cli::parse();
 
-    // Initialize logging based on verbosity
-    let log_level = if cli_args.verbose { Level::DEBUG } else { Level::INFO };
+    // Determine output format - priority: machine flag > env var > cli arg > default
+    let output_format = if cli_args.machine {
+        "json".to_string()
+    } else if let Ok(env_output) = std::env::var("LOCAI_OUTPUT") {
+        env_output
+    } else {
+        cli_args.output.clone()
+    };
+
+    // Override quiet flag with environment variable if set
+    let is_quiet = cli_args.quiet || std::env::var("LOCAI_QUIET").map(|v| v == "true" || v == "1").unwrap_or(false);
+
+    // Initialize logging based on verbosity and quiet mode
+    // Machine mode automatically enables quiet mode for clean JSON output
+    let log_level = if is_quiet || cli_args.machine {
+        Level::ERROR  // Only show critical errors
+    } else if cli_args.verbose {
+        Level::DEBUG  // Show everything when verbose
+    } else {
+        Level::WARN   // Default to warnings only
+    };
+    
     tracing_subscriber::fmt()
         .with_max_level(log_level)
         .init();
@@ -445,7 +490,7 @@ async fn main() -> locai::Result<()> {
                 // Get storage metadata
                 match ctx.memory_manager.storage().get_metadata().await {
                     Ok(metadata) => {
-                        if cli_args.output == "json" {
+                        if output_format == "json" {
                             println!("{}", serde_json::to_string_pretty(&metadata).unwrap_or_else(|_| "{}".to_string()));
                         } else {
                             println!("Storage metadata: {}", metadata);
@@ -458,25 +503,25 @@ async fn main() -> locai::Result<()> {
         
         Commands::Memory(memory_cmd) => {
             if let Some(ctx) = context {
-                handle_memory_command(memory_cmd, &ctx, &cli_args.output).await?;
+                handle_memory_command(memory_cmd, &ctx, &output_format).await?;
             }
         }
         
         Commands::Entity(entity_cmd) => {
             if let Some(ctx) = context {
-                handle_entity_command(entity_cmd, &ctx, &cli_args.output).await?;
+                handle_entity_command(entity_cmd, &ctx, &output_format).await?;
             }
         }
         
         Commands::Relationship(rel_cmd) => {
             if let Some(ctx) = context {
-                handle_relationship_command(rel_cmd, &ctx, &cli_args.output).await?;
+                handle_relationship_command(rel_cmd, &ctx, &output_format).await?;
             }
         }
         
         Commands::Graph(graph_cmd) => {
             if let Some(ctx) = context {
-                handle_graph_command(graph_cmd, &ctx, &cli_args.output).await?;
+                handle_graph_command(graph_cmd, &ctx, &output_format).await?;
             }
         }
         
@@ -547,8 +592,9 @@ async fn handle_memory_command(
             let search_mode = match args.mode.as_str() {
                 "vector" => SearchMode::Vector,
                 "hybrid" => SearchMode::Hybrid,
-                "semantic" => SearchMode::Vector, // Legacy compatibility
-                _ => SearchMode::Text,
+                "semantic" => SearchMode::Vector, // Requires embeddings
+                "text" | "keyword" | "bm25" => SearchMode::Text,
+                _ => SearchMode::Text, // Default to BM25 text search
             };
             
             // Create search filter
@@ -590,7 +636,7 @@ async fn handle_memory_command(
                     }
                 }
                 Err(e) => {
-                    error!("Search failed: {}", e);
+                    output_error(&format!("Search failed: {}", e), output_format);
                 }
             }
         }
