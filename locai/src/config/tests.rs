@@ -16,7 +16,7 @@ mod tests {
             config.storage.vector.storage_type,
             VectorStorageType::SurrealDB
         );
-        assert_eq!(config.ml.embedding.model_name, "BAAI/bge-small-en");
+        assert_eq!(config.ml.embedding.model_name, "text-embedding-3-small");
         assert_eq!(config.logging.level, LogLevel::Info);
     }
 

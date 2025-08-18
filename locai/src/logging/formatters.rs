@@ -9,6 +9,7 @@ use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields, format};
 use tracing_subscriber::registry::LookupSpan;
 
 /// Custom formatter for development that emphasizes readability.
+#[allow(dead_code)]
 pub struct DevelopmentFormatter;
 
 impl<S, N> FormatEvent<S, N> for DevelopmentFormatter
@@ -64,6 +65,7 @@ where
 }
 
 /// Formatter that produces detailed JSON output for production and analysis.
+#[allow(dead_code)]
 pub struct DetailedJsonFormatter;
 
 impl<S, N> FormatEvent<S, N> for DetailedJsonFormatter

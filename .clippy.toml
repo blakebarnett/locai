@@ -1,1 +1,20 @@
-doc-valid-idents = ["SurrealDB", "Locai"] 
+# Clippy Configuration for Locai Project
+# This file defines the linting rules and preferences for consistent code quality
+
+# Set complexity thresholds
+cognitive-complexity-threshold = 30
+type-complexity-threshold = 250
+
+# Documentation
+doc-valid-idents = [
+    "locai", "Locai", "API", "CLI", "TUI", "SurrealDB", "AI", "ML", "JSON", "UUID", "HTTP", "WebSocket"
+]
+
+# Performance and style preferences
+avoid-breaking-exported-api = true
+enum-variant-name-threshold = 3
+max-trait-bounds = 3
+max-fn-params-bools = 3
+
+# Allow certain patterns that are common in this codebase
+allowed-idents-below-min-chars = ["id", "db", "ai", "ml", "ui"] 

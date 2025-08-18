@@ -46,17 +46,25 @@ fn configure_rocksdb(_target: &str, target_os: &str, target_arch: &str) {
                 }
             }
 
-            // Use LLD linker for faster linking on x86_64 Linux
-            println!("cargo:rustc-link-arg=-fuse-ld=lld");
+            // Use LLD linker for faster linking on x86_64 Linux if available
+            if which::which("ld.lld").is_ok() {
+                println!("cargo:rustc-link-arg=-fuse-ld=lld");
+                println!("cargo:warning=Using LLD linker for faster builds");
+            } else {
+                println!("cargo:warning=LLD not available, using default linker");
+            }
         }
 
         ("linux", "aarch64") => {
             // ARM64 Linux: Usually auto-detects correctly
             println!("cargo:warning=ARM64 Linux detected - using default RocksDB configuration");
 
-            // Try to use LLD if available
+            // Try to use LLD if available for ARM64 Linux
             if which::which("ld.lld").is_ok() {
                 println!("cargo:rustc-link-arg=-fuse-ld=lld");
+                println!("cargo:warning=Using LLD linker for ARM64 builds");
+            } else {
+                println!("cargo:warning=LLD not available, using default linker");
             }
         }
 

@@ -1,7 +1,9 @@
 use clap::{Args, Parser, Subcommand};
+use colored::*;
 use locai::LocaiError;
 use locai::config::ConfigBuilder;
 use locai::memory::search_extensions::SearchMode;
+use locai::models::{MemoryPriority, MemoryType};
 use locai::prelude::*;
 use locai::storage::filters::{
     EntityFilter, MemoryFilter, RelationshipFilter, SemanticSearchFilter,
@@ -472,7 +474,12 @@ async fn main() -> locai::Result<()> {
 
     match cli_args.command {
         Commands::Version => {
-            println!("Locai CLI v{}", locai::VERSION);
+            println!(
+                "{} {} {}",
+                "Locai CLI".color(CliColors::accent()).bold(),
+                "v".color(CliColors::muted()),
+                locai::VERSION.color(CliColors::success()).bold()
+            );
         }
 
         Commands::Diagnose => {
@@ -481,18 +488,18 @@ async fn main() -> locai::Result<()> {
 
                 // Check storage health
                 match ctx.memory_manager.storage().health_check().await {
-                    Ok(true) => println!("✓ Storage: Healthy"),
-                    Ok(false) => println!("✗ Storage: Unhealthy"),
-                    Err(e) => println!("✗ Storage: Error - {}", e),
+                    Ok(true) => println!("{}", format_success("Storage: Healthy")),
+                    Ok(false) => println!("{}", format_error("Storage: Unhealthy")),
+                    Err(e) => println!("{}", format_error(&format!("Storage: Error - {}", e))),
                 }
 
                 // Check if ML service is available
                 if ctx.memory_manager.config().ml.embedding.service_type
                     == locai::config::EmbeddingServiceType::Local
                 {
-                    println!("✓ ML Service: Enabled (Local)");
+                    println!("{}", format_success("ML Service: Enabled (Local)"));
                 } else {
-                    println!("✓ ML Service: Enabled (Remote)");
+                    println!("{}", format_success("ML Service: Enabled (Remote)"));
                 }
 
                 // Get storage metadata
@@ -548,9 +555,9 @@ async fn main() -> locai::Result<()> {
                 }
                 if input.trim() == "yes" {
                     ctx.memory_manager.clear_storage().await?;
-                    println!("Storage cleared successfully.");
+                    println!("{}", format_success("Storage cleared successfully."));
                 } else {
-                    println!("Operation cancelled.");
+                    println!("{}", format_info("Operation cancelled."));
                 }
             }
         }
@@ -587,7 +594,13 @@ async fn handle_memory_command(
                     serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
                 );
             } else {
-                println!("Memory created with ID: {}", memory_id);
+                println!(
+                    "{}",
+                    format_success(&format!(
+                        "Memory created with ID: {}",
+                        memory_id.color(CliColors::accent()).bold()
+                    ))
+                );
             }
         }
 
@@ -603,7 +616,13 @@ async fn handle_memory_command(
                 }
             }
             None => {
-                println!("Memory with ID '{}' not found.", args.id);
+                println!(
+                    "{}",
+                    format_warning(&format!(
+                        "Memory with ID '{}' not found.",
+                        args.id.color(CliColors::accent())
+                    ))
+                );
             }
         },
 
@@ -649,14 +668,31 @@ async fn handle_memory_command(
                                 .unwrap_or_else(|_| "{}".to_string())
                         );
                     } else if results.is_empty() {
-                        println!("No memories found matching '{}'", args.query);
+                        println!(
+                            "{}",
+                            format_info(&format!(
+                                "No memories found matching '{}'",
+                                args.query.color(CliColors::accent())
+                            ))
+                        );
                     } else {
-                        println!("Found {} memories:", results.len());
+                        println!(
+                            "{} (query: {})",
+                            format_info(&format!("Found {} memories:", results.len())),
+                            args.query.color(CliColors::accent()).italic()
+                        );
                         for (i, result) in results.iter().enumerate() {
+                            let score = result.score.unwrap_or(0.0);
+                            let (score_label, score_color) = match score {
+                                s if s > 1.4 => ("Excellent", CliColors::success()),
+                                s if s > 1.2 => ("Good", CliColors::info()),
+                                s if s > 1.0 => ("Fair", CliColors::warning()),
+                                _ => ("Weak", CliColors::muted()),
+                            };
                             println!(
-                                "{}. [Score: {:.3}] {}",
-                                i + 1,
-                                result.score.unwrap_or(0.0),
+                                "{}. {} {}",
+                                format!("{}", i + 1).color(CliColors::muted()),
+                                format!("[{} match: {:.2}]", score_label, score).color(score_color),
                                 result.memory.content
                             );
                         }
@@ -669,8 +705,20 @@ async fn handle_memory_command(
         }
 
         MemoryCommands::Delete(args) => match ctx.memory_manager.delete_memory(&args.id).await? {
-            true => println!("Memory '{}' deleted successfully.", args.id),
-            false => println!("Memory '{}' not found or could not be deleted.", args.id),
+            true => println!(
+                "{}",
+                format_success(&format!(
+                    "Memory '{}' deleted successfully.",
+                    args.id.color(CliColors::accent())
+                ))
+            ),
+            false => println!(
+                "{}",
+                format_warning(&format!(
+                    "Memory '{}' not found or could not be deleted.",
+                    args.id.color(CliColors::accent())
+                ))
+            ),
         },
 
         MemoryCommands::List(args) => {
@@ -1019,6 +1067,148 @@ async fn handle_graph_command(
     Ok(())
 }
 
+// Color constants matching web app theme
+struct CliColors;
+
+impl CliColors {
+    // Status colors (same as web app)
+    fn success() -> Color {
+        Color::TrueColor {
+            r: 34,
+            g: 197,
+            b: 94,
+        }
+    } // #22c55e
+    fn error() -> Color {
+        Color::TrueColor {
+            r: 239,
+            g: 68,
+            b: 68,
+        }
+    } // #ef4444
+    fn warning() -> Color {
+        Color::TrueColor {
+            r: 245,
+            g: 158,
+            b: 11,
+        }
+    } // #f59e0b
+    fn info() -> Color {
+        Color::TrueColor {
+            r: 59,
+            g: 130,
+            b: 246,
+        }
+    } // #3b82f6
+
+    // Memory type colors (same as web app nodes)
+    fn memory_fact() -> Color {
+        Color::TrueColor {
+            r: 59,
+            g: 130,
+            b: 246,
+        }
+    } // #3b82f6
+    fn memory_episodic() -> Color {
+        Color::TrueColor {
+            r: 34,
+            g: 197,
+            b: 94,
+        }
+    } // #22c55e
+    fn memory_semantic() -> Color {
+        Color::TrueColor {
+            r: 168,
+            g: 85,
+            b: 247,
+        }
+    } // #a855f7
+    fn entity() -> Color {
+        Color::TrueColor {
+            r: 245,
+            g: 158,
+            b: 11,
+        }
+    } // #f59e0b
+
+    // Text colors
+    fn muted() -> Color {
+        Color::TrueColor {
+            r: 148,
+            g: 163,
+            b: 184,
+        }
+    } // #94a3b8
+    fn primary() -> Color {
+        Color::White
+    }
+    fn accent() -> Color {
+        Color::TrueColor {
+            r: 59,
+            g: 130,
+            b: 246,
+        }
+    } // #3b82f6
+}
+
+// Utility functions for styled output
+fn format_success(msg: &str) -> String {
+    format!(
+        "{} {}",
+        "✓".color(CliColors::success()).bold(),
+        msg.color(CliColors::success())
+    )
+}
+
+fn format_error(msg: &str) -> String {
+    format!(
+        "{} {}",
+        "✗".color(CliColors::error()).bold(),
+        msg.color(CliColors::error())
+    )
+}
+
+fn format_warning(msg: &str) -> String {
+    format!(
+        "{} {}",
+        "⚠".color(CliColors::warning()).bold(),
+        msg.color(CliColors::warning())
+    )
+}
+
+fn format_info(msg: &str) -> String {
+    format!(
+        "{} {}",
+        "ℹ".color(CliColors::info()).bold(),
+        msg.color(CliColors::info())
+    )
+}
+
+fn format_memory_type(memory_type: &MemoryType) -> ColoredString {
+    match memory_type {
+        MemoryType::Fact => "Fact".color(CliColors::memory_fact()),
+        MemoryType::Episodic => "Episodic".color(CliColors::memory_episodic()),
+        MemoryType::Procedural
+        | MemoryType::World
+        | MemoryType::Action
+        | MemoryType::Event
+        | MemoryType::Wisdom => format!("{:?}", memory_type).color(CliColors::memory_semantic()),
+        MemoryType::Conversation | MemoryType::Identity => {
+            format!("{:?}", memory_type).color(CliColors::memory_episodic())
+        }
+        MemoryType::Custom(name) => name.color(CliColors::memory_semantic()),
+    }
+}
+
+fn format_priority(priority: &MemoryPriority) -> ColoredString {
+    match priority {
+        MemoryPriority::Critical => "Critical".color(CliColors::error()).bold(),
+        MemoryPriority::High => "High".color(CliColors::warning()),
+        MemoryPriority::Normal => "Normal".color(CliColors::muted()),
+        MemoryPriority::Low => "Low".color(CliColors::muted()).dimmed(),
+    }
+}
+
 // Helper functions for parsing and printing
 
 fn parse_memory_type(type_str: &str) -> locai::Result<MemoryType> {
@@ -1052,38 +1242,92 @@ fn parse_priority(priority_str: &str) -> locai::Result<MemoryPriority> {
 }
 
 fn print_memory(memory: &Memory) {
-    println!("--- Memory Details ---");
-    println!("ID: {}", memory.id);
-    println!("Type: {:?}", memory.memory_type);
-    println!("Priority: {:?}", memory.priority);
-    println!("Content: {}", memory.content);
     println!(
-        "Created: {}",
-        memory.created_at.format("%Y-%m-%d %H:%M:%S UTC")
+        "{}",
+        "━━━ Memory Details ━━━".color(CliColors::accent()).bold()
+    );
+    println!(
+        "{}: {}",
+        "ID".color(CliColors::muted()),
+        memory.id.color(CliColors::accent()).bold()
+    );
+    println!(
+        "{}: {}",
+        "Type".color(CliColors::muted()),
+        format_memory_type(&memory.memory_type)
+    );
+    println!(
+        "{}: {}",
+        "Priority".color(CliColors::muted()),
+        format_priority(&memory.priority)
+    );
+    println!(
+        "{}: {}",
+        "Content".color(CliColors::muted()),
+        memory.content
+    );
+    println!(
+        "{}: {}",
+        "Created".color(CliColors::muted()),
+        memory
+            .created_at
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string()
+            .color(CliColors::primary())
     );
     if let Some(last_accessed) = memory.last_accessed {
         println!(
-            "Last Accessed: {}",
-            last_accessed.format("%Y-%m-%d %H:%M:%S UTC")
+            "{}: {}",
+            "Last Accessed".color(CliColors::muted()),
+            last_accessed
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string()
+                .color(CliColors::primary())
         );
     }
     if !memory.tags.is_empty() {
-        println!("Tags: {}", memory.tags.join(", "));
+        println!(
+            "{}: {}",
+            "Tags".color(CliColors::muted()),
+            memory
+                .tags
+                .iter()
+                .map(|tag| format!("#{}", tag))
+                .collect::<Vec<_>>()
+                .join(" ")
+                .color(CliColors::info())
+        );
     }
     if memory.embedding.is_some() {
-        println!("Has Embedding: Yes");
+        println!(
+            "{}: {}",
+            "Has Embedding".color(CliColors::muted()),
+            "Yes".color(CliColors::success())
+        );
     }
 }
 
 fn print_memory_list(memories: &[Memory]) {
     if memories.is_empty() {
-        println!("No memories found.");
+        println!("{}", format_info("No memories found."));
         return;
     }
 
-    println!("Found {} memories:", memories.len());
-    println!("{:<36} {:<15} {:<8} Content", "ID", "Type", "Priority");
-    println!("{}", "-".repeat(80));
+    println!(
+        "{}",
+        format_info(&format!("Found {} memories:", memories.len()))
+    );
+    println!();
+
+    // Print header with colors
+    println!(
+        "{:<36} {:<15} {:<10} {}",
+        "ID".color(CliColors::muted()).bold(),
+        "Type".color(CliColors::muted()).bold(),
+        "Priority".color(CliColors::muted()).bold(),
+        "Content".color(CliColors::muted()).bold()
+    );
+    println!("{}", "─".repeat(80).color(CliColors::muted()));
 
     for memory in memories {
         let content = if memory.content.len() > 50 {
@@ -1093,104 +1337,214 @@ fn print_memory_list(memories: &[Memory]) {
         };
 
         println!(
-            "{:<36} {:<15} {:<8} {}",
-            memory.id,
-            format!("{:?}", memory.memory_type),
-            format!("{:?}", memory.priority),
-            content
+            "{:<36} {:<24} {:<18} {}",
+            memory.id.color(CliColors::accent()),
+            format_memory_type(&memory.memory_type),
+            format_priority(&memory.priority),
+            content.color(CliColors::primary())
         );
     }
 }
 
 fn print_entity(entity: &Entity) {
-    println!("--- Entity Details ---");
-    println!("ID: {}", entity.id);
-    println!("Type: {}", entity.entity_type);
     println!(
-        "Created: {}",
-        entity.created_at.format("%Y-%m-%d %H:%M:%S UTC")
+        "{}",
+        "━━━ Entity Details ━━━".color(CliColors::entity()).bold()
     );
     println!(
-        "Updated: {}",
-        entity.updated_at.format("%Y-%m-%d %H:%M:%S UTC")
+        "{}: {}",
+        "ID".color(CliColors::muted()),
+        entity.id.color(CliColors::entity()).bold()
+    );
+    println!(
+        "{}: {}",
+        "Type".color(CliColors::muted()),
+        entity.entity_type.color(CliColors::entity())
+    );
+    println!(
+        "{}: {}",
+        "Created".color(CliColors::muted()),
+        entity
+            .created_at
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string()
+            .color(CliColors::primary())
+    );
+    println!(
+        "{}: {}",
+        "Updated".color(CliColors::muted()),
+        entity
+            .updated_at
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string()
+            .color(CliColors::primary())
     );
     if entity.properties != Value::Null {
         println!(
-            "Properties: {}",
-            serde_json::to_string_pretty(&entity.properties).unwrap_or_default()
+            "{}: {}",
+            "Properties".color(CliColors::muted()),
+            serde_json::to_string_pretty(&entity.properties)
+                .unwrap_or_default()
+                .color(CliColors::primary())
         );
     }
 }
 
 fn print_entity_list(entities: &[Entity]) {
     if entities.is_empty() {
-        println!("No entities found.");
+        println!("{}", format_info("No entities found."));
         return;
     }
 
-    println!("Found {} entities:", entities.len());
-    println!("{:<36} {:<20}", "ID", "Type");
-    println!("{}", "-".repeat(60));
+    println!(
+        "{}",
+        format_info(&format!("Found {} entities:", entities.len()))
+    );
+    println!();
+
+    println!(
+        "{:<36} {}",
+        "ID".color(CliColors::muted()).bold(),
+        "Type".color(CliColors::muted()).bold()
+    );
+    println!("{}", "─".repeat(60).color(CliColors::muted()));
 
     for entity in entities {
-        println!("{:<36} {:<20}", entity.id, entity.entity_type);
+        println!(
+            "{:<36} {}",
+            entity.id.color(CliColors::accent()),
+            entity.entity_type.color(CliColors::entity())
+        );
     }
 }
 
 fn print_relationship(relationship: &Relationship) {
-    println!("--- Relationship Details ---");
-    println!("ID: {}", relationship.id);
-    println!("Source: {}", relationship.source_id);
-    println!("Target: {}", relationship.target_id);
-    println!("Type: {}", relationship.relationship_type);
     println!(
-        "Created: {}",
-        relationship.created_at.format("%Y-%m-%d %H:%M:%S UTC")
+        "{}",
+        "━━━ Relationship Details ━━━"
+            .color(CliColors::info())
+            .bold()
+    );
+    println!(
+        "{}: {}",
+        "ID".color(CliColors::muted()),
+        relationship.id.color(CliColors::accent()).bold()
+    );
+    println!(
+        "{}: {}",
+        "Source".color(CliColors::muted()),
+        relationship.source_id.color(CliColors::accent())
+    );
+    println!(
+        "{}: {}",
+        "Target".color(CliColors::muted()),
+        relationship.target_id.color(CliColors::accent())
+    );
+    println!(
+        "{}: {}",
+        "Type".color(CliColors::muted()),
+        relationship.relationship_type.color(CliColors::info())
+    );
+    println!(
+        "{}: {}",
+        "Created".color(CliColors::muted()),
+        relationship
+            .created_at
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string()
+            .color(CliColors::primary())
     );
     if relationship.properties != Value::Null {
         println!(
-            "Properties: {}",
-            serde_json::to_string_pretty(&relationship.properties).unwrap_or_default()
+            "{}: {}",
+            "Properties".color(CliColors::muted()),
+            serde_json::to_string_pretty(&relationship.properties)
+                .unwrap_or_default()
+                .color(CliColors::primary())
         );
     }
 }
 
 fn print_relationship_list(relationships: &[Relationship]) {
     if relationships.is_empty() {
-        println!("No relationships found.");
+        println!("{}", format_info("No relationships found."));
         return;
     }
 
-    println!("Found {} relationships:", relationships.len());
-    println!("{:<20} {:<36} {:<36} ID", "Type", "Source", "Target");
-    println!("{}", "-".repeat(120));
+    println!(
+        "{}",
+        format_info(&format!("Found {} relationships:", relationships.len()))
+    );
+    println!();
+
+    println!(
+        "{:<20} {:<36} {:<36} {}",
+        "Type".color(CliColors::muted()).bold(),
+        "Source".color(CliColors::muted()).bold(),
+        "Target".color(CliColors::muted()).bold(),
+        "ID".color(CliColors::muted()).bold()
+    );
+    println!("{}", "─".repeat(120).color(CliColors::muted()));
 
     for rel in relationships {
         println!(
             "{:<20} {:<36} {:<36} {}",
-            rel.relationship_type, rel.source_id, rel.target_id, rel.id
+            rel.relationship_type.color(CliColors::info()),
+            rel.source_id.color(CliColors::accent()),
+            rel.target_id.color(CliColors::accent()),
+            rel.id.color(CliColors::muted())
         );
     }
 }
 
 fn print_memory_graph(graph: &MemoryGraph) {
-    println!("--- Memory Graph ---");
-    println!("Memories: {}", graph.memories.len());
-    println!("Relationships: {}", graph.relationships.len());
+    println!(
+        "{}",
+        "━━━ Memory Graph ━━━".color(CliColors::accent()).bold()
+    );
+    println!(
+        "{}: {}",
+        "Memories".color(CliColors::muted()),
+        graph.memories.len().to_string().color(CliColors::success())
+    );
+    println!(
+        "{}: {}",
+        "Relationships".color(CliColors::muted()),
+        graph
+            .relationships
+            .len()
+            .to_string()
+            .color(CliColors::info())
+    );
 
     if !graph.memories.is_empty() {
-        println!("\nMemories:");
-        for (id, memory) in &graph.memories {
-            println!("  {} [{:?}] {}", id, memory.memory_type, memory.content);
+        println!();
+        println!("{}", "Memories:".color(CliColors::primary()).bold());
+        for memory in graph.memories.values() {
+            let content = if memory.content.len() > 60 {
+                format!("{}...", &memory.content[..57])
+            } else {
+                memory.content.clone()
+            };
+            println!(
+                "  {} [{}] {}",
+                "●".color(CliColors::accent()),
+                format_memory_type(&memory.memory_type),
+                content.color(CliColors::primary())
+            );
         }
     }
 
     if !graph.relationships.is_empty() {
-        println!("\nRelationships:");
+        println!();
+        println!("{}", "Relationships:".color(CliColors::primary()).bold());
         for rel in &graph.relationships {
             println!(
-                "  {} --[{}]--> {}",
-                rel.source_id, rel.relationship_type, rel.target_id
+                "  {} {} {} {}",
+                rel.source_id.color(CliColors::accent()),
+                "→".color(CliColors::info()),
+                format!("[{}]", rel.relationship_type).color(CliColors::info()),
+                rel.target_id.color(CliColors::accent())
             );
         }
     }
@@ -1198,20 +1552,33 @@ fn print_memory_graph(graph: &MemoryGraph) {
 
 fn print_paths(paths: &[MemoryPath]) {
     if paths.is_empty() {
-        println!("No paths found.");
+        println!("{}", format_info("No paths found."));
         return;
     }
 
-    println!("Found {} paths:", paths.len());
+    println!("{}", format_info(&format!("Found {} paths:", paths.len())));
     for (i, path) in paths.iter().enumerate() {
-        println!("\nPath {}: {} steps", i + 1, path.memories.len());
+        println!();
+        println!(
+            "{} {} {}",
+            "Path".color(CliColors::primary()).bold(),
+            format!("{}", i + 1).color(CliColors::accent()).bold(),
+            format!("({} steps)", path.memories.len()).color(CliColors::muted())
+        );
         for (j, memory) in path.memories.iter().enumerate() {
             if j > 0 {
-                println!("  ↓");
+                println!("  {}", "↓".color(CliColors::info()));
             }
+            let content = if memory.content.len() > 60 {
+                format!("{}...", &memory.content[..57])
+            } else {
+                memory.content.clone()
+            };
             println!(
-                "  {} [{:?}] {}",
-                memory.id, memory.memory_type, memory.content
+                "  {} [{}] {}",
+                "●".color(CliColors::accent()),
+                format_memory_type(&memory.memory_type),
+                content.color(CliColors::primary())
             );
         }
     }

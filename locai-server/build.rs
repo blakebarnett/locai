@@ -20,13 +20,20 @@ fn main() {
             // Try to use LLD linker for faster linking
             if which::which("ld.lld").is_ok() {
                 println!("cargo:rustc-link-arg=-fuse-ld=lld");
+                println!("cargo:warning=Using LLD linker for server builds");
+            } else {
+                println!("cargo:warning=LLD not available, using default linker");
             }
         }
 
         ("linux", "aarch64") => {
             println!("cargo:warning=ARM64 Linux server build");
+            // Try to use LLD if available for ARM64 server builds
             if which::which("ld.lld").is_ok() {
                 println!("cargo:rustc-link-arg=-fuse-ld=lld");
+                println!("cargo:warning=Using LLD linker for ARM64 server builds");
+            } else {
+                println!("cargo:warning=LLD not available, using default linker");
             }
         }
 
