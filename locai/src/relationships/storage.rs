@@ -1,5 +1,5 @@
 //! Relationship storage operations
-//! 
+//!
 //! This module handles the low-level CRUD operations for relationships
 //! in the graph database, separate from the high-level relationship management.
 
@@ -25,12 +25,12 @@ impl RelationshipStorage {
     // This module focuses on memory-specific relationship operations and business logic
 
     /// Create a relationship between two memories
-    /// 
+    ///
     /// # Arguments
     /// * `source_id` - The ID of the source memory
     /// * `target_id` - The ID of the target memory
     /// * `relationship_type` - The type of relationship
-    /// 
+    ///
     /// # Returns
     /// Whether the relationship was created successfully
     pub async fn create_memory_relationship(
@@ -39,12 +39,22 @@ impl RelationshipStorage {
         target_id: &str,
         relationship_type: &str,
     ) -> Result<bool> {
-        tracing::debug!("Creating relationship: {} --[{}]--> {}", 
-                       source_id, relationship_type, target_id);
-        
+        tracing::debug!(
+            "Creating relationship: {} --[{}]--> {}",
+            source_id,
+            relationship_type,
+            target_id
+        );
+
         // Create relationship object
         let relationship = Relationship {
-            id: format!("{}_{}_{}_{}", source_id, relationship_type, target_id, chrono::Utc::now().timestamp()),
+            id: format!(
+                "{}_{}_{}_{}",
+                source_id,
+                relationship_type,
+                target_id,
+                chrono::Utc::now().timestamp()
+            ),
             source_id: source_id.to_string(),
             target_id: target_id.to_string(),
             relationship_type: relationship_type.to_string(),
@@ -52,28 +62,41 @@ impl RelationshipStorage {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
-        
+
         match self.storage.create_relationship(relationship).await {
             Ok(result) => {
-                tracing::debug!("Successfully created relationship: {} --[{}]--> {} (ID: {})", 
-                               source_id, relationship_type, target_id, result.id);
-                Ok(result.id.len() > 0)
-            },
+                tracing::debug!(
+                    "Successfully created relationship: {} --[{}]--> {} (ID: {})",
+                    source_id,
+                    relationship_type,
+                    target_id,
+                    result.id
+                );
+                Ok(!result.id.is_empty())
+            }
             Err(e) => {
-                tracing::error!("Failed to create relationship {} --[{}]--> {}: {}", 
-                               source_id, relationship_type, target_id, e);
-                Err(LocaiError::Storage(format!("Failed to create relationship: {}", e)))
+                tracing::error!(
+                    "Failed to create relationship {} --[{}]--> {}: {}",
+                    source_id,
+                    relationship_type,
+                    target_id,
+                    e
+                );
+                Err(LocaiError::Storage(format!(
+                    "Failed to create relationship: {}",
+                    e
+                )))
             }
         }
     }
 
     /// Create a bidirectional relationship between two memories
-    /// 
+    ///
     /// # Arguments
     /// * `memory_id1` - The ID of the first memory
     /// * `memory_id2` - The ID of the second memory
     /// * `relationship_type` - The type of relationship
-    /// 
+    ///
     /// # Returns
     /// Whether both relationships were created successfully
     pub async fn create_bidirectional_memory_relationship(
@@ -83,9 +106,13 @@ impl RelationshipStorage {
         relationship_type: &str,
     ) -> Result<bool> {
         // Create both directions
-        let forward = self.create_memory_relationship(memory_id1, memory_id2, relationship_type).await?;
-        let backward = self.create_memory_relationship(memory_id2, memory_id1, relationship_type).await?;
-        
+        let forward = self
+            .create_memory_relationship(memory_id1, memory_id2, relationship_type)
+            .await?;
+        let backward = self
+            .create_memory_relationship(memory_id2, memory_id1, relationship_type)
+            .await?;
+
         Ok(forward && backward)
     }
 
@@ -93,4 +120,4 @@ impl RelationshipStorage {
     pub fn storage(&self) -> &Arc<dyn GraphStore> {
         &self.storage
     }
-} 
+}

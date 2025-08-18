@@ -1,14 +1,17 @@
 //! Automatic relationship creation between memories based on shared entities and other criteria
-//! 
+//!
 //! This module provides functionality to automatically create relationships between memories
 //! that share entities, are temporally related, or have topic overlap.
 
 use crate::models::Memory;
-use crate::storage::{models::{Entity, Relationship}, traits::GraphStore};
+use crate::storage::{
+    models::{Entity, Relationship},
+    traits::GraphStore,
+};
 use crate::{LocaiError, Result};
 use serde::{Deserialize, Serialize};
 
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
 
 /// Configuration for automatic relationship creation
@@ -34,7 +37,7 @@ impl Default for AutomaticRelationshipConfig {
                 },
                 RelationshipMethod::TemporalProximity {
                     max_time_gap: Duration::minutes(30), // Longer time window
-                    same_source_only: false, // Allow cross-source relationships
+                    same_source_only: false,             // Allow cross-source relationships
                 },
                 RelationshipMethod::TopicOverlap {
                     min_overlap_ratio: 0.3, // Add topic-based relationships
@@ -50,18 +53,14 @@ impl Default for AutomaticRelationshipConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RelationshipMethod {
     /// Same entities mentioned in different memories
-    EntityCoreference {
-        min_entity_confidence: f32,
-    },
+    EntityCoreference { min_entity_confidence: f32 },
     /// Memories close in time from same source
     TemporalProximity {
         max_time_gap: Duration,
         same_source_only: bool,
     },
     /// Memories with overlapping tags/topics
-    TopicOverlap {
-        min_overlap_ratio: f32,
-    },
+    TopicOverlap { min_overlap_ratio: f32 },
 }
 
 /// Automatic relationship creator
@@ -97,14 +96,27 @@ impl AutomaticRelationshipCreator {
             }
 
             let relationships = match method {
-                RelationshipMethod::EntityCoreference { min_entity_confidence } => {
-                    self.find_entity_coreferences(memory_id, *min_entity_confidence, storage).await?
+                RelationshipMethod::EntityCoreference {
+                    min_entity_confidence,
+                } => {
+                    self.find_entity_coreferences(memory_id, *min_entity_confidence, storage)
+                        .await?
                 }
-                RelationshipMethod::TemporalProximity { max_time_gap, same_source_only } => {
-                    self.find_temporal_relationships(memory_id, *max_time_gap, *same_source_only, storage).await?
+                RelationshipMethod::TemporalProximity {
+                    max_time_gap,
+                    same_source_only,
+                } => {
+                    self.find_temporal_relationships(
+                        memory_id,
+                        *max_time_gap,
+                        *same_source_only,
+                        storage,
+                    )
+                    .await?
                 }
                 RelationshipMethod::TopicOverlap { min_overlap_ratio } => {
-                    self.find_topic_relationships(memory_id, *min_overlap_ratio, storage).await?
+                    self.find_topic_relationships(memory_id, *min_overlap_ratio, storage)
+                        .await?
                 }
             };
 
@@ -143,7 +155,9 @@ impl AutomaticRelationshipCreator {
         let mut relationships = Vec::new();
 
         // Get the memory
-        let memory = storage.get_memory(memory_id).await
+        let memory = storage
+            .get_memory(memory_id)
+            .await
             .map_err(|e| LocaiError::Storage(format!("Failed to get memory: {}", e)))?
             .ok_or_else(|| LocaiError::Memory(format!("Memory {} not found", memory_id)))?;
 
@@ -152,7 +166,8 @@ impl AutomaticRelationshipCreator {
 
         for entity in entities {
             // Skip low-confidence entities
-            let entity_confidence = entity.properties
+            let entity_confidence = entity
+                .properties
                 .get("confidence")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0) as f32;
@@ -162,7 +177,9 @@ impl AutomaticRelationshipCreator {
             }
 
             // Find other memories that mention this entity
-            let related_memories = self.find_memories_mentioning_entity(&entity.id, storage).await?;
+            let related_memories = self
+                .find_memories_mentioning_entity(&entity.id, storage)
+                .await?;
 
             for related_memory in related_memories {
                 if related_memory.id != memory_id {
@@ -178,10 +195,14 @@ impl AutomaticRelationshipCreator {
                         relationship_type: "entity_coreference".to_string(),
                         confidence,
                         evidence: RelationshipEvidence {
-                            description: format!("Both memories mention entity: {}", 
-                                entity.properties.get("name")
+                            description: format!(
+                                "Both memories mention entity: {}",
+                                entity
+                                    .properties
+                                    .get("name")
                                     .and_then(|v| v.as_str())
-                                    .unwrap_or("unknown")),
+                                    .unwrap_or("unknown")
+                            ),
                             supporting_data: serde_json::json!({
                                 "entity_id": entity.id,
                                 "entity_type": entity.entity_type,
@@ -210,7 +231,9 @@ impl AutomaticRelationshipCreator {
         let mut relationships = Vec::new();
 
         // Get the memory
-        let memory = storage.get_memory(memory_id).await
+        let memory = storage
+            .get_memory(memory_id)
+            .await
             .map_err(|e| LocaiError::Storage(format!("Failed to get memory: {}", e)))?
             .ok_or_else(|| LocaiError::Memory(format!("Memory {} not found", memory_id)))?;
 
@@ -218,12 +241,18 @@ impl AutomaticRelationshipCreator {
         let time_window_start = memory.created_at - max_time_gap;
         let time_window_end = memory.created_at + max_time_gap;
 
-        let nearby_memories = self.find_memories_in_time_range(
-            time_window_start,
-            time_window_end,
-            if same_source_only { Some(memory.source.as_str()) } else { None },
-            storage,
-        ).await?;
+        let nearby_memories = self
+            .find_memories_in_time_range(
+                time_window_start,
+                time_window_end,
+                if same_source_only {
+                    Some(memory.source.as_str())
+                } else {
+                    None
+                },
+                storage,
+            )
+            .await?;
 
         for nearby_memory in nearby_memories {
             if nearby_memory.id != memory_id {
@@ -236,8 +265,10 @@ impl AutomaticRelationshipCreator {
                     relationship_type: "temporal_sequence".to_string(),
                     confidence,
                     evidence: RelationshipEvidence {
-                        description: format!("Memories created within {} of each other", 
-                            format_duration(time_diff)),
+                        description: format!(
+                            "Memories created within {} of each other",
+                            format_duration(time_diff)
+                        ),
                         supporting_data: serde_json::json!({
                             "time_gap_seconds": time_diff.num_seconds(),
                             "max_gap_seconds": max_time_gap.num_seconds(),
@@ -264,7 +295,9 @@ impl AutomaticRelationshipCreator {
         let mut relationships = Vec::new();
 
         // Get the memory
-        let memory = storage.get_memory(memory_id).await
+        let memory = storage
+            .get_memory(memory_id)
+            .await
             .map_err(|e| LocaiError::Storage(format!("Failed to get memory: {}", e)))?
             .ok_or_else(|| LocaiError::Memory(format!("Memory {} not found", memory_id)))?;
 
@@ -273,14 +306,19 @@ impl AutomaticRelationshipCreator {
         }
 
         // Find memories with overlapping tags
-        let memories_with_tags = self.find_memories_with_overlapping_tags(&memory.tags, storage).await?;
+        let memories_with_tags = self
+            .find_memories_with_overlapping_tags(&memory.tags, storage)
+            .await?;
 
         for other_memory in memories_with_tags {
             if other_memory.id != memory_id {
-                let overlap_ratio = self.calculate_tag_overlap_ratio(&memory.tags, &other_memory.tags);
-                
+                let overlap_ratio =
+                    self.calculate_tag_overlap_ratio(&memory.tags, &other_memory.tags);
+
                 if overlap_ratio >= min_overlap_ratio {
-                    let common_tags: Vec<_> = memory.tags.iter()
+                    let common_tags: Vec<_> = memory
+                        .tags
+                        .iter()
                         .filter(|tag| other_memory.tags.contains(tag))
                         .cloned()
                         .collect();
@@ -291,15 +329,16 @@ impl AutomaticRelationshipCreator {
                         relationship_type: "topic_similarity".to_string(),
                         confidence: overlap_ratio,
                         evidence: RelationshipEvidence {
-                            description: format!("Memories share {} common tags", common_tags.len()),
+                            description: format!(
+                                "Memories share {} common tags",
+                                common_tags.len()
+                            ),
                             supporting_data: serde_json::json!({
                                 "common_tags": common_tags,
                                 "overlap_ratio": overlap_ratio
                             }),
                         },
-                        generation_method: GenerationMethod::TopicSimilarity {
-                            common_tags,
-                        },
+                        generation_method: GenerationMethod::TopicSimilarity { common_tags },
                     });
                 }
             }
@@ -323,8 +362,12 @@ impl AutomaticRelationshipCreator {
             ..Default::default()
         };
 
-        let relationships = storage.list_relationships(Some(filter), None, None).await
-            .map_err(|e| LocaiError::Storage(format!("Failed to find entity relationships: {}", e)))?;
+        let relationships = storage
+            .list_relationships(Some(filter), None, None)
+            .await
+            .map_err(|e| {
+                LocaiError::Storage(format!("Failed to find entity relationships: {}", e))
+            })?;
 
         let mut entities = Vec::new();
         for rel in relationships {
@@ -351,8 +394,12 @@ impl AutomaticRelationshipCreator {
             ..Default::default()
         };
 
-        let relationships = storage.list_relationships(Some(filter), None, None).await
-            .map_err(|e| LocaiError::Storage(format!("Failed to find memory relationships: {}", e)))?;
+        let relationships = storage
+            .list_relationships(Some(filter), None, None)
+            .await
+            .map_err(|e| {
+                LocaiError::Storage(format!("Failed to find memory relationships: {}", e))
+            })?;
 
         let mut memories = Vec::new();
         for rel in relationships {
@@ -384,8 +431,12 @@ impl AutomaticRelationshipCreator {
             filter.source = Some(source.to_string());
         }
 
-        storage.list_memories(Some(filter), Some(100), None).await
-            .map_err(|e| LocaiError::Storage(format!("Failed to find memories in time range: {}", e)))
+        storage
+            .list_memories(Some(filter), Some(100), None)
+            .await
+            .map_err(|e| {
+                LocaiError::Storage(format!("Failed to find memories in time range: {}", e))
+            })
     }
 
     /// Find memories with overlapping tags
@@ -401,7 +452,9 @@ impl AutomaticRelationshipCreator {
             ..Default::default()
         };
 
-        storage.list_memories(Some(filter), Some(100), None).await
+        storage
+            .list_memories(Some(filter), Some(100), None)
+            .await
             .map_err(|e| LocaiError::Storage(format!("Failed to find memories with tags: {}", e)))
     }
 
@@ -413,7 +466,8 @@ impl AutomaticRelationshipCreator {
         entity: &Entity,
     ) -> f32 {
         // Base confidence on entity confidence
-        let entity_confidence = entity.properties
+        let entity_confidence = entity
+            .properties
             .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.5) as f32;
@@ -438,9 +492,7 @@ impl AutomaticRelationshipCreator {
             return 0.0;
         }
 
-        let common_count = tags1.iter()
-            .filter(|tag| tags2.contains(tag))
-            .count();
+        let common_count = tags1.iter().filter(|tag| tags2.contains(tag)).count();
 
         let total_unique = tags1.len() + tags2.len() - common_count;
         if total_unique == 0 {
@@ -454,13 +506,19 @@ impl AutomaticRelationshipCreator {
     fn create_relationship_record(&self, potential: PotentialRelationship) -> Result<Relationship> {
         let mut properties = serde_json::Map::new();
         properties.insert("auto_generated".to_string(), serde_json::Value::Bool(true));
-        properties.insert("confidence".to_string(), 
-            serde_json::Value::Number(serde_json::Number::from_f64(potential.confidence as f64).unwrap()));
-        
-        let generation_method_value = serde_json::to_value(&potential.generation_method)
-            .map_err(|e| LocaiError::Other(format!("Failed to serialize generation method: {}", e)))?;
+        properties.insert(
+            "confidence".to_string(),
+            serde_json::Value::Number(
+                serde_json::Number::from_f64(potential.confidence as f64).unwrap(),
+            ),
+        );
+
+        let generation_method_value =
+            serde_json::to_value(&potential.generation_method).map_err(|e| {
+                LocaiError::Other(format!("Failed to serialize generation method: {}", e))
+            })?;
         properties.insert("generation_method".to_string(), generation_method_value);
-        
+
         let evidence_value = serde_json::to_value(&potential.evidence)
             .map_err(|e| LocaiError::Other(format!("Failed to serialize evidence: {}", e)))?;
         properties.insert("evidence".to_string(), evidence_value);
@@ -507,7 +565,7 @@ pub enum GenerationMethod {
 /// Format a duration for human readability
 fn format_duration(duration: Duration) -> String {
     let total_seconds = duration.num_seconds().abs();
-    
+
     if total_seconds < 60 {
         format!("{} seconds", total_seconds)
     } else if total_seconds < 3600 {
@@ -517,4 +575,4 @@ fn format_duration(duration: Duration) -> String {
     } else {
         format!("{} days", total_seconds / 86400)
     }
-} 
+}

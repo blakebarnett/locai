@@ -2,17 +2,17 @@
 //!
 //! This module provides validation functions for configuration values.
 
-use super::models::*;
 use super::ConfigError;
+use super::models::*;
 
 /// Validate the entire configuration.
 pub fn validate_config(config: &LocaiConfig) -> Result<(), ConfigError> {
     // Validate storage configuration
     validate_storage_config(&config.storage)?;
-    
+
     // Validate ML configuration
     validate_ml_config(&config.ml)?;
-    
+
     Ok(())
 }
 
@@ -24,7 +24,7 @@ fn validate_storage_config(config: &StorageConfig) -> Result<(), ConfigError> {
             "Data directory cannot be empty".to_string(),
         ));
     }
-    
+
     // Validate graph storage configuration
     match config.graph.storage_type {
         GraphStorageType::SurrealDB => {
@@ -41,7 +41,7 @@ fn validate_storage_config(config: &StorageConfig) -> Result<(), ConfigError> {
             }
         }
     }
-    
+
     // Validate vector storage configuration
     match config.vector.storage_type {
         VectorStorageType::SurrealDB => {
@@ -57,12 +57,12 @@ fn validate_storage_config(config: &StorageConfig) -> Result<(), ConfigError> {
                     "SurrealDB database cannot be empty".to_string(),
                 ));
             }
-        },
+        }
         VectorStorageType::Memory => {
             // No additional validation needed for memory storage
-        },
+        }
     }
-    
+
     Ok(())
 }
 
@@ -74,7 +74,7 @@ fn validate_ml_config(config: &MLConfig) -> Result<(), ConfigError> {
             "Model cache directory cannot be empty".to_string(),
         ));
     }
-    
+
     // Validate embedding configuration
     match config.embedding.model_type {
         EmbeddingModelType::OpenAI => {
@@ -84,15 +84,21 @@ fn validate_ml_config(config: &MLConfig) -> Result<(), ConfigError> {
                     "OpenAI model name cannot be empty".to_string(),
                 ));
             }
-            
+
             // Validate service URL for OpenAI
-            if config.embedding.service_type == EmbeddingServiceType::Remote {
-                if config.embedding.service_url.is_none() || 
-                   config.embedding.service_url.as_ref().unwrap().trim().is_empty() {
-                    return Err(ConfigError::ValidationError(
-                        "Service URL is required for remote OpenAI embedding service".to_string(),
-                    ));
-                }
+            if config.embedding.service_type == EmbeddingServiceType::Remote
+                && (config.embedding.service_url.is_none()
+                    || config
+                        .embedding
+                        .service_url
+                        .as_ref()
+                        .unwrap()
+                        .trim()
+                        .is_empty())
+            {
+                return Err(ConfigError::ValidationError(
+                    "Service URL is required for remote OpenAI embedding service".to_string(),
+                ));
             }
         }
         EmbeddingModelType::Cohere => {
@@ -102,15 +108,21 @@ fn validate_ml_config(config: &MLConfig) -> Result<(), ConfigError> {
                     "Cohere model name cannot be empty".to_string(),
                 ));
             }
-            
+
             // Validate service URL for Cohere
-            if config.embedding.service_type == EmbeddingServiceType::Remote {
-                if config.embedding.service_url.is_none() || 
-                   config.embedding.service_url.as_ref().unwrap().trim().is_empty() {
-                    return Err(ConfigError::ValidationError(
-                        "Service URL is required for remote Cohere embedding service".to_string(),
-                    ));
-                }
+            if config.embedding.service_type == EmbeddingServiceType::Remote
+                && (config.embedding.service_url.is_none()
+                    || config
+                        .embedding
+                        .service_url
+                        .as_ref()
+                        .unwrap()
+                        .trim()
+                        .is_empty())
+            {
+                return Err(ConfigError::ValidationError(
+                    "Service URL is required for remote Cohere embedding service".to_string(),
+                ));
             }
         }
         EmbeddingModelType::Custom => {
@@ -120,19 +132,23 @@ fn validate_ml_config(config: &MLConfig) -> Result<(), ConfigError> {
                     "Custom embedding model name cannot be empty".to_string(),
                 ));
             }
-            
-            if config.embedding.service_type == EmbeddingServiceType::Remote {
-                if config.embedding.service_url.is_none() || 
-                   config.embedding.service_url.as_ref().unwrap().trim().is_empty() {
-                    return Err(ConfigError::ValidationError(
-                        "Service URL is required for remote custom embedding service".to_string(),
-                    ));
-                }
+
+            if config.embedding.service_type == EmbeddingServiceType::Remote
+                && (config.embedding.service_url.is_none()
+                    || config
+                        .embedding
+                        .service_url
+                        .as_ref()
+                        .unwrap()
+                        .trim()
+                        .is_empty())
+            {
+                return Err(ConfigError::ValidationError(
+                    "Service URL is required for remote custom embedding service".to_string(),
+                ));
             }
         }
     }
-    
+
     Ok(())
 }
-
- 

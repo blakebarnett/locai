@@ -3,12 +3,12 @@
 //! Tracks memory evolution over time with sophisticated version management,
 //! personality evolution tracing, and campaign snapshot capabilities.
 
-use crate::models::{Memory, MemoryType};
-use crate::core::MemoryManager;
 use super::TimeRange;
+use crate::core::MemoryManager;
+use crate::models::{Memory, MemoryType};
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -28,7 +28,7 @@ impl MemoryVersionManager {
             retention_policy: RetentionPolicy::default(),
         }
     }
-    
+
     /// Track memory evolution over time
     pub async fn create_memory_version(
         &self,
@@ -46,11 +46,10 @@ impl MemoryVersionManager {
             created_at: Utc::now(),
             metadata: self.collect_version_metadata(memory_id).await?,
         };
-        
+
         // Store version as a special memory type
-        self.memory_manager.add_memory_with_options(
-            &format!("Version: {}", version.content),
-            |builder| {
+        self.memory_manager
+            .add_memory_with_options(&format!("Version: {}", version.content), |builder| {
                 builder
                     .memory_type(MemoryType::Identity)
                     .source("memory_versioning")
@@ -59,22 +58,19 @@ impl MemoryVersionManager {
                         &format!("original:{}", memory_id),
                         &format!("version_type:{:?}", version.version_type),
                     ])
-            }
-        ).await?;
-        
+            })
+            .await?;
+
         // Apply retention policy
         self.apply_retention_policy(memory_id).await?;
-        
+
         Ok(version)
     }
-    
+
     /// Get memory evolution history
-    pub async fn get_memory_evolution(
-        &self,
-        memory_id: &str,
-    ) -> Result<MemoryEvolution> {
+    pub async fn get_memory_evolution(&self, memory_id: &str) -> Result<MemoryEvolution> {
         let versions = self.get_memory_versions(memory_id).await?;
-        
+
         let evolution = MemoryEvolution {
             memory_id: memory_id.to_string(),
             original_version: versions.first().cloned(),
@@ -83,10 +79,10 @@ impl MemoryVersionManager {
             evolution_summary: self.analyze_evolution(&versions).await?,
             key_changes: self.identify_key_changes(&versions).await?,
         };
-        
+
         Ok(evolution)
     }
-    
+
     /// Track personality evolution through memory versions
     pub async fn track_personality_evolution(
         &self,
@@ -95,12 +91,12 @@ impl MemoryVersionManager {
     ) -> Result<PersonalityEvolutionTrace> {
         // Find all personality-related memories
         let personality_memories = self.find_memories_by_tag("personality", time_range).await?;
-        
+
         let mut evolution_points = Vec::new();
-        
+
         for memory in personality_memories {
             let evolution = self.get_memory_evolution(&memory.id).await?;
-            
+
             if evolution.has_significant_changes() {
                 evolution_points.push(PersonalityEvolutionPoint {
                     timestamp: memory.created_at,
@@ -110,14 +106,14 @@ impl MemoryVersionManager {
                 });
             }
         }
-        
+
         Ok(PersonalityEvolutionTrace {
             character_name: character_name.to_string(),
             evolution_points: evolution_points.clone(),
             overall_trajectory: self.calculate_personality_trajectory(&evolution_points)?,
         })
     }
-    
+
     /// Create memory snapshots for major campaign events
     pub async fn create_campaign_snapshot(
         &self,
@@ -126,14 +122,14 @@ impl MemoryVersionManager {
     ) -> Result<CampaignSnapshot> {
         let snapshot_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now();
-        
+
         let mut memory_snapshots = Vec::new();
-        
+
         for memory_id in affected_memories {
             let snapshot = self.create_snapshot(memory_id, &snapshot_id).await?;
             memory_snapshots.push(snapshot);
         }
-        
+
         let campaign_snapshot = CampaignSnapshot {
             snapshot_id,
             event_name: event_name.to_string(),
@@ -141,35 +137,37 @@ impl MemoryVersionManager {
             memory_snapshots,
             event_impact: self.analyze_event_impact(affected_memories).await?,
         };
-        
+
         Ok(campaign_snapshot)
     }
-    
+
     /// Get all versions of a memory
     async fn get_memory_versions(&self, memory_id: &str) -> Result<Vec<MemoryVersion>> {
-        let version_memories = self.memory_manager.search_memories(
-            &format!("original:{}", memory_id),
-            None
-        ).await?;
-        
+        let version_memories = self
+            .memory_manager
+            .search_memories(&format!("original:{}", memory_id), None)
+            .await?;
+
         let mut versions = Vec::new();
         for memory in version_memories {
             if let Some(version) = self.parse_memory_version(&memory)? {
                 versions.push(version);
             }
         }
-        
+
         versions.sort_by(|a, b| a.created_at.cmp(&b.created_at));
         Ok(versions)
     }
-    
+
     /// Collect metadata for version
     async fn collect_version_metadata(&self, memory_id: &str) -> Result<VersionMetadata> {
         // Get original memory
         let memories = self.memory_manager.search_memories(memory_id, None).await?;
-        let memory = memories.into_iter().next()
+        let memory = memories
+            .into_iter()
+            .next()
             .ok_or_else(|| anyhow::anyhow!("Memory not found: {}", memory_id))?;
-        
+
         let memory_type = memory.memory_type.clone();
         Ok(VersionMetadata {
             original_created_at: memory.created_at,
@@ -178,11 +176,11 @@ impl MemoryVersionManager {
             context: self.extract_context(&memory).await?,
         })
     }
-    
+
     /// Apply retention policy to limit version storage
     async fn apply_retention_policy(&self, memory_id: &str) -> Result<()> {
         let versions = self.get_memory_versions(memory_id).await?;
-        
+
         if versions.len() > self.retention_policy.max_versions {
             let excess_count = versions.len() - self.retention_policy.max_versions;
             for version in &versions[..excess_count] {
@@ -190,16 +188,16 @@ impl MemoryVersionManager {
                 tracing::debug!("Would delete version: {}", version.version_id);
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Analyze evolution patterns
     async fn analyze_evolution(&self, versions: &[MemoryVersion]) -> Result<String> {
         if versions.len() < 2 {
             return Ok("No significant evolution detected".to_string());
         }
-        
+
         let mut changes = Vec::new();
         for window in versions.windows(2) {
             if let [earlier, later] = window {
@@ -207,7 +205,7 @@ impl MemoryVersionManager {
                 changes.push(change);
             }
         }
-        
+
         let summary = if changes.iter().any(|c| c.contains("personality")) {
             "Significant personality evolution detected"
         } else if changes.iter().any(|c| c.contains("skill")) {
@@ -215,14 +213,14 @@ impl MemoryVersionManager {
         } else {
             "Gradual memory refinement over time"
         };
-        
+
         Ok(summary.to_string())
     }
-    
+
     /// Identify key changes in evolution
     async fn identify_key_changes(&self, versions: &[MemoryVersion]) -> Result<Vec<MemoryChange>> {
         let mut changes = Vec::new();
-        
+
         for window in versions.windows(2) {
             if let [earlier, later] = window {
                 let change_magnitude = self.calculate_change_magnitude(earlier, later);
@@ -239,27 +237,33 @@ impl MemoryVersionManager {
                 }
             }
         }
-        
+
         Ok(changes)
     }
-    
+
     /// Find memories by tag with optional time range
-    async fn find_memories_by_tag(&self, tag: &str, time_range: Option<TimeRange>) -> Result<Vec<Memory>> {
+    async fn find_memories_by_tag(
+        &self,
+        tag: &str,
+        time_range: Option<TimeRange>,
+    ) -> Result<Vec<Memory>> {
         let mut memories = self.memory_manager.find_memories_by_tag(tag, None).await?;
-        
+
         if let Some(range) = time_range {
             memories.retain(|m| m.created_at >= range.start && m.created_at <= range.end);
         }
-        
+
         Ok(memories)
     }
-    
+
     /// Create snapshot for memory
     async fn create_snapshot(&self, memory_id: &str, snapshot_id: &str) -> Result<MemorySnapshot> {
         let memories = self.memory_manager.search_memories(memory_id, None).await?;
-        let memory = memories.into_iter().next()
+        let memory = memories
+            .into_iter()
+            .next()
             .ok_or_else(|| anyhow::anyhow!("Memory not found: {}", memory_id))?;
-        
+
         Ok(MemorySnapshot {
             memory_id: memory.id.clone(),
             snapshot_id: snapshot_id.to_string(),
@@ -268,35 +272,39 @@ impl MemoryVersionManager {
             captured_at: Utc::now(),
         })
     }
-    
+
     /// Analyze event impact
     async fn analyze_event_impact(&self, affected_memories: &[String]) -> Result<EventImpact> {
         let impact_score = affected_memories.len() as f32 * 0.1;
-        
+
         Ok(EventImpact {
             affected_memory_count: affected_memories.len(),
             impact_score: impact_score.clamp(0.0, 1.0),
             impact_areas: vec!["character_development".to_string()],
         })
     }
-    
+
     /// Parse memory version from stored memory
     fn parse_memory_version(&self, memory: &Memory) -> Result<Option<MemoryVersion>> {
         if !memory.tags.contains(&"version".to_string()) {
             return Ok(None);
         }
-        
+
         // Extract version info from tags
-        let version_type = memory.tags.iter()
+        let version_type = memory
+            .tags
+            .iter()
             .find(|tag| tag.starts_with("version_type:"))
             .and_then(|tag| tag.strip_prefix("version_type:"))
             .unwrap_or("GradualEvolution");
-        
-        let memory_id = memory.tags.iter()
+
+        let memory_id = memory
+            .tags
+            .iter()
             .find(|tag| tag.starts_with("original:"))
             .and_then(|tag| tag.strip_prefix("original:"))
             .unwrap_or("unknown");
-        
+
         Ok(Some(MemoryVersion {
             version_id: memory.id.clone(),
             memory_id: memory_id.to_string(),
@@ -307,11 +315,13 @@ impl MemoryVersionManager {
             metadata: VersionMetadata::default(),
         }))
     }
-    
+
     /// Extract context from memory
     async fn extract_context(&self, memory: &Memory) -> Result<ContextInfo> {
         Ok(ContextInfo {
-            related_characters: memory.tags.iter()
+            related_characters: memory
+                .tags
+                .iter()
                 .filter(|tag| tag.starts_with("char_"))
                 .map(|tag| tag.strip_prefix("char_").unwrap_or("").to_string())
                 .collect(),
@@ -319,11 +329,11 @@ impl MemoryVersionManager {
             emotional_state: "neutral".to_string(),
         })
     }
-    
+
     /// Compare two versions
     fn compare_versions(&self, earlier: &MemoryVersion, later: &MemoryVersion) -> String {
         let content_diff = self.calculate_content_similarity(&earlier.content, &later.content);
-        
+
         if content_diff < 0.5 {
             "Major content change".to_string()
         } else if content_diff < 0.8 {
@@ -332,24 +342,29 @@ impl MemoryVersionManager {
             "Minor adjustment".to_string()
         }
     }
-    
+
     /// Calculate change magnitude
     fn calculate_change_magnitude(&self, earlier: &MemoryVersion, later: &MemoryVersion) -> f32 {
-        let content_similarity = self.calculate_content_similarity(&earlier.content, &later.content);
+        let content_similarity =
+            self.calculate_content_similarity(&earlier.content, &later.content);
         1.0 - content_similarity
     }
-    
+
     /// Calculate content similarity
     fn calculate_content_similarity(&self, content1: &str, content2: &str) -> f32 {
         let words1: std::collections::HashSet<_> = content1.split_whitespace().collect();
         let words2: std::collections::HashSet<_> = content2.split_whitespace().collect();
-        
+
         let intersection = words1.intersection(&words2).count();
         let union = words1.union(&words2).count();
-        
-        if union == 0 { 1.0 } else { intersection as f32 / union as f32 }
+
+        if union == 0 {
+            1.0
+        } else {
+            intersection as f32 / union as f32
+        }
     }
-    
+
     /// Classify change type
     fn classify_change_type(&self, earlier: &MemoryVersion, later: &MemoryVersion) -> ChangeType {
         match (&earlier.version_type, &later.version_type) {
@@ -360,14 +375,16 @@ impl MemoryVersionManager {
             _ => ChangeType::ContentUpdate,
         }
     }
-    
+
     /// Describe change
     fn describe_change(&self, earlier: &MemoryVersion, later: &MemoryVersion) -> String {
-        format!("Memory evolved from '{}' to '{}'", 
+        format!(
+            "Memory evolved from '{}' to '{}'",
             earlier.content.chars().take(50).collect::<String>(),
-            later.content.chars().take(50).collect::<String>())
+            later.content.chars().take(50).collect::<String>()
+        )
     }
-    
+
     /// Parse version type from string
     fn parse_version_type(&self, type_str: &str) -> VersionType {
         match type_str {
@@ -381,21 +398,29 @@ impl MemoryVersionManager {
             _ => VersionType::MemoryConsolidation,
         }
     }
-    
+
     /// Calculate personality impact
     async fn calculate_personality_impact(&self, evolution: &MemoryEvolution) -> Result<f32> {
         let change_count = evolution.key_changes.len() as f32;
         let avg_magnitude = if evolution.key_changes.is_empty() {
             0.0
         } else {
-            evolution.key_changes.iter().map(|c| c.magnitude).sum::<f32>() / change_count
+            evolution
+                .key_changes
+                .iter()
+                .map(|c| c.magnitude)
+                .sum::<f32>()
+                / change_count
         };
-        
+
         Ok((change_count * 0.1 + avg_magnitude * 0.5).clamp(0.0, 1.0))
     }
-    
+
     /// Calculate personality trajectory
-    fn calculate_personality_trajectory(&self, evolution_points: &[PersonalityEvolutionPoint]) -> Result<PersonalityTrajectory> {
+    fn calculate_personality_trajectory(
+        &self,
+        evolution_points: &[PersonalityEvolutionPoint],
+    ) -> Result<PersonalityTrajectory> {
         if evolution_points.is_empty() {
             return Ok(PersonalityTrajectory {
                 direction: TrajectoryDirection::Stable,
@@ -404,12 +429,14 @@ impl MemoryVersionManager {
                 predicted_next_changes: Vec::new(),
             });
         }
-        
+
         let recent_changes = evolution_points.len() as f32;
-        let avg_impact = evolution_points.iter()
+        let avg_impact = evolution_points
+            .iter()
             .map(|p| p.personality_impact)
-            .sum::<f32>() / evolution_points.len() as f32;
-        
+            .sum::<f32>()
+            / evolution_points.len() as f32;
+
         let direction = if avg_impact > 0.6 {
             TrajectoryDirection::Ascending
         } else if avg_impact < 0.3 {
@@ -417,7 +444,7 @@ impl MemoryVersionManager {
         } else {
             TrajectoryDirection::Stable
         };
-        
+
         Ok(PersonalityTrajectory {
             direction,
             velocity: recent_changes * 0.1,
@@ -540,9 +567,10 @@ impl MemoryEvolution {
     pub fn has_significant_changes(&self) -> bool {
         self.key_changes.iter().any(|c| c.magnitude > 0.5)
     }
-    
+
     pub fn get_trigger_events(&self) -> Vec<String> {
-        self.key_changes.iter()
+        self.key_changes
+            .iter()
             .map(|c| c.description.clone())
             .collect()
     }
@@ -632,4 +660,4 @@ pub struct EventImpact {
     pub affected_memory_count: usize,
     pub impact_score: f32,
     pub impact_areas: Vec<String>,
-} 
+}

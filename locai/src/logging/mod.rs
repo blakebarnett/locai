@@ -9,7 +9,7 @@ mod middleware;
 #[cfg(test)]
 mod tests;
 
-use crate::config::{LoggingConfig, LogLevel, LogFormat};
+use crate::config::{LogFormat, LogLevel, LoggingConfig};
 use std::path::Path;
 use tracing::Level;
 use tracing_appender::non_blocking::NonBlocking;
@@ -82,23 +82,21 @@ fn init_json_logging(level: Level, config: &LoggingConfig) -> Result<()> {
         .with_target(true)
         .with_line_number(true)
         .with_thread_ids(true);
-    
+
     if let Some(file_path) = &config.file {
         let (writer, _guard) = create_non_blocking_file(file_path)?;
-        
+
         if config.stdout {
-            subscriber.with_writer(std::io::stdout)
-                .try_init()?;
+            subscriber.with_writer(std::io::stdout).try_init()?;
             // Note: we can't easily log to both stdout and file with simple setup
             tracing::warn!("Configured for stdout only; file logging ignored");
         } else {
-            subscriber.with_writer(writer)
-                .try_init()?;
+            subscriber.with_writer(writer).try_init()?;
         }
     } else if config.stdout {
         subscriber.try_init()?;
     }
-    
+
     Ok(())
 }
 
@@ -111,23 +109,21 @@ fn init_compact_logging(level: Level, config: &LoggingConfig) -> Result<()> {
         .with_target(true)
         .with_line_number(true)
         .with_thread_ids(true);
-    
+
     if let Some(file_path) = &config.file {
         let (writer, _guard) = create_non_blocking_file(file_path)?;
-        
+
         if config.stdout {
-            subscriber.with_writer(std::io::stdout)
-                .try_init()?;
+            subscriber.with_writer(std::io::stdout).try_init()?;
             // Note: we can't easily log to both stdout and file with simple setup
             tracing::warn!("Configured for stdout only; file logging ignored");
         } else {
-            subscriber.with_writer(writer)
-                .try_init()?;
+            subscriber.with_writer(writer).try_init()?;
         }
     } else if config.stdout {
         subscriber.try_init()?;
     }
-    
+
     Ok(())
 }
 
@@ -140,46 +136,46 @@ fn init_pretty_logging(level: Level, config: &LoggingConfig) -> Result<()> {
         .with_target(true)
         .with_line_number(true)
         .with_thread_ids(true);
-    
+
     if let Some(file_path) = &config.file {
         let (writer, _guard) = create_non_blocking_file(file_path)?;
-        
+
         if config.stdout {
-            subscriber.with_writer(std::io::stdout)
-                .try_init()?;
+            subscriber.with_writer(std::io::stdout).try_init()?;
             // Note: we can't easily log to both stdout and file with simple setup
             tracing::warn!("Configured for stdout only; file logging ignored");
         } else {
-            subscriber.with_writer(writer)
-                .try_init()?;
+            subscriber.with_writer(writer).try_init()?;
         }
     } else if config.stdout {
         subscriber.try_init()?;
     }
-    
+
     Ok(())
 }
 
 /// Create a non-blocking file writer.
-fn create_non_blocking_file(path: impl AsRef<Path>) -> Result<(NonBlocking, tracing_appender::non_blocking::WorkerGuard)> {
+fn create_non_blocking_file(
+    path: impl AsRef<Path>,
+) -> Result<(NonBlocking, tracing_appender::non_blocking::WorkerGuard)> {
     let path = path.as_ref();
-    
+
     // Ensure the directory exists
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             std::fs::create_dir_all(parent)?;
         }
     }
-    
+
     // Create a rolling file appender
     let file_appender = tracing_appender::rolling::never(
         path.parent().unwrap_or_else(|| Path::new(".")),
         path.file_name().unwrap_or_default(),
     );
-    
+
     // Create a non-blocking writer
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-    
+
     Ok((non_blocking, guard))
 }
 
@@ -213,7 +209,7 @@ pub fn set_log_level(level: LogLevel) -> Result<()> {
     // For now we'll just log a message.
     let level_name = match level {
         LogLevel::Trace => "TRACE",
-        LogLevel::Debug => "DEBUG", 
+        LogLevel::Debug => "DEBUG",
         LogLevel::Info => "INFO",
         LogLevel::Warn => "WARN",
         LogLevel::Error => "ERROR",
@@ -253,4 +249,4 @@ impl std::fmt::Display for LogError {
     }
 }
 
-impl std::error::Error for LogError {} 
+impl std::error::Error for LogError {}

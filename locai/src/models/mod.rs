@@ -3,6 +3,6 @@
 pub mod memory;
 
 // Re-export important models
-pub use memory::{Memory, MemoryType, MemoryPriority, MemoryBuilder};
+pub use memory::{Memory, MemoryBuilder, MemoryPriority, MemoryType};
 
-// Placeholder for future implementation 
+// Placeholder for future implementation

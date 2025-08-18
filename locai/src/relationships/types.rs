@@ -1,8 +1,8 @@
 //! Generic relationship data structures
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 /// Generic relationship between two entities (agents, characters, etc.)
@@ -12,9 +12,9 @@ pub struct Relationship {
     pub entity_a: String,
     pub entity_b: String,
     pub relationship_type: RelationshipType,
-    pub intensity: f32,          // -1.0 (hostile) to 1.0 (close)
-    pub trust_level: f32,        // 0.0 (no trust) to 1.0 (complete trust)
-    pub familiarity: f32,        // 0.0 (strangers) to 1.0 (very familiar)
+    pub intensity: f32,   // -1.0 (hostile) to 1.0 (close)
+    pub trust_level: f32, // 0.0 (no trust) to 1.0 (complete trust)
+    pub familiarity: f32, // 0.0 (strangers) to 1.0 (very familiar)
     pub history: Vec<RelationshipEvent>,
     pub created_at: DateTime<Utc>,
     pub last_updated: DateTime<Utc>,
@@ -38,7 +38,7 @@ impl Relationship {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Get the other entity in this relationship
     pub fn get_other_entity(&self, entity: &str) -> Option<&str> {
         if self.entity_a == entity {
@@ -49,22 +49,23 @@ impl Relationship {
             None
         }
     }
-    
+
     /// Check if this relationship involves the given entity
     pub fn involves_entity(&self, entity: &str) -> bool {
         self.entity_a == entity || self.entity_b == entity
     }
-    
+
     /// Add an event to the relationship history
     pub fn add_event(&mut self, event: RelationshipEvent) {
         self.history.push(event);
         self.last_updated = Utc::now();
     }
-    
+
     /// Get recent events within the specified duration
     pub fn get_recent_events(&self, within_hours: i64) -> Vec<&RelationshipEvent> {
         let cutoff = Utc::now() - chrono::Duration::hours(within_hours);
-        self.history.iter()
+        self.history
+            .iter()
             .filter(|e| e.timestamp > cutoff)
             .collect()
     }
@@ -171,7 +172,7 @@ impl RelationshipImpact {
             relationship_type_shift: None,
         }
     }
-    
+
     /// Create a negative interaction impact
     pub fn negative_interaction(magnitude: f32) -> Self {
         Self {
@@ -181,7 +182,7 @@ impl RelationshipImpact {
             relationship_type_shift: None,
         }
     }
-    
+
     /// Create a shared experience impact
     pub fn shared_experience(magnitude: f32) -> Self {
         Self {
@@ -191,7 +192,7 @@ impl RelationshipImpact {
             relationship_type_shift: None,
         }
     }
-    
+
     /// Create a cooperation impact
     pub fn cooperation(magnitude: f32) -> Self {
         Self {
@@ -201,7 +202,7 @@ impl RelationshipImpact {
             relationship_type_shift: None,
         }
     }
-    
+
     /// Create a conflict impact
     pub fn conflict(magnitude: f32) -> Self {
         Self {
@@ -211,13 +212,13 @@ impl RelationshipImpact {
             relationship_type_shift: None,
         }
     }
-    
+
     /// Check if this impact has any relationship effect
     pub fn has_relationship_effect(&self) -> bool {
-        self.intensity_change.abs() > 0.01 ||
-        self.trust_change.abs() > 0.01 ||
-        self.familiarity_change.abs() > 0.01 ||
-        self.relationship_type_shift.is_some()
+        self.intensity_change.abs() > 0.01
+            || self.trust_change.abs() > 0.01
+            || self.familiarity_change.abs() > 0.01
+            || self.relationship_type_shift.is_some()
     }
 }
 
@@ -314,4 +315,4 @@ impl std::fmt::Display for InteractionStyle {
             InteractionStyle::Protective => write!(f, "Protective"),
         }
     }
-} 
+}

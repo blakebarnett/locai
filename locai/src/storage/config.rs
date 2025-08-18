@@ -1,9 +1,9 @@
 //! Configuration structures for storage backends
 
-use serde::{Serialize, Deserialize};
+use crate::storage::errors::StorageError;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use crate::storage::errors::StorageError;
 
 /// Supported graph storage backend types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -34,16 +34,16 @@ pub enum StorageConfig {
     /// SurrealDB storage configuration
     #[cfg(any(feature = "surrealdb-embedded", feature = "surrealdb-remote"))]
     SurrealDB(SurrealDBConfig),
-    
+
     /// Graph storage configuration
     Graph(GraphStorageConfig),
-    
+
     /// Vector storage configuration
     Vector(VectorStorageConfig),
-    
+
     /// Memory storage configuration
     Memory,
-    
+
     /// File storage configuration
     File(FileStorageConfig),
 }
@@ -53,19 +53,19 @@ pub enum StorageConfig {
 pub struct SurrealDBConfig {
     /// SurrealDB engine type
     pub engine: SurrealDBEngine,
-    
+
     /// Connection string for remote or path for embedded
     pub connection: String,
-    
+
     /// Namespace
     pub namespace: String,
-    
+
     /// Database name
     pub database: String,
-    
+
     /// Authentication information
     pub auth: Option<SurrealDBAuth>,
-    
+
     /// Common storage settings
     pub settings: Option<CommonStorageSettings>,
 }
@@ -88,16 +88,16 @@ pub enum SurrealDBEngine {
 pub struct SurrealDBAuth {
     /// Authentication type
     pub auth_type: SurrealDBAuthType,
-    
+
     /// Username (for root/namespace/database auth)
     pub username: Option<String>,
-    
+
     /// Password (for root/namespace/database auth)
     pub password: Option<String>,
-    
+
     /// Token (for JWT auth)
     pub token: Option<String>,
-    
+
     /// Scope (for scope auth)
     pub scope: Option<String>,
 }
@@ -122,13 +122,13 @@ pub enum SurrealDBAuthType {
 pub struct GraphStorageConfig {
     /// Graph storage backend type
     pub backend: GraphStorageType,
-    
+
     /// Connection string for the database
     pub connection_string: String,
-    
+
     /// Additional connection parameters
     pub params: HashMap<String, String>,
-    
+
     /// Authentication information
     pub auth: Option<StorageAuth>,
 }
@@ -138,13 +138,13 @@ pub struct GraphStorageConfig {
 pub struct VectorStorageConfig {
     /// Vector storage backend type
     pub backend: VectorStorageType,
-    
+
     /// Connection string for the database
     pub connection_string: String,
-    
+
     /// Authentication information
     pub auth: Option<StorageAuth>,
-    
+
     /// Common storage settings
     pub settings: Option<CommonStorageSettings>,
 }
@@ -154,11 +154,11 @@ pub struct VectorStorageConfig {
 pub struct CommonStorageSettings {
     /// Connection pool size
     pub pool_size: Option<usize>,
-    
+
     /// Connection timeout
     #[serde(with = "humantime_serde")]
     pub timeout: Option<Duration>,
-    
+
     /// Additional configuration parameters
     pub params: HashMap<String, String>,
 }
@@ -168,10 +168,10 @@ pub struct CommonStorageSettings {
 pub struct StorageAuth {
     /// Username for authentication
     pub username: Option<String>,
-    
+
     /// Password for authentication
     pub password: Option<String>,
-    
+
     /// Access token
     pub token: Option<String>,
 }
@@ -188,16 +188,16 @@ pub struct FileStorageConfig {
 pub enum StorageType {
     /// SurrealDB storage
     SurrealDB,
-    
+
     /// In-memory storage
     Memory,
-    
+
     /// File-based storage
     File,
-    
+
     /// Graph storage
     Graph,
-    
+
     /// Vector storage
     Vector,
 }
@@ -221,32 +221,44 @@ impl StorageConfig {
             #[cfg(any(feature = "surrealdb-embedded", feature = "surrealdb-remote"))]
             StorageConfig::SurrealDB(config) => {
                 if config.connection.is_empty() {
-                    return Err(StorageError::Configuration("SurrealDB connection string cannot be empty".to_string()));
+                    return Err(StorageError::Configuration(
+                        "SurrealDB connection string cannot be empty".to_string(),
+                    ));
                 }
                 if config.namespace.is_empty() {
-                    return Err(StorageError::Configuration("SurrealDB namespace cannot be empty".to_string()));
+                    return Err(StorageError::Configuration(
+                        "SurrealDB namespace cannot be empty".to_string(),
+                    ));
                 }
                 if config.database.is_empty() {
-                    return Err(StorageError::Configuration("SurrealDB database cannot be empty".to_string()));
+                    return Err(StorageError::Configuration(
+                        "SurrealDB database cannot be empty".to_string(),
+                    ));
                 }
                 Ok(())
             }
             StorageConfig::Graph(config) => {
                 if config.connection_string.is_empty() {
-                    return Err(StorageError::Configuration("Graph storage connection string cannot be empty".to_string()));
+                    return Err(StorageError::Configuration(
+                        "Graph storage connection string cannot be empty".to_string(),
+                    ));
                 }
                 Ok(())
             }
             StorageConfig::Vector(config) => {
                 if config.connection_string.is_empty() {
-                    return Err(StorageError::Configuration("Vector storage connection string cannot be empty".to_string()));
+                    return Err(StorageError::Configuration(
+                        "Vector storage connection string cannot be empty".to_string(),
+                    ));
                 }
                 Ok(())
             }
             StorageConfig::Memory => Ok(()),
             StorageConfig::File(config) => {
                 if config.base_dir.is_empty() {
-                    return Err(StorageError::Configuration("File storage base directory cannot be empty".to_string()));
+                    return Err(StorageError::Configuration(
+                        "File storage base directory cannot be empty".to_string(),
+                    ));
                 }
                 Ok(())
             }
@@ -278,4 +290,4 @@ impl Default for SurrealDBConfig {
             settings: None,
         }
     }
-} 
+}

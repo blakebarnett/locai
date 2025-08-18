@@ -8,8 +8,8 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use headers::{authorization::Bearer, Authorization, HeaderMapExt};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use headers::{Authorization, HeaderMapExt, authorization::Bearer};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -89,7 +89,7 @@ pub async fn auth_middleware(
     if !state.config.enable_auth {
         return Ok(next.run(request).await);
     }
-    
+
     // Skip authentication for public endpoints
     let path = request.uri().path();
     tracing::debug!("Checking auth for path: {}", path);
@@ -97,45 +97,44 @@ pub async fn auth_middleware(
         tracing::debug!("Path {} is public, skipping auth", path);
         return Ok(next.run(request).await);
     }
-    
+
     tracing::debug!("Path {} requires auth", path);
-    
+
     // Get authorization header
-    let auth_header = headers.typed_get::<Authorization<Bearer>>()
+    let auth_header = headers
+        .typed_get::<Authorization<Bearer>>()
         .ok_or_else(|| ServerError::Auth("Missing authorization header".to_string()))?;
-    
+
     // Validate and decode the JWT token
     let auth_context = validate_jwt_token(auth_header.token(), &state.config.jwt_secret)?;
-    
+
     // Insert auth context into request extensions
     request.extensions_mut().insert(auth_context);
-    
+
     // Continue with the request
     Ok(next.run(request).await)
 }
 
 /// Check if an endpoint is public (doesn't require authentication)
 fn is_public_endpoint(path: &str) -> bool {
-    matches!(path, 
-        "/health" | 
-        "/docs" | 
-        "/api-docs" |
-        "/auth/login" | 
-        "/auth/signup"
-    ) || path.starts_with("/docs") || path.starts_with("/api-docs")
+    matches!(
+        path,
+        "/health" | "/docs" | "/api-docs" | "/auth/login" | "/auth/signup"
+    ) || path.starts_with("/docs")
+        || path.starts_with("/api-docs")
 }
 
 /// Validate a JWT token and return the authentication context
 fn validate_jwt_token(token: &str, secret: &str) -> Result<AuthContext, ServerError> {
     let decoding_key = DecodingKey::from_secret(secret.as_ref());
     let validation = Validation::default();
-    
+
     let token_data = decode::<Claims>(token, &decoding_key, &validation)
         .map_err(|e| ServerError::Auth(format!("Invalid token: {}", e)))?;
-    
+
     let user_id = Uuid::parse_str(&token_data.claims.sub)
         .map_err(|e| ServerError::Auth(format!("Invalid user ID in token: {}", e)))?;
-    
+
     Ok(AuthContext {
         user_id,
         username: token_data.claims.username,
@@ -153,7 +152,7 @@ pub fn generate_jwt_token(
 ) -> Result<(String, i64), ServerError> {
     let now = chrono::Utc::now().timestamp() as usize;
     let exp = now + (expiration_hours * 3600) as usize;
-    
+
     let claims = Claims {
         sub: user_id.to_string(),
         username: username.to_string(),
@@ -161,11 +160,11 @@ pub fn generate_jwt_token(
         iat: now,
         exp,
     };
-    
+
     let encoding_key = EncodingKey::from_secret(secret.as_ref());
     let token = encode(&Header::default(), &claims, &encoding_key)
         .map_err(|e| ServerError::Auth(format!("Failed to generate token: {}", e)))?;
-    
+
     Ok((token, exp as i64))
 }
 
@@ -191,7 +190,7 @@ pub fn get_auth_context(request: &Request) -> Option<&AuthContext> {
 #[allow(dead_code)]
 pub fn check_role_permission(auth_context: &AuthContext, required_role: &str) -> bool {
     match (auth_context.role.as_str(), required_role) {
-        ("root", _) => true, // Root can do anything
+        ("root", _) => true,       // Root can do anything
         ("admin", "user") => true, // Admin can do user actions
         (user_role, required) => user_role == required,
     }
@@ -206,4 +205,4 @@ pub fn generate_root_password() -> String {
         .take(16)
         .map(char::from)
         .collect()
-} 
+}

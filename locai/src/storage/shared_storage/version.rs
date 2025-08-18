@@ -7,11 +7,11 @@ use serde_json::Value;
 use surrealdb::{Connection, RecordId};
 use uuid::Uuid;
 
+use super::base::SharedStorage;
 use crate::models::Memory;
 use crate::storage::errors::StorageError;
 use crate::storage::models::{Entity, Relationship, Version};
 use crate::storage::traits::{EntityStore, MemoryStore, RelationshipStore, VersionStore};
-use super::base::SharedStorage;
 
 /// Internal representation for SharedStorage version documents
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,14 +39,14 @@ pub enum SnapshotType {
     Knowledge,
 }
 
-impl ToString for SnapshotType {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for SnapshotType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SnapshotType::Full => "full".to_string(),
-            SnapshotType::Incremental => "incremental".to_string(),
-            SnapshotType::Metadata => "metadata".to_string(),
-            SnapshotType::Conversation => "conversation".to_string(),
-            SnapshotType::Knowledge => "knowledge".to_string(),
+            SnapshotType::Full => write!(f, "full"),
+            SnapshotType::Incremental => write!(f, "incremental"),
+            SnapshotType::Metadata => write!(f, "metadata"),
+            SnapshotType::Conversation => write!(f, "conversation"),
+            SnapshotType::Knowledge => write!(f, "knowledge"),
         }
     }
 }
@@ -87,9 +87,11 @@ where
 
         // Create a snapshot of the current graph state
         let snapshot_data = self.create_snapshot().await?;
-        
+
         // Determine snapshot type from metadata
-        let snapshot_type = version.metadata.get("snapshot_type")
+        let snapshot_type = version
+            .metadata
+            .get("snapshot_type")
             .and_then(|v| v.as_str())
             .unwrap_or("full")
             .to_string();
@@ -109,19 +111,23 @@ where
             }
         "#;
 
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(query)
             .bind(("description", description_clone))
             .bind(("metadata", metadata_clone))
             .bind(("snapshot_type", snapshot_type))
-            .bind(("snapshot_data", serde_json::to_value(&snapshot_data)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?))
+            .bind((
+                "snapshot_data",
+                serde_json::to_value(&snapshot_data)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?,
+            ))
             .await
             .map_err(|e| StorageError::Query(format!("Failed to create version: {}", e)))?;
 
-        let created: Vec<SurrealVersion> = result
-            .take(0)
-            .map_err(|e| StorageError::Query(format!("Failed to extract created version: {}", e)))?;
+        let created: Vec<SurrealVersion> = result.take(0).map_err(|e| {
+            StorageError::Query(format!("Failed to extract created version: {}", e))
+        })?;
 
         created
             .into_iter()
@@ -132,10 +138,11 @@ where
 
     async fn get_version(&self, id: &str) -> Result<Option<Version>, StorageError> {
         let record_id = RecordId::from(("version", id));
-        
+
         let query = "SELECT * FROM $id";
-        
-        let mut result = self.client
+
+        let mut result = self
+            .client
             .query(query)
             .bind(("id", record_id))
             .await
@@ -148,16 +155,21 @@ where
         Ok(versions.into_iter().next().map(Version::from))
     }
 
-    async fn list_versions(&self, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<Version>, StorageError> {
+    async fn list_versions(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<Version>, StorageError> {
         let limit_clause = limit.map(|l| format!("LIMIT {}", l)).unwrap_or_default();
         let offset_clause = offset.map(|o| format!("START {}", o)).unwrap_or_default();
-        
+
         let query = format!(
             "SELECT * FROM version ORDER BY created_at DESC {} {}",
             offset_clause, limit_clause
         );
 
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(query.as_str())
             .await
             .map_err(|e| StorageError::Query(format!("Failed to list versions: {}", e)))?;
@@ -172,12 +184,12 @@ where
     async fn checkout_version(&self, id: &str) -> Result<bool, StorageError> {
         // Get the version and its snapshot data
         let version = self.get_version_with_snapshot(id).await?;
-        
+
         match version {
             Some((_version_data, snapshot)) => {
                 // Start a transaction for atomic restoration
                 self.restore_from_snapshot(snapshot).await?;
-                
+
                 tracing::info!("Successfully checked out version: {}", id);
                 Ok(true)
             }
@@ -206,7 +218,10 @@ where
         let relationship_count = relationships.len();
 
         // Generate a simple checksum for data integrity
-        let checksum = Some(format!("{}-{}-{}", memory_count, entity_count, relationship_count));
+        let checksum = Some(format!(
+            "{}-{}-{}",
+            memory_count, entity_count, relationship_count
+        ));
 
         Ok(SnapshotData {
             memories,
@@ -220,16 +235,22 @@ where
     }
 
     /// Get a version with its snapshot data
-    async fn get_version_with_snapshot(&self, id: &str) -> Result<Option<(Version, SnapshotData)>, StorageError> {
+    async fn get_version_with_snapshot(
+        &self,
+        id: &str,
+    ) -> Result<Option<(Version, SnapshotData)>, StorageError> {
         let record_id = RecordId::from(("version", id));
-        
+
         let query = "SELECT * FROM $id";
-        
-        let mut result = self.client
+
+        let mut result = self
+            .client
             .query(query)
             .bind(("id", record_id))
             .await
-            .map_err(|e| StorageError::Query(format!("Failed to get version with snapshot {}: {}", id, e)))?;
+            .map_err(|e| {
+                StorageError::Query(format!("Failed to get version with snapshot {}: {}", id, e))
+            })?;
 
         let versions: Vec<SurrealVersion> = result
             .take(0)
@@ -239,10 +260,12 @@ where
             Some(version_record) => {
                 let version = Version::from(version_record.clone());
                 let snapshot: SnapshotData = serde_json::from_value(version_record.snapshot_data)
-                    .map_err(|e| StorageError::Serialization(format!("Failed to deserialize snapshot: {}", e)))?;
+                    .map_err(|e| {
+                    StorageError::Serialization(format!("Failed to deserialize snapshot: {}", e))
+                })?;
                 Ok(Some((version, snapshot)))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -250,23 +273,20 @@ where
     async fn restore_from_snapshot(&self, snapshot: SnapshotData) -> Result<(), StorageError> {
         // Clear current data (this should be done in a transaction in production)
         tracing::info!("Clearing current graph state for restoration");
-        
+
         // Delete all current data
-        let delete_queries = [
-            "DELETE relationship",
-            "DELETE entity", 
-            "DELETE memory",
-        ];
+        let delete_queries = ["DELETE relationship", "DELETE entity", "DELETE memory"];
 
         for query_str in &delete_queries {
-            let mut result = self.client
+            let mut result = self
+                .client
                 .query(*query_str)
                 .await
                 .map_err(|e| StorageError::Query(format!("Failed to clear data: {}", e)))?;
-            
-            let _: Vec<Value> = result
-                .take(0)
-                .map_err(|e| StorageError::Query(format!("Failed to process delete result: {}", e)))?;
+
+            let _: Vec<Value> = result.take(0).map_err(|e| {
+                StorageError::Query(format!("Failed to process delete result: {}", e))
+            })?;
         }
 
         // Restore memories
@@ -292,11 +312,24 @@ where
     }
 
     /// Create a conversation state version for AI assistant context management
-    pub async fn create_conversation_version(&self, conversation_id: &str, description: &str) -> Result<Version, StorageError> {
+    pub async fn create_conversation_version(
+        &self,
+        conversation_id: &str,
+        description: &str,
+    ) -> Result<Version, StorageError> {
         let mut metadata = serde_json::Map::new();
-        metadata.insert("snapshot_type".to_string(), Value::String("conversation".to_string()));
-        metadata.insert("conversation_id".to_string(), Value::String(conversation_id.to_string()));
-        metadata.insert("context_type".to_string(), Value::String("ai_assistant".to_string()));
+        metadata.insert(
+            "snapshot_type".to_string(),
+            Value::String("conversation".to_string()),
+        );
+        metadata.insert(
+            "conversation_id".to_string(),
+            Value::String(conversation_id.to_string()),
+        );
+        metadata.insert(
+            "context_type".to_string(),
+            Value::String("ai_assistant".to_string()),
+        );
 
         let version = Version {
             id: Uuid::new_v4().to_string(),
@@ -309,11 +342,21 @@ where
     }
 
     /// Create a knowledge evolution version for tracking learning progress
-    pub async fn create_knowledge_version(&self, topic: &str, description: &str) -> Result<Version, StorageError> {
+    pub async fn create_knowledge_version(
+        &self,
+        topic: &str,
+        description: &str,
+    ) -> Result<Version, StorageError> {
         let mut metadata = serde_json::Map::new();
-        metadata.insert("snapshot_type".to_string(), Value::String("knowledge".to_string()));
+        metadata.insert(
+            "snapshot_type".to_string(),
+            Value::String("knowledge".to_string()),
+        );
         metadata.insert("topic".to_string(), Value::String(topic.to_string()));
-        metadata.insert("learning_context".to_string(), Value::String("evolution_tracking".to_string()));
+        metadata.insert(
+            "learning_context".to_string(),
+            Value::String("evolution_tracking".to_string()),
+        );
 
         let version = Version {
             id: Uuid::new_v4().to_string(),
@@ -326,15 +369,20 @@ where
     }
 
     /// List versions by type for better organization
-    pub async fn list_versions_by_type(&self, snapshot_type: SnapshotType, limit: Option<usize>) -> Result<Vec<Version>, StorageError> {
+    pub async fn list_versions_by_type(
+        &self,
+        snapshot_type: SnapshotType,
+        limit: Option<usize>,
+    ) -> Result<Vec<Version>, StorageError> {
         let limit_clause = limit.map(|l| format!("LIMIT {}", l)).unwrap_or_default();
-        
+
         let query = format!(
             "SELECT * FROM version WHERE snapshot_type = $snapshot_type ORDER BY created_at DESC {}",
             limit_clause
         );
 
-        let mut result = self.client
+        let mut result = self
+            .client
             .query(query.as_str())
             .bind(("snapshot_type", snapshot_type.to_string()))
             .await
@@ -346,4 +394,4 @@ where
 
         Ok(versions.into_iter().map(Version::from).collect())
     }
-} 
+}

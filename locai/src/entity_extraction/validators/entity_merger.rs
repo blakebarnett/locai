@@ -29,7 +29,9 @@ impl EntityMerger {
             RawEntity {
                 text: if b.end_pos > a.end_pos {
                     // Extend the text to include B's text
-                    format!("{} {}", a.text.trim(), b.text.trim()).trim().to_string()
+                    format!("{} {}", a.text.trim(), b.text.trim())
+                        .trim()
+                        .to_string()
                 } else {
                     a.text
                 },
@@ -44,7 +46,9 @@ impl EntityMerger {
             RawEntity {
                 text: if a.end_pos > b.end_pos {
                     // Extend the text to include A's text
-                    format!("{} {}", b.text.trim(), a.text.trim()).trim().to_string()
+                    format!("{} {}", b.text.trim(), a.text.trim())
+                        .trim()
+                        .to_string()
                 } else {
                     b.text
                 },
@@ -97,4 +101,4 @@ impl EntityPostProcessor for EntityMerger {
     fn name(&self) -> &str {
         &self.name
     }
-} 
+}

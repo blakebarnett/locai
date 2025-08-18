@@ -14,4 +14,4 @@ impl Default for SharedStorageConfig {
             database: "main".to_string(),
         }
     }
-} 
+}

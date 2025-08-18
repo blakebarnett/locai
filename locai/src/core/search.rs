@@ -12,22 +12,22 @@ use serde::{Deserialize, Serialize};
 pub struct SearchResult {
     /// Unique identifier for the result
     pub id: String,
-    
+
     /// Type of the result
     pub result_type: SearchResultType,
-    
+
     /// The actual content/data
     pub content: SearchContent,
-    
+
     /// Relevance score (0.0 to 1.0)
     pub score: f32,
-    
+
     /// Why this result matched
     pub match_info: MatchInfo,
-    
+
     /// Related entities and memories
     pub context: SearchContext,
-    
+
     /// Metadata about the result
     pub metadata: SearchMetadata,
 }
@@ -62,13 +62,13 @@ pub struct RelationshipInfo {
 pub struct MatchInfo {
     /// Primary reason for match
     pub reason: String,
-    
+
     /// Detailed match explanations
     pub details: Vec<String>,
-    
+
     /// Highlighted snippets
     pub highlights: Vec<Highlight>,
-    
+
     /// Match path (for graph results)
     pub path: Option<Vec<String>>,
 }
@@ -77,13 +77,13 @@ pub struct MatchInfo {
 pub struct Highlight {
     /// The highlighted text
     pub text: String,
-    
+
     /// Start position in the original text
     pub start: usize,
-    
+
     /// End position in the original text
     pub end: usize,
-    
+
     /// Type of highlight (e.g., "exact_match", "semantic_match")
     pub highlight_type: String,
 }
@@ -92,10 +92,10 @@ pub struct Highlight {
 pub struct SearchContext {
     /// Related entities
     pub entities: Vec<EntityRef>,
-    
+
     /// Related memories
     pub memories: Vec<MemoryRef>,
-    
+
     /// Relevant relationships
     pub relationships: Vec<RelationshipRef>,
 }
@@ -129,16 +129,16 @@ pub struct RelationshipRef {
 pub struct SearchMetadata {
     /// When this was created
     pub created_at: DateTime<Utc>,
-    
+
     /// Last accessed/updated
     pub last_accessed: Option<DateTime<Utc>>,
-    
+
     /// Source of the data
     pub source: String,
-    
+
     /// Any tags
     pub tags: Vec<String>,
-    
+
     /// Custom properties
     pub properties: serde_json::Value,
 }
@@ -148,22 +148,22 @@ pub struct SearchMetadata {
 pub struct SearchOptions {
     /// Maximum number of results
     pub limit: usize,
-    
+
     /// Search strategy
     pub strategy: SearchStrategy,
-    
+
     /// Result types to include
     pub include_types: SearchTypeFilter,
-    
+
     /// Time range filter
     pub time_range: Option<TimeRange>,
-    
+
     /// Minimum relevance score
     pub min_score: Option<f32>,
-    
+
     /// Expand results with context
     pub include_context: bool,
-    
+
     /// Graph traversal depth
     pub graph_depth: u8,
 }
@@ -213,7 +213,7 @@ impl SearchTypeFilter {
             relationships: true,
         }
     }
-    
+
     pub fn memories_only() -> Self {
         Self {
             memories: true,
@@ -222,7 +222,7 @@ impl SearchTypeFilter {
             relationships: false,
         }
     }
-    
+
     pub fn entities_only() -> Self {
         Self {
             memories: false,
@@ -244,27 +244,37 @@ impl SearchResult {
     pub fn summary(&self) -> String {
         match &self.content {
             SearchContent::Memory(memory) => {
-                format!("Memory: {}", memory.content.chars().take(100).collect::<String>())
-            },
+                format!(
+                    "Memory: {}",
+                    memory.content.chars().take(100).collect::<String>()
+                )
+            }
             SearchContent::Entity(entity) => {
-                let entity_name = entity.properties.get("name")
+                let entity_name = entity
+                    .properties
+                    .get("name")
                     .or_else(|| entity.properties.get("text"))
                     .or_else(|| entity.properties.get("value"))
                     .and_then(|v| v.as_str())
                     .unwrap_or(&entity.id);
                 format!("Entity: {} [{}]", entity_name, entity.entity_type)
-            },
+            }
             SearchContent::Graph(graph) => {
-                format!("Graph: {} memories, {} relationships", 
-                    graph.memories.len(), graph.relationships.len())
-            },
+                format!(
+                    "Graph: {} memories, {} relationships",
+                    graph.memories.len(),
+                    graph.relationships.len()
+                )
+            }
             SearchContent::Relationship(rel) => {
-                format!("Relationship: {} -> {} [{}]", 
-                    rel.from_id, rel.to_id, rel.relationship_type)
-            },
+                format!(
+                    "Relationship: {} -> {} [{}]",
+                    rel.from_id, rel.to_id, rel.relationship_type
+                )
+            }
         }
     }
-    
+
     /// Get the primary match reason
     pub fn match_reason(&self) -> &str {
         &self.match_info.reason
@@ -273,7 +283,11 @@ impl SearchResult {
     /// Convert from UniversalSearchResult to SearchResult
     pub fn from_universal(result: crate::memory::search_extensions::UniversalSearchResult) -> Self {
         match result {
-            crate::memory::search_extensions::UniversalSearchResult::Memory { memory, score, match_reason } => {
+            crate::memory::search_extensions::UniversalSearchResult::Memory {
+                memory,
+                score,
+                match_reason,
+            } => {
                 SearchResult {
                     id: memory.id.clone(),
                     result_type: SearchResultType::Memory,
@@ -298,8 +312,13 @@ impl SearchResult {
                         properties: memory.properties,
                     },
                 }
-            },
-            crate::memory::search_extensions::UniversalSearchResult::Entity { entity, score, match_reason, related_memories } => {
+            }
+            crate::memory::search_extensions::UniversalSearchResult::Entity {
+                entity,
+                score,
+                match_reason,
+                related_memories,
+            } => {
                 SearchResult {
                     id: entity.id.clone(),
                     result_type: SearchResultType::Entity,
@@ -313,12 +332,15 @@ impl SearchResult {
                     },
                     context: SearchContext {
                         entities: vec![],
-                        memories: related_memories.into_iter().map(|id| MemoryRef {
-                            id,
-                            memory_type: MemoryType::Episodic, // Default, would need to fetch actual type
-                            summary: "Related memory".to_string(),
-                            relevance_score: 0.5,
-                        }).collect(),
+                        memories: related_memories
+                            .into_iter()
+                            .map(|id| MemoryRef {
+                                id,
+                                memory_type: MemoryType::Episodic, // Default, would need to fetch actual type
+                                summary: "Related memory".to_string(),
+                                relevance_score: 0.5,
+                            })
+                            .collect(),
                         relationships: vec![],
                     },
                     metadata: SearchMetadata {
@@ -329,16 +351,23 @@ impl SearchResult {
                         properties: entity.properties.clone(),
                     },
                 }
-            },
-            crate::memory::search_extensions::UniversalSearchResult::Graph { center_id, center_type, graph, score, match_reason } => {
+            }
+            crate::memory::search_extensions::UniversalSearchResult::Graph {
+                center_id,
+                center_type,
+                graph,
+                score,
+                match_reason,
+            } => {
                 // Extract entities and relationships from the graph for context
                 let context_entities = vec![];
                 let mut context_memories = vec![];
                 let mut context_relationships = vec![];
-                
+
                 // Add memories from the graph as context
                 for (memory_id, memory) in &graph.memories {
-                    if memory_id != &center_id {  // Don't include the center as context
+                    if memory_id != &center_id {
+                        // Don't include the center as context
                         context_memories.push(MemoryRef {
                             id: memory.id.clone(),
                             memory_type: memory.memory_type.clone(),
@@ -347,7 +376,7 @@ impl SearchResult {
                         });
                     }
                 }
-                
+
                 // Add relationships from the graph as context
                 for relationship in &graph.relationships {
                     context_relationships.push(RelationshipRef {
@@ -358,7 +387,7 @@ impl SearchResult {
                         relevance_score: 1.0, // Default strength
                     });
                 }
-                
+
                 SearchResult {
                     id: center_id.clone(),
                     result_type: SearchResultType::Graph,
@@ -383,7 +412,7 @@ impl SearchResult {
                         properties: serde_json::Value::Object(serde_json::Map::new()),
                     },
                 }
-            },
+            }
         }
     }
-} 
+}

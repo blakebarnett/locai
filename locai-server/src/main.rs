@@ -1,13 +1,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use locai::{init, config::ConfigBuilder};
 use anyhow::Result;
+use locai::{config::ConfigBuilder, init};
 use tokio::net::TcpListener;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{info, warn};
 
 mod api;
@@ -39,9 +36,7 @@ async fn main() -> Result<()> {
             .add_directive("surrealdb=warn".parse().unwrap())
     };
 
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .init();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     info!("Starting Locai server v{}", locai::VERSION);
 
@@ -51,30 +46,40 @@ async fn main() -> Result<()> {
 
     // Initialize Locai with configuration - load from file if provided!
     let locai_config = if let Some(config_file) = &cli_args.config_file {
-        info!("📁 Loading Locai configuration from: {}", config_file.display());
-        
+        info!(
+            "📁 Loading Locai configuration from: {}",
+            config_file.display()
+        );
+
         let mut loader = locai::config::ConfigLoader::new();
         match loader.load_file(config_file) {
-            Ok(_) => {
-                match loader.extract() {
-                    Ok(config) => {
-                        info!("✅ Successfully loaded configuration from {}", config_file.display());
-                        info!("🔍 Entity extraction enabled: {}", config.entity_extraction.enabled);
-                        info!("🔍 Entity extraction confidence threshold: {}", config.entity_extraction.confidence_threshold);
-                        config
-                    },
-                    Err(e) => {
-                        warn!("Failed to parse config file {}: {}. Using defaults.", config_file.display(), e);
-                        ConfigBuilder::new()
-                            .with_default_storage()
-                            .with_remote_surrealdb_if_configured()
-                            .with_default_ml()
-                            .build()?
-                    }
+            Ok(_) => match loader.extract() {
+                Ok(config) => {
+                    info!(
+                        "✅ Successfully loaded configuration from {}",
+                        config_file.display()
+                    );
+                    config
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to parse config file {}: {}. Using defaults.",
+                        config_file.display(),
+                        e
+                    );
+                    ConfigBuilder::new()
+                        .with_default_storage()
+                        .with_remote_surrealdb_if_configured()
+                        .with_default_ml()
+                        .build()?
                 }
             },
             Err(e) => {
-                warn!("Failed to load config file {}: {}. Using defaults.", config_file.display(), e);
+                warn!(
+                    "Failed to load config file {}: {}. Using defaults.",
+                    config_file.display(),
+                    e
+                );
                 ConfigBuilder::new()
                     .with_default_storage()
                     .with_remote_surrealdb_if_configured()
@@ -93,15 +98,9 @@ async fn main() -> Result<()> {
 
     let memory_manager = init(locai_config).await?;
     info!("Locai memory manager initialized");
-    
+
     // Additional config verification
-    let config = memory_manager.config();
-    if !config.entity_extraction.enabled {
-        warn!("❌ Entity extraction is disabled - this may cause missing entity-memory relationships");
-    }
-    if memory_manager.has_ml_service() {
-        info!("🤖 ML service available for enhanced entity extraction");
-    }
+    let _ = memory_manager.config();
 
     // Create application state
     let mut app_state = AppState::new(memory_manager, server_config.clone());
@@ -111,8 +110,8 @@ async fn main() -> Result<()> {
         // Get the shared storage from the memory manager instead of creating a separate instance
         let shared_storage = app_state.memory_manager.storage();
         let messaging_server = messaging::MessagingServer::new_with_shared_storage(
-            server_config.messaging.clone(), 
-            shared_storage
+            server_config.messaging.clone(),
+            shared_storage,
         );
         info!("Messaging server initialized successfully with shared storage from memory manager");
         app_state.set_messaging_server(Arc::new(messaging_server));
@@ -121,7 +120,10 @@ async fn main() -> Result<()> {
     // Initialize authentication if enabled
     if server_config.enable_auth {
         if let Err(e) = initialize_auth(&mut app_state, server_config.clone()).await {
-            warn!("Failed to initialize authentication: {}. Auth may not work properly.", e);
+            warn!(
+                "Failed to initialize authentication: {}. Auth may not work properly.",
+                e
+            );
         }
     }
 
@@ -130,7 +132,10 @@ async fn main() -> Result<()> {
     // Initialize live queries if enabled and using SurrealDB
     if server_config.enable_live_queries {
         if let Err(e) = setup_live_queries(app_state.clone()).await {
-            warn!("Failed to setup live queries: {}. Continuing without live query support.", e);
+            warn!(
+                "Failed to setup live queries: {}. Continuing without live query support.",
+                e
+            );
         }
     }
 
@@ -142,10 +147,10 @@ async fn main() -> Result<()> {
     // Start the server
     let addr = SocketAddr::from(([0, 0, 0, 0], server_config.port));
     let listener = TcpListener::bind(addr).await?;
-    
+
     info!("Server listening on {}", addr);
     info!("API documentation available at http://{}/docs", addr);
-    
+
     if server_config.enable_auth {
         info!("Authentication is enabled");
         if server_config.allow_signup {
@@ -165,14 +170,20 @@ async fn main() -> Result<()> {
 /// Initialize authentication system and create root user if needed
 async fn initialize_auth(app_state: &mut AppState, server_config: ServerConfig) -> Result<()> {
     use crate::api::auth_service::AuthService;
-    
+
     info!("Initializing authentication system using storage abstractions");
 
     // Create the auth service
     let auth_service = AuthService::new(server_config.jwt_secret.clone());
 
     // Initialize the authentication system
-    if let Err(e) = auth_service.initialize(&app_state.memory_manager, server_config.root_password.clone()).await {
+    if let Err(e) = auth_service
+        .initialize(
+            &app_state.memory_manager,
+            server_config.root_password.clone(),
+        )
+        .await
+    {
         return Err(anyhow::anyhow!("Failed to initialize auth service: {}", e));
     }
 
@@ -185,25 +196,25 @@ async fn initialize_auth(app_state: &mut AppState, server_config: ServerConfig) 
 /// Setup live queries for SurrealDB if available
 async fn setup_live_queries(app_state: Arc<AppState>) -> Result<()> {
     info!("Setting up live queries");
-    
+
     // Get the memory manager from app state
     let memory_manager = &app_state.memory_manager;
-    
+
     // Get the graph store from the storage service
     let graph_store = memory_manager.storage();
-    
+
     // Check if the store supports live queries
     if graph_store.supports_live_queries() {
         info!("Graph store supports live queries, setting up...");
-        
+
         // For now, we'll use a simpler approach that doesn't require unsafe downcasting
         // The shared_storage module will handle live queries internally if available
         // and broadcast events through the normal channels
-        
+
         info!("Live query system configured successfully");
     } else {
         info!("Graph store does not support live queries, skipping setup");
     }
-    
+
     Ok(())
-} 
+}

@@ -1,8 +1,8 @@
 //! Traits for entity extraction functionality.
 
-use async_trait::async_trait;
+use super::{EntityType, ExtractedEntity};
 use crate::Result;
-use super::{ExtractedEntity, EntityType};
+use async_trait::async_trait;
 
 /// Trait for extracting entities from text content.
 #[async_trait]
@@ -43,4 +43,4 @@ pub trait EntityExtractor: Send + Sync + std::fmt::Debug {
     fn is_enabled(&self) -> bool {
         true
     }
-} 
+}

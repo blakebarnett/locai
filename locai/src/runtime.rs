@@ -42,17 +42,17 @@ pub fn create_optimized_runtime() -> io::Result<tokio::runtime::Runtime> {
 /// let runtime = create_optimized_runtime_with_threads(Some(4))
 ///     .expect("Failed to create runtime");
 /// ```
-pub fn create_optimized_runtime_with_threads(worker_threads: Option<usize>) -> io::Result<tokio::runtime::Runtime> {
+pub fn create_optimized_runtime_with_threads(
+    worker_threads: Option<usize>,
+) -> io::Result<tokio::runtime::Runtime> {
     let mut builder = tokio::runtime::Builder::new_multi_thread();
-    
-    builder
-        .enable_all()
-        .thread_stack_size(10 * 1024 * 1024); // 10MiB
-    
+
+    builder.enable_all().thread_stack_size(10 * 1024 * 1024); // 10MiB
+
     if let Some(threads) = worker_threads {
         builder.worker_threads(threads);
     }
-    
+
     builder.build()
 }
 
@@ -87,4 +87,4 @@ mod tests {
         let _in_runtime = is_in_tokio_runtime();
         // We can't assert specific values since test environment varies
     }
-} 
+}

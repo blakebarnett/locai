@@ -10,15 +10,16 @@ use locai::prelude::*;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging with a clean level for demo purposes
-    use locai::config::{LoggingConfig, LogLevel, LogFormat};
+    use locai::config::{LogFormat, LogLevel, LoggingConfig};
     use locai::logging;
-    logging::init(&LoggingConfig { 
+    logging::init(&LoggingConfig {
         level: LogLevel::Info,
         format: LogFormat::Default,
         file: None,
         stdout: true,
-    }).expect("Failed to initialize logging");
-    
+    })
+    .expect("Failed to initialize logging");
+
     println!("🧠 Locai Simple API Demo");
     println!("========================");
 
@@ -29,30 +30,40 @@ async fn main() -> Result<()> {
 
     // Basic memory operations
     println!("\n📝 2. Storing memories with simple API...");
-    
+
     // Simple memory storage
-    let memory_id = locai.remember("I learned about the new Locai API today").await?;
+    let memory_id = locai
+        .remember("I learned about the new Locai API today")
+        .await?;
     println!("✅ Stored episodic memory: {}", memory_id);
 
     // Fact storage
-    let fact_id = locai.remember_fact("Rust is a systems programming language").await?;
+    let fact_id = locai
+        .remember_fact("Rust is a systems programming language")
+        .await?;
     println!("✅ Stored fact: {}", fact_id);
 
     // Conversation storage
-    let conversation_id = locai.remember_conversation(
-        "User: How does the new API work?\nBot: It's much simpler! Just use locai.remember()"
-    ).await?;
+    let conversation_id = locai
+        .remember_conversation(
+            "User: How does the new API work?\nBot: It's much simpler! Just use locai.remember()",
+        )
+        .await?;
     println!("✅ Stored conversation: {}", conversation_id);
 
     // Advanced memory builder (Phase 2: Unified Memory API)
     println!("\n📝 3. Using advanced memory builder...");
-    let advanced_id = locai.remember_with("Important AI breakthrough discovered")
+    let advanced_id = locai
+        .remember_with("Important AI breakthrough discovered")
         .as_fact()
         .with_priority(MemoryPriority::High)
         .with_tags(&["ai", "breakthrough", "research"])
         .save()
         .await?;
-    println!("✅ Stored advanced memory with tags and priority: {}", advanced_id);
+    println!(
+        "✅ Stored advanced memory with tags and priority: {}",
+        advanced_id
+    );
 
     // Get recent memories
     println!("\n📝 4. Retrieving recent memories...");
@@ -64,7 +75,7 @@ async fn main() -> Result<()> {
 
     // Search operations (Phase 3: Unified Search)
     println!("\n📝 5. Testing search capabilities...");
-    
+
     // Check if semantic search is available
     if locai.has_semantic_search() {
         println!("✅ Semantic search is available!");
@@ -78,8 +89,9 @@ async fn main() -> Result<()> {
         Ok(results) => {
             println!("   ✅ Found {} results:", results.len());
             for (i, result) in results.iter().enumerate() {
-                println!("      {}. {} (score: {:?})", 
-                    i + 1, 
+                println!(
+                    "      {}. {} (score: {:?})",
+                    i + 1,
                     result.summary(),
                     result.score
                 );
@@ -95,7 +107,8 @@ async fn main() -> Result<()> {
 
     // Advanced search builder
     println!("\n   🔍 Advanced search for facts with 'ai' tag:");
-    match locai.search_for("ai")
+    match locai
+        .search_for("ai")
         .limit(5)
         .of_type(MemoryType::Fact)
         .with_tags(&["ai"])
@@ -118,7 +131,7 @@ async fn main() -> Result<()> {
 
     // Error handling demonstration (Phase 4: Better Error Messages)
     println!("\n📝 6. Demonstrating improved error handling...");
-    
+
     // Test empty search query
     match locai.search("").await {
         Err(LocaiError::EmptySearchQuery) => {
@@ -134,16 +147,22 @@ async fn main() -> Result<()> {
         .with_defaults()
         .build()
         .await?;
-    
-    let builder_test_id = custom_locai.remember("Builder pattern works great!").await?;
+
+    let builder_test_id = custom_locai
+        .remember("Builder pattern works great!")
+        .await?;
     println!("✅ Builder pattern memory stored: {}", builder_test_id);
 
     // Access to advanced features when needed
     println!("\n📝 8. Access to advanced features...");
     let advanced_manager = locai.manager();
     let storage_metadata = advanced_manager.storage().get_metadata().await?;
-    println!("✅ Advanced features accessible: storage type = {}", 
-        storage_metadata.get("storage_type").unwrap_or(&"unknown".into()));
+    println!(
+        "✅ Advanced features accessible: storage type = {}",
+        storage_metadata
+            .get("storage_type")
+            .unwrap_or(&"unknown".into())
+    );
 
     println!("\n🎉 Demo completed successfully!");
     println!("\nKey improvements in the new API:");
@@ -155,4 +174,4 @@ async fn main() -> Result<()> {
     println!("• 🎯 Progressive disclosure: simple by default, powerful when needed");
 
     Ok(())
-} 
+}

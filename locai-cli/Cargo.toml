@@ -29,4 +29,5 @@ tracing-subscriber = { workspace = true }
 clap = { version = "4.5.1", features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = { version = "0.4.39", features = ["serde"] } 
+chrono = { version = "0.4.39", features = ["serde"] }
+colored = "2.1" 

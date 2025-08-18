@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 use regex::Regex;
 
-use lazy_static::lazy_static;
+use super::{EntityExtractor, EntityType, ExtractedEntity};
 use crate::Result;
-use super::{EntityExtractor, ExtractedEntity, EntityType};
+use lazy_static::lazy_static;
 
 /// Basic pattern-based entity extractor using regular expressions.
 #[derive(Debug)]
@@ -58,9 +58,8 @@ impl BasicEntityExtractor {
     /// Extract email addresses from text.
     fn extract_emails(&self, content: &str) -> Vec<ExtractedEntity> {
         lazy_static! {
-            static ref EMAIL_REGEX: Regex = Regex::new(
-                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
-            ).unwrap();
+            static ref EMAIL_REGEX: Regex =
+                Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap();
         }
 
         EMAIL_REGEX
@@ -197,22 +196,24 @@ impl BasicEntityExtractor {
     fn remove_overlaps(&self, mut entities: Vec<ExtractedEntity>) -> Vec<ExtractedEntity> {
         // Sort by start position first
         entities.sort_by_key(|e| e.start_pos);
-        
+
         let mut result = Vec::new();
-        
+
         for entity in entities {
             let mut should_add = true;
             let mut indices_to_remove = Vec::new();
-            
+
             // Check for overlaps with already added entities
             for (idx, existing) in result.iter().enumerate() {
                 if self.entities_overlap(&entity, existing) {
                     // If overlapping, prefer the entity with higher priority
                     let entity_priority = self.get_entity_priority(&entity.entity_type);
                     let existing_priority = self.get_entity_priority(&existing.entity_type);
-                    
-                    if entity_priority > existing_priority || 
-                       (entity_priority == existing_priority && entity.confidence > existing.confidence) {
+
+                    if entity_priority > existing_priority
+                        || (entity_priority == existing_priority
+                            && entity.confidence > existing.confidence)
+                    {
                         // Mark the existing entity for removal
                         indices_to_remove.push(idx);
                     } else {
@@ -222,35 +223,35 @@ impl BasicEntityExtractor {
                     }
                 }
             }
-            
+
             // Remove overlapping entities (in reverse order to maintain indices)
             for &idx in indices_to_remove.iter().rev() {
                 result.remove(idx);
             }
-            
+
             if should_add {
                 result.push(entity);
             }
         }
-        
+
         result
     }
-    
+
     /// Check if two entities overlap
     fn entities_overlap(&self, entity1: &ExtractedEntity, entity2: &ExtractedEntity) -> bool {
         entity1.start_pos < entity2.end_pos && entity1.end_pos > entity2.start_pos
     }
-    
+
     /// Get priority for entity types (higher priority entities are preferred in case of overlap)
     fn get_entity_priority(&self, entity_type: &EntityType) -> u8 {
         match entity_type {
-            EntityType::Email => 100,      // Highest priority - emails are very specific
+            EntityType::Email => 100, // Highest priority - emails are very specific
             EntityType::PhoneNumber => 90, // High priority - phone numbers are specific
-            EntityType::Money => 80,       // High priority - money amounts are specific
-            EntityType::Date => 70,        // Medium-high priority
-            EntityType::Time => 60,        // Medium priority
-            EntityType::Url => 50,         // Lower priority - URLs can be part of emails
-            _ => 40,                       // Default priority
+            EntityType::Money => 80,  // High priority - money amounts are specific
+            EntityType::Date => 70,   // Medium-high priority
+            EntityType::Time => 60,   // Medium priority
+            EntityType::Url => 50,    // Lower priority - URLs can be part of emails
+            _ => 40,                  // Default priority
         }
     }
 }
@@ -298,5 +299,3 @@ impl Default for BasicEntityExtractor {
         Self::new()
     }
 }
-
- 

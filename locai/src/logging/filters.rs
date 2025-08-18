@@ -3,9 +3,9 @@
 //! This module provides advanced log filtering capabilities to control
 //! which log events are recorded based on various criteria.
 
+use std::marker::PhantomData;
 use tracing::Subscriber;
 use tracing_subscriber::Layer;
-use std::marker::PhantomData;
 
 /// Filter that enables sampling of high-volume logs.
 pub struct SamplingFilter<S> {
@@ -33,7 +33,7 @@ impl<S> SamplingFilter<S> {
     }
 }
 
-impl<S> Layer<S> for SamplingFilter<S> 
+impl<S> Layer<S> for SamplingFilter<S>
 where
     S: Subscriber,
 {
@@ -46,9 +46,11 @@ where
         if metadata.level() <= &tracing::Level::WARN {
             return true;
         }
-        
+
         // Sample other events based on rate
-        let counter = self.counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let counter = self
+            .counter
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         counter % self.rate == 0
     }
 }
@@ -63,35 +65,39 @@ pub struct DynamicTargetFilter {
 #[cfg(feature = "dynamic-logging")]
 impl DynamicTargetFilter {
     /// Create a new dynamic target filter with the given default level.
+    #[allow(dead_code)]
     pub fn new(default_level: tracing::Level) -> Self {
         DynamicTargetFilter {
             filters: std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
             default_level,
         }
     }
-    
+
     /// Set the log level for a specific target.
+    #[allow(dead_code)]
     pub fn set_target_level(&self, target: &str, level: tracing::Level) {
         if let Ok(mut filters) = self.filters.write() {
             filters.insert(target.to_string(), level);
         }
     }
-    
+
     /// Remove a target-specific filter.
+    #[allow(dead_code)]
     pub fn clear_target_level(&self, target: &str) {
         if let Ok(mut filters) = self.filters.write() {
             filters.remove(target);
         }
     }
-    
+
     /// Set the default log level.
+    #[allow(dead_code)]
     pub fn set_default_level(&mut self, level: tracing::Level) {
         self.default_level = level;
     }
 }
 
 #[cfg(feature = "dynamic-logging")]
-impl<S> Layer<S> for DynamicTargetFilter 
+impl<S> Layer<S> for DynamicTargetFilter
 where
     S: Subscriber,
 {
@@ -107,8 +113,8 @@ where
         } else {
             self.default_level
         };
-        
+
         // Check if this event's level meets the threshold
         metadata.level() <= &level
     }
-} 
+}
