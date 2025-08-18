@@ -141,11 +141,13 @@ where
 }
 
 /// Custom field formatter for JSON output
+#[allow(dead_code)]
 struct CustomFieldFormatter<'a> {
     buffer: &'a mut String,
 }
 
 impl<'a> CustomFieldFormatter<'a> {
+    #[allow(dead_code)]
     fn new(buffer: &'a mut String) -> Self {
         Self { buffer }
     }

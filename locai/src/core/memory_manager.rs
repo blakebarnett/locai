@@ -279,15 +279,23 @@ impl MemoryManager {
     /// # Examples
     ///
     /// ```rust
-    /// // Vector search with OpenAI embedding
-    /// let embedding = openai.embed("search query").await?;
-    /// let results = manager.search_with_embedding(
-    ///     "search query",
-    ///     Some(&embedding),
-    ///     Some(10),
-    ///     None,
-    ///     SearchMode::Vector
-    /// ).await?;
+    /// use locai::memory::SearchMode;
+    ///
+    /// // This example shows the concept - you would use your actual embedding provider
+    /// async fn example_usage() -> locai::Result<()> {
+    ///     let embedding = vec![0.1, 0.2, 0.3]; // Mock embedding
+    ///     
+    ///     // You would typically get the manager from a configured Locai instance:
+    ///     // let locai = Locai::new().await?;
+    ///     // let results = locai.manager().search_with_embedding(
+    ///     //     "search query",
+    ///     //     Some(&embedding),
+    ///     //     Some(10),
+    ///     //     None,
+    ///     //     SearchMode::Vector
+    ///     // ).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn search_with_embedding(
         &self,

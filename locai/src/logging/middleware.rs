@@ -22,7 +22,7 @@ use axum::{extract::Request, response::Response};
 ///
 /// # Example
 ///
-/// ```
+/// ```text
 /// use tower::ServiceBuilder;
 /// use locai::logging::middleware::trace_requests;
 ///

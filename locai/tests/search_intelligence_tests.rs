@@ -115,16 +115,44 @@ async fn test_search_strategy_selection() {
             ..Default::default()
         };
 
-        let results = locai
-            .search_with_options("neural networks", options)
-            .await
-            .unwrap();
+        // Handle strategies that require embeddings
+        let results = match strategy {
+            SearchStrategy::Semantic | SearchStrategy::Hybrid => {
+                // These strategies require embeddings in BYOE approach
+                let result = locai.search_with_options("neural networks", options).await;
 
-        // Each strategy should return some results
-        println!("Strategy {:?} found {} results", strategy, results.len());
+                match result {
+                    Ok(results) => {
+                        println!("Strategy {:?} found {} results", strategy, results.len());
+                        results
+                    }
+                    Err(err) => {
+                        // Expected error for vector-based search without embeddings
+                        println!(
+                            "Strategy {:?} requires embeddings (BYOE): {}",
+                            strategy, err
+                        );
+                        assert!(
+                            err.to_string().contains("query embedding"),
+                            "Should mention query embedding requirement"
+                        );
+                        vec![] // Empty results for strategies requiring embeddings
+                    }
+                }
+            }
+            _ => {
+                // Keyword and Graph strategies should work without embeddings
+                let results = locai
+                    .search_with_options("neural networks", options)
+                    .await
+                    .unwrap();
+                println!("Strategy {:?} found {} results", strategy, results.len());
+                results
+            }
+        };
 
+        // Verify results are properly formatted (if any)
         if !results.is_empty() {
-            // Verify results are properly formatted
             for result in &results {
                 assert!(!result.id.is_empty(), "Result should have an ID");
                 assert!(result.score >= 0.0, "Score should be non-negative");

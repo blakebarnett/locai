@@ -22,7 +22,8 @@
 //!     let results = locai.search("sky color").await?;
 //!     
 //!     // Add embeddings for hybrid search (BYOE approach)
-//!     let embedding = your_provider.embed("text").await?;
+//!     // This example shows the concept - you would use your actual embedding provider
+//!     let embedding = vec![0.1, 0.2, 0.3]; // Mock embedding from your provider
 //!     let memory = MemoryBuilder::new_with_content("text")
 //!         .embedding(embedding)  // ← You provide the embedding
 //!         .build();

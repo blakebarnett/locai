@@ -13,12 +13,16 @@
 //! ```rust
 //! use locai::ml::EmbeddingManager;
 //!
-//! // Create embedding manager with validation
-//! let manager = EmbeddingManager::with_expected_dimensions(1536);
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create embedding manager with validation
+//!     let manager = EmbeddingManager::with_expected_dimensions(1536);
 //!
-//! // Validate user-provided embeddings
-//! let embedding = get_embedding_from_provider("text").await?;
-//! manager.validate_embedding(&embedding)?;
+//!     // Validate user-provided embeddings
+//!     // This example shows the concept - you would use your actual embedding provider
+//!     let embedding = vec![0.1; 1536]; // Mock embedding with expected dimensions
+//!     manager.validate_embedding(&embedding)?;
+//!     Ok(())
+//! }
 //! ```
 
 pub mod error;

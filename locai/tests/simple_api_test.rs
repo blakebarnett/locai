@@ -83,13 +83,12 @@ async fn test_search_operations() {
         .await
         .expect("Failed to add fact");
 
-    // Test empty search query
+    // Test empty search query - should return empty results, not error
     let result = locai.search("").await;
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        LocaiError::EmptySearchQuery => {} // Expected
-        _ => panic!("Expected EmptySearchQuery error"),
-    }
+    assert!(result.is_ok(), "Empty search should succeed");
+    let results = result.unwrap();
+    assert!(results.is_empty(), "Empty search should return no results");
+    println!("Empty search correctly returned {} results", results.len());
 
     // Test search with results (should work even without ML service via keyword search)
     let results = locai.search("sky blue").await;

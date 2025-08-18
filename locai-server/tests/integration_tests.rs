@@ -22,8 +22,9 @@ async fn create_test_server() -> (TestServer, TempDir) {
         .await
         .expect("Failed to initialize memory manager");
 
-    // Create server configuration
-    let server_config = locai_server::config::ServerConfig::default();
+    // Create server configuration with authentication disabled for testing
+    let mut server_config = locai_server::config::ServerConfig::default();
+    server_config.enable_auth = false; // Disable auth for integration tests
 
     // Create AppState
     let state = Arc::new(locai_server::AppState::new(memory_manager, server_config));
@@ -38,10 +39,12 @@ async fn create_test_server() -> (TestServer, TempDir) {
 async fn test_health_check() {
     let (server, _temp_dir) = create_test_server().await;
 
-    let response = server.get("/health").await;
+    let response = server.get("/api/health").await;
 
     response.assert_status_ok();
-    response.assert_text("OK");
+    // Health endpoint returns JSON, not plain text
+    let json: serde_json::Value = response.json();
+    assert_eq!(json["status"], "OK");
 }
 
 #[tokio::test]

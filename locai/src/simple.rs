@@ -20,7 +20,7 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```rust
-/// use locai::Locai;
+/// use locai::prelude::Locai;
 ///
 /// async fn example() -> locai::Result<()> {
 ///     // Dead simple - everything auto-configured
@@ -52,7 +52,7 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// use locai::Locai;
+    /// use locai::prelude::Locai;
     ///
     /// async fn example() -> locai::Result<()> {
     ///     let locai = Locai::new().await?;
@@ -74,7 +74,7 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// use locai::Locai;
+    /// use locai::prelude::Locai;
     ///
     /// async fn example() -> locai::Result<()> {
     ///     let locai = Locai::with_data_dir("./my_locai_data").await?;
@@ -100,7 +100,7 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// use locai::Locai;
+    /// use locai::prelude::Locai;
     ///
     /// #[tokio::test]
     /// async fn test_example() -> locai::Result<()> {
@@ -124,7 +124,7 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// use locai::Locai;
+    /// use locai::prelude::Locai;
     ///
     /// #[tokio::test]
     /// async fn test_parallel_safe() -> locai::Result<()> {
@@ -176,7 +176,7 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// use locai::Locai;
+    /// use locai::prelude::Locai;
     ///
     /// #[tokio::test]
     /// async fn test_with_custom_id() -> locai::Result<()> {
@@ -217,7 +217,7 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// use locai::Locai;
+    /// use locai::prelude::Locai;
     ///
     /// async fn example() -> locai::Result<()> {
     ///     let locai = Locai::builder()
@@ -245,8 +245,13 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// let memory_id = locai.remember("I learned something important today").await?;
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let memory_id = locai.remember("I learned something important today").await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn remember(&self, content: impl Into<String>) -> Result<String> {
         let memory = MemoryBuilder::episodic(content).build();
@@ -260,8 +265,13 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// locai.remember_fact("The capital of France is Paris").await?;
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     locai.remember_fact("The capital of France is Paris").await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn remember_fact(&self, content: impl Into<String>) -> Result<String> {
         self.manager.add_fact(content).await
@@ -272,8 +282,13 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// locai.remember_conversation("User: Hello\nBot: Hi there!").await?;
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     locai.remember_conversation("User: Hello\nBot: Hi there!").await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn remember_conversation(&self, content: impl Into<String>) -> Result<String> {
         self.manager.add_conversation(content).await
@@ -287,12 +302,17 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// locai.remember_with("Important scientific discovery")
-    ///     .as_fact()
-    ///     .with_priority(MemoryPriority::High)
-    ///     .with_tags(&["science", "breakthrough"])
-    ///     .save().await?;
+    /// use locai::prelude::{Locai, MemoryPriority};
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     locai.remember_with("Important scientific discovery")
+    ///         .as_fact()
+    ///         .with_priority(MemoryPriority::High)
+    ///         .with_tags(&["science", "breakthrough"])
+    ///         .save().await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn remember_with(&self, content: impl Into<String>) -> RememberBuilder<'_> {
         RememberBuilder::new(&self.manager, content.into())
@@ -309,10 +329,15 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// let results = locai.search("what did I learn about physics?").await?;
-    /// for result in results {
-    ///     println!("Found: {}", result.summary());
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let results = locai.search("what did I learn about physics?").await?;
+    ///     for result in results {
+    ///         println!("Found: {}", result.summary());
+    ///     }
+    ///     Ok(())
     /// }
     /// ```
     pub async fn search(&self, query: &str) -> Result<Vec<crate::core::SearchResult>> {
@@ -334,14 +359,17 @@ impl Locai {
     /// ```rust
     /// use locai::prelude::*;
     ///
-    /// let locai = Locai::new().await?;
-    /// let options = SearchOptions {
-    ///     limit: 5,
-    ///     strategy: SearchStrategy::Semantic,
-    ///     include_types: SearchTypeFilter::memories_only(),
-    ///     ..Default::default()
-    /// };
-    /// let results = locai.search_with_options("physics", options).await?;
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let options = SearchOptions {
+    ///         limit: 5,
+    ///         strategy: SearchStrategy::Semantic,
+    ///         include_types: SearchTypeFilter::memories_only(),
+    ///         ..Default::default()
+    ///     };
+    ///     let results = locai.search_with_options("physics", options).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn search_with_options(
         &self,
@@ -466,10 +494,15 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// let results = locai.search_memories("what did I learn about physics?").await?;
-    /// for result in results {
-    ///     println!("Found: {}", result.content);
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let results = locai.search_memories("what did I learn about physics?").await?;
+    ///     for result in results {
+    ///         println!("Found: {}", result.content);
+    ///     }
+    ///     Ok(())
     /// }
     /// ```
     #[deprecated(
@@ -490,8 +523,13 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// let results = locai.search("john").await?; // Use this instead
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let results = locai.search("john").await?; // Use this instead
+    ///     Ok(())
+    /// }
     /// ```
     #[deprecated(note = "Use search() which now provides universal search by default")]
     pub async fn universal_search(&self, query: &str) -> Result<Vec<crate::core::SearchResult>> {
@@ -503,12 +541,17 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// let results = locai.search_for("physics")
-    ///     .limit(5)
-    ///     .of_type(MemoryType::Fact)
-    ///     .with_tags(&["science"])
-    ///     .execute().await?;
+    /// use locai::prelude::{Locai, MemoryType};
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let results = locai.search_for("physics")
+    ///         .limit(5)
+    ///         .of_type(MemoryType::Fact)
+    ///         .with_tags(&["science"])
+    ///         .execute().await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn search_for(&self, query: impl Into<String>) -> SearchBuilder<'_> {
         SearchBuilder::new(&self.manager, query.into())
@@ -522,8 +565,13 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::new().await?;
-    /// let recent = locai.recent_memories(5).await?;
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     let recent = locai.recent_memories(Some(5)).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn recent_memories(&self, limit: Option<usize>) -> Result<Vec<Memory>> {
         self.manager.get_recent_memories(limit.unwrap_or(10)).await
@@ -555,9 +603,14 @@ impl Locai {
     /// # Examples
     ///
     /// ```rust
-    /// let locai = Locai::for_testing().await?;
-    /// // ... do some testing ...
-    /// locai.clear_all().await?; // Clean up after test
+    /// use locai::prelude::Locai;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::for_testing().await?;
+    ///     // ... do some testing ...
+    ///     locai.clear_all().await?; // Clean up after test
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn clear_all(&self) -> Result<()> {
         self.manager.clear_storage().await
@@ -772,12 +825,21 @@ impl<'a> SearchBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// // With OpenAI embeddings
-    /// let query_embedding = openai_client.embed("search query").await?;
-    /// let results = locai.search_for("search query")
-    ///     .mode(SearchMode::Vector)
-    ///     .with_query_embedding(query_embedding)
-    ///     .execute().await?;
+    /// use locai::prelude::Locai;
+    /// use locai::memory::SearchMode;
+    ///
+    /// async fn example() -> locai::Result<()> {
+    ///     let locai = Locai::new().await?;
+    ///     
+    ///     // With embeddings from your provider
+    ///     // This example shows the concept - you would use your actual embedding provider
+    ///     let query_embedding = vec![0.1, 0.2, 0.3]; // Mock embedding from OpenAI client
+    ///     let results = locai.search_for("search query")
+    ///         .mode(SearchMode::Vector)
+    ///         .with_query_embedding(query_embedding)
+    ///         .execute().await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn with_query_embedding(mut self, embedding: Vec<f32>) -> Self {
         self.query_embedding = Some(embedding);
