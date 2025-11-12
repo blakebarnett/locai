@@ -65,6 +65,9 @@ lazy_static = "1.4.0"
 # WebSocket dependencies for remote messaging
 tokio-tungstenite = "0.26.2"
 
+# HTTP client for webhooks
+reqwest = { version = "0.11", features = ["json"] }
+
 [build-dependencies]
 which = "6.0.3"
 
@@ -73,6 +76,7 @@ tempfile = "3.10.0"
 mockall = "0.13.1"
 tokio-test = "0.4.3"
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 
 [features]
 default = ["surrealdb-embedded"]
@@ -114,8 +118,9 @@ name = "embedded_messaging_advanced"
 path = "examples/embedded_messaging_advanced.rs"
 required-features = ["surrealdb-embedded"]
 
-
-
-
+[[bench]]
+name = "rfc_001_benchmarks"
+harness = false
+required-features = ["surrealdb-embedded"]
 
 
