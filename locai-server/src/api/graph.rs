@@ -26,10 +26,11 @@ use crate::{
     tag = "graph",
     params(
         ("id" = String, Path, description = "Memory ID"),
-        ("depth" = Option<u8>, Query, description = "Graph traversal depth")
+        ("depth" = Option<u8>, Query, description = "Graph traversal depth"),
+        ("include_temporal_span" = Option<bool>, Query, description = "Include temporal span analysis (start/end times, duration)")
     ),
     responses(
-        (status = 200, description = "Memory graph", body = MemoryGraphDto),
+        (status = 200, description = "Memory graph with optional temporal span", body = MemoryGraphDto),
         (status = 404, description = "Memory not found"),
     )
 )]
@@ -39,6 +40,7 @@ pub async fn get_memory_graph(
     Query(params): Query<GraphParams>,
 ) -> ServerResult<Json<MemoryGraphDto>> {
     let depth = params.depth.unwrap_or(2);
+    let include_temporal_span = params.include_temporal_span.unwrap_or(false);
 
     // First check if the memory exists
     let _memory = state
@@ -48,7 +50,27 @@ pub async fn get_memory_graph(
         .ok_or_else(|| not_found("Memory", &id))?;
 
     let graph = state.memory_manager.get_memory_graph(&id, depth).await?;
-    let graph_dto = MemoryGraphDto::from(graph);
+    let mut graph_dto = MemoryGraphDto::from(graph.clone());
+
+    // Calculate temporal span if requested
+    if include_temporal_span && !graph.memories.is_empty() {
+        let memories: Vec<_> = graph.memories.values().collect();
+        let mut timestamps: Vec<_> = memories.iter().map(|m| m.created_at).collect();
+        timestamps.sort();
+
+        if let (Some(&start), Some(&end)) = (timestamps.first(), timestamps.last()) {
+            let duration_days = (end - start).num_days();
+            let duration_seconds = (end - start).num_seconds();
+
+            graph_dto.metadata.temporal_span = Some(crate::api::dto::TemporalSpanDto {
+                start: start.to_rfc3339(),
+                end: end.to_rfc3339(),
+                duration_days,
+                duration_seconds,
+                memory_count: memories.len(),
+            });
+        }
+    }
 
     Ok(Json(graph_dto))
 }
@@ -60,10 +82,11 @@ pub async fn get_memory_graph(
     tag = "graph",
     params(
         ("id" = String, Path, description = "Entity ID"),
-        ("depth" = Option<u8>, Query, description = "Graph traversal depth")
+        ("depth" = Option<u8>, Query, description = "Graph traversal depth"),
+        ("include_temporal_span" = Option<bool>, Query, description = "Include temporal span analysis (start/end times, duration)")
     ),
     responses(
-        (status = 200, description = "Entity graph", body = MemoryGraphDto),
+        (status = 200, description = "Entity graph with optional temporal span", body = MemoryGraphDto),
         (status = 404, description = "Entity not found"),
     )
 )]
@@ -73,6 +96,7 @@ pub async fn get_entity_graph(
     Query(params): Query<GraphParams>,
 ) -> ServerResult<Json<MemoryGraphDto>> {
     let depth = params.depth.unwrap_or(2);
+    let include_temporal_span = params.include_temporal_span.unwrap_or(false);
 
     // Check if entity exists
     let _entity = state
@@ -95,7 +119,29 @@ pub async fn get_entity_graph(
     if let Ok(Some(_memory)) = state.memory_manager.get_memory(&id).await {
         // This entity is also a memory, so we can get its full graph
         let memory_graph = state.memory_manager.get_memory_graph(&id, depth).await?;
-        return Ok(Json(MemoryGraphDto::from(memory_graph)));
+        let mut graph_dto = MemoryGraphDto::from(memory_graph.clone());
+
+        // Calculate temporal span if requested
+        if include_temporal_span && !memory_graph.memories.is_empty() {
+            let memories: Vec<_> = memory_graph.memories.values().collect();
+            let mut timestamps: Vec<_> = memories.iter().map(|m| m.created_at).collect();
+            timestamps.sort();
+
+            if let (Some(&start), Some(&end)) = (timestamps.first(), timestamps.last()) {
+                let duration_days = (end - start).num_days();
+                let duration_seconds = (end - start).num_seconds();
+
+                graph_dto.metadata.temporal_span = Some(crate::api::dto::TemporalSpanDto {
+                    start: start.to_rfc3339(),
+                    end: end.to_rfc3339(),
+                    duration_days,
+                    duration_seconds,
+                    memory_count: memories.len(),
+                });
+            }
+        }
+
+        return Ok(Json(graph_dto));
     }
 
     // Otherwise, find related entities and their memories
@@ -150,7 +196,28 @@ pub async fn get_entity_graph(
         graph.relationships.push(relationship);
     }
 
-    let graph_dto = MemoryGraphDto::from(graph);
+    let mut graph_dto = MemoryGraphDto::from(graph.clone());
+
+    // Calculate temporal span if requested
+    if include_temporal_span && !graph.memories.is_empty() {
+        let memories: Vec<_> = graph.memories.values().collect();
+        let mut timestamps: Vec<_> = memories.iter().map(|m| m.created_at).collect();
+        timestamps.sort();
+
+        if let (Some(&start), Some(&end)) = (timestamps.first(), timestamps.last()) {
+            let duration_days = (end - start).num_days();
+            let duration_seconds = (end - start).num_seconds();
+
+            graph_dto.metadata.temporal_span = Some(crate::api::dto::TemporalSpanDto {
+                start: start.to_rfc3339(),
+                end: end.to_rfc3339(),
+                duration_days,
+                duration_seconds,
+                memory_count: memories.len(),
+            });
+        }
+    }
+
     Ok(Json(graph_dto))
 }
 
@@ -603,6 +670,10 @@ pub async fn get_central_entities(
 pub struct GraphParams {
     /// Graph traversal depth
     pub depth: Option<u8>,
+
+    /// Include temporal span analysis in the response
+    #[param(example = "true")]
+    pub include_temporal_span: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]

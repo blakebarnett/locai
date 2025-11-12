@@ -18,7 +18,15 @@ pub struct MemoryDto {
     /// The actual content of the memory
     pub content: String,
 
-    /// Type of memory
+    /// Type of memory. Custom types are prefixed with "custom:".
+    /// 
+    /// Examples:
+    /// - "custom:dialogue"
+    /// - "custom:quest"
+    /// - "custom:observation"
+    /// 
+    /// Built-in types (if any) do not require a prefix.
+    #[schema(example = "custom:dialogue")]
     pub memory_type: String,
 
     /// When the memory was created
@@ -30,7 +38,10 @@ pub struct MemoryDto {
     /// How many times the memory has been accessed
     pub access_count: u32,
 
-    /// Priority/importance of the memory
+    /// Priority/importance of the memory. Values are capitalized.
+    /// 
+    /// Possible values: "Low", "Normal", "High", "Critical"
+    #[schema(example = "Normal")]
     pub priority: String,
 
     /// Tags associated with the memory
@@ -79,12 +90,17 @@ pub struct CreateMemoryRequest {
     /// The content of the memory
     pub content: String,
 
-    /// Type of memory (defaults to "fact")
+    /// Type of memory. For custom types, include the "custom:" prefix.
+    /// Examples: "custom:dialogue", "custom:quest"
+    /// Defaults to "fact" if not specified.
     #[serde(default = "default_memory_type")]
+    #[schema(example = "custom:dialogue")]
     pub memory_type: String,
 
-    /// Priority of the memory (defaults to "normal")
+    /// Priority of the memory. Values are capitalized: "Low", "Normal", "High", "Critical"
+    /// Defaults to "Normal" if not specified.
     #[serde(default = "default_priority")]
+    #[schema(example = "Normal")]
     pub priority: String,
 
     /// Tags for the memory
@@ -121,10 +137,13 @@ pub struct UpdateMemoryRequest {
     /// Updated content (optional)
     pub content: Option<String>,
 
-    /// Updated memory type (optional)
+    /// Updated memory type. For custom types, include the "custom:" prefix.
+    /// Examples: "custom:dialogue", "custom:quest"
+    #[schema(example = "custom:dialogue")]
     pub memory_type: Option<String>,
 
-    /// Updated priority (optional)
+    /// Updated priority. Values are capitalized: "Low", "Normal", "High", "Critical"
+    #[schema(example = "High")]
     pub priority: Option<String>,
 
     /// Updated tags (optional)
@@ -147,9 +166,15 @@ pub struct EntityDto {
     pub id: String,
 
     /// Type of entity
+    #[schema(example = "character")]
     pub entity_type: String,
 
-    /// Properties associated with the entity
+    /// Custom properties for the entity. Common conventions include:
+    /// - "name": A human-readable name for the entity
+    /// - Store any domain-specific fields here
+    /// 
+    /// Example: {"name": "Thorin Oakenshield", "race": "dwarf", "class": "warrior"}
+    #[schema(example = json!({"name": "Thorin Oakenshield", "race": "dwarf", "class": "warrior"}))]
     pub properties: serde_json::Value,
 
     /// When the entity was created
@@ -241,7 +266,7 @@ impl From<Relationship> for RelationshipDto {
     }
 }
 
-/// Request to create a new relationship
+/// Request to create a new relationship between entities
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateRelationshipRequest {
     /// Type of relationship
@@ -256,6 +281,37 @@ pub struct CreateRelationshipRequest {
     /// Properties associated with the relationship
     #[serde(default)]
     pub properties: serde_json::Value,
+}
+
+/// Request to create a new relationship between memories (or memory→entity)
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateMemoryRelationshipRequest {
+    /// Type of relationship (e.g., "has_character", "depends_on", "related_to")
+    #[schema(example = "has_character")]
+    pub relationship_type: String,
+
+    /// Target ID - can be another memory ID or an entity ID
+    /// The system will automatically detect which type it is
+    pub target_id: String,
+
+    /// Properties associated with the relationship
+    #[serde(default)]
+    pub properties: serde_json::Value,
+}
+
+/// Query parameters for listing memory relationships  
+#[derive(Debug, Deserialize)]
+pub struct GetMemoryRelationshipsParams {
+    /// Filter by relationship type
+    pub relationship_type: Option<String>,
+
+    /// Relationship direction: "outgoing", "incoming", or "both" (default)
+    #[serde(default = "default_direction")]
+    pub direction: String,
+}
+
+fn default_direction() -> String {
+    "both".to_string()
 }
 
 /// Version DTO for API responses
@@ -399,13 +455,16 @@ pub struct SearchRequest {
     /// Similarity threshold for semantic search
     pub threshold: Option<f32>,
 
-    /// Memory type filter
+    /// Memory type filter. For custom memory types, include the "custom:" prefix.
+    /// Examples: "custom:dialogue", "custom:quest"
+    #[schema(example = "custom:dialogue")]
     pub memory_type: Option<String>,
 
     /// Tags filter
     pub tags: Option<Vec<String>>,
 
-    /// Priority filter
+    /// Priority filter. Values are capitalized: "Low", "Normal", "High", "Critical"
+    #[schema(example = "Normal")]
     pub priority: Option<String>,
 }
 
@@ -437,7 +496,13 @@ pub struct SearchResultDto {
     /// The memory that matched the search
     pub memory: MemoryDto,
 
-    /// Relevance score (for semantic search)
+    /// Relevance score for the search result. Higher scores indicate better matches.
+    /// Scores are non-negative and have no upper bound.
+    /// 
+    /// Typical ranges:
+    /// - 0.0-1.0: Standard semantic similarity scores
+    /// - >1.0: Boosted scores from exact matches or other factors
+    #[schema(example = 0.87, minimum = 0.0)]
     pub score: Option<f32>,
 }
 
@@ -628,4 +693,239 @@ pub struct GraphMetadata {
 
     /// Maximum depth traversed
     pub max_depth: u8,
+
+    /// Temporal span of memories in this graph (optional, included when include_temporal_span=true)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temporal_span: Option<TemporalSpanDto>,
 }
+
+/// Temporal span of a set of memories
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TemporalSpanDto {
+    /// Earliest memory creation time
+    pub start: String,
+
+    /// Latest memory creation time
+    pub end: String,
+
+    /// Duration in days
+    pub duration_days: i64,
+
+    /// Duration in seconds (for finer-grained analysis)
+    pub duration_seconds: i64,
+
+    /// Number of memories in this span
+    pub memory_count: usize,
+}
+
+/// Decay function for time-based score reduction
+///
+/// Models how the importance of information decays over time.
+/// Values: "none", "linear", "exponential", "logarithmic"
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum DecayFunctionDto {
+    /// No decay - all memories have equal recency weight
+    None,
+    
+    /// Linear decay: importance decreases linearly with age
+    /// Formula: `boost * max(0, 1 - age_hours * decay_rate)`
+    Linear,
+    
+    /// Exponential decay: importance decreases exponentially with age
+    /// Formula: `boost * exp(-decay_rate * age_hours)`
+    /// This closely models human memory and forgetting curves
+    Exponential,
+    
+    /// Logarithmic decay: importance decreases logarithmically with age
+    /// Formula: `boost / (1 + age_hours * decay_rate).ln()`
+    /// Slower decay than exponential, useful for long-term memory
+    Logarithmic,
+}
+
+impl From<DecayFunctionDto> for locai::search::DecayFunction {
+    fn from(dto: DecayFunctionDto) -> Self {
+        match dto {
+            DecayFunctionDto::None => locai::search::DecayFunction::None,
+            DecayFunctionDto::Linear => locai::search::DecayFunction::Linear,
+            DecayFunctionDto::Exponential => locai::search::DecayFunction::Exponential,
+            DecayFunctionDto::Logarithmic => locai::search::DecayFunction::Logarithmic,
+        }
+    }
+}
+
+/// Configuration for enhanced search scoring
+///
+/// Controls how different scoring factors are weighted and combined to produce
+/// final relevance scores. Combines BM25 keyword matching, vector similarity,
+/// and memory lifecycle metadata (recency, access frequency, priority).
+///
+/// All scoring parameters are optional. If not provided, only basic BM25 scoring is used.
+///
+/// # Example JSON
+///
+/// ```json
+/// {
+///   "bm25_weight": 1.0,
+///   "vector_weight": 1.0,
+///   "recency_boost": 2.0,
+///   "access_boost": 1.5,
+///   "priority_boost": 1.0,
+///   "decay_function": "exponential",
+///   "decay_rate": 0.1
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ScoringConfigDto {
+    /// Weight for BM25 keyword matching (0.0 - 1.0)
+    ///
+    /// BM25 is a proven probabilistic relevance framework that considers
+    /// term frequency and document length. Default: 1.0
+    #[serde(default = "default_bm25_weight")]
+    #[schema(example = 1.0)]
+    pub bm25_weight: f32,
+
+    /// Weight for vector embedding similarity (0.0 - 1.0)
+    ///
+    /// Vector search considers semantic similarity using embeddings.
+    /// Default: 1.0
+    #[serde(default = "default_vector_weight")]
+    #[schema(example = 1.0)]
+    pub vector_weight: f32,
+
+    /// Boost factor for recent memories
+    ///
+    /// Controls how much more recent memories are favored.
+    /// Applied via decay_function over memory age. Default: 0.5
+    #[serde(default = "default_recency_boost")]
+    #[schema(example = 0.5)]
+    pub recency_boost: f32,
+
+    /// Boost factor for frequently accessed memories
+    ///
+    /// Memories accessed more often get higher scores.
+    /// Formula: `log(1 + access_count) * access_boost`. Default: 0.3
+    #[serde(default = "default_access_boost")]
+    #[schema(example = 0.3)]
+    pub access_boost: f32,
+
+    /// Boost factor for high-priority memories
+    ///
+    /// Priority levels (Low=0, Normal=1, High=2, Critical=3) are multiplied
+    /// by this factor. Default: 0.2
+    #[serde(default = "default_priority_boost")]
+    #[schema(example = 0.2)]
+    pub priority_boost: f32,
+
+    /// Time-based decay function to apply to recency boost
+    ///
+    /// Determines how quickly the recency boost diminishes over time.
+    /// Default: "exponential"
+    #[serde(default = "default_decay_function")]
+    pub decay_function: DecayFunctionDto,
+
+    /// Decay rate parameter (0.0 - ∞)
+    ///
+    /// Meaning depends on decay_function:
+    /// - Linear: hours until boost reaches 0
+    /// - Exponential: decay constant (higher = faster decay)
+    /// - Logarithmic: decay constant (higher = faster decay)
+    /// Default: 0.1 (slow decay, favors long-term relevance)
+    #[serde(default = "default_decay_rate")]
+    #[schema(example = 0.1)]
+    pub decay_rate: f32,
+}
+
+impl From<ScoringConfigDto> for locai::search::ScoringConfig {
+    fn from(dto: ScoringConfigDto) -> Self {
+        locai::search::ScoringConfig {
+            bm25_weight: dto.bm25_weight,
+            vector_weight: dto.vector_weight,
+            recency_boost: dto.recency_boost,
+            access_boost: dto.access_boost,
+            priority_boost: dto.priority_boost,
+            decay_function: dto.decay_function.into(),
+            decay_rate: dto.decay_rate,
+        }
+    }
+}
+
+// Default functions for ScoringConfigDto
+fn default_bm25_weight() -> f32 { 1.0 }
+fn default_vector_weight() -> f32 { 1.0 }
+fn default_recency_boost() -> f32 { 0.5 }
+fn default_access_boost() -> f32 { 0.3 }
+fn default_priority_boost() -> f32 { 0.2 }
+fn default_decay_function() -> DecayFunctionDto { DecayFunctionDto::Exponential }
+fn default_decay_rate() -> f32 { 0.1 }
+
+/// Webhook event type
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum WebhookEvent {
+    /// Memory created event
+    #[serde(rename = "memory.created")]
+    MemoryCreated,
+    /// Memory updated event
+    #[serde(rename = "memory.updated")]
+    MemoryUpdated,
+    /// Memory accessed event
+    #[serde(rename = "memory.accessed")]
+    MemoryAccessed,
+    /// Memory deleted event
+    #[serde(rename = "memory.deleted")]
+    MemoryDeleted,
+}
+
+/// Webhook configuration DTO
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct WebhookDto {
+    /// Unique identifier for the webhook
+    pub id: String,
+    /// Event type this webhook listens to
+    pub event: String,
+    /// URL to send webhooks to
+    pub url: String,
+    /// Whether the webhook is enabled
+    pub enabled: bool,
+    /// Custom headers to include in webhook requests
+    #[serde(default)]
+    pub headers: std::collections::HashMap<String, String>,
+    /// Secret for HMAC signing (optional, Phase 3)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
+    /// When the webhook was created
+    pub created_at: DateTime<Utc>,
+}
+
+/// Request to create a new webhook
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateWebhookRequest {
+    /// Event type to listen for
+    pub event: String,
+    /// URL to send webhooks to
+    pub url: String,
+    /// Custom headers to include in webhook requests
+    #[serde(default)]
+    pub headers: std::collections::HashMap<String, String>,
+    /// Secret for HMAC signing (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
+}
+
+/// Request to update a webhook
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct UpdateWebhookRequest {
+    /// Whether the webhook is enabled
+    pub enabled: Option<bool>,
+    /// Updated URL (optional)
+    pub url: Option<String>,
+    /// Updated headers (optional)
+    pub headers: Option<std::collections::HashMap<String, String>>,
+    /// Updated secret (optional)
+    pub secret: Option<String>,
+}
+
+#[cfg(test)]
+#[path = "dto_tests.rs"]
+mod dto_tests;

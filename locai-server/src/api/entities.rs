@@ -18,7 +18,9 @@ use locai::storage::{
 };
 
 use crate::{
-    api::dto::{CreateEntityRequest, EntityDto, MemoryDto, UpdateEntityRequest},
+    api::dto::{
+        CreateEntityRequest, EntityDto, MemoryDto, RelationshipDto, UpdateEntityRequest,
+    },
     error::{ServerResult, not_found},
     state::AppState,
     websocket::WebSocketMessage,
@@ -316,4 +318,195 @@ pub async fn get_entity_memories(
     }
 
     Ok(Json(memories))
+}
+
+/// Create a relationship between entities
+#[utoipa::path(
+    post,
+    path = "/api/entities/{id}/relationships",
+    tag = "entities",
+    params(
+        ("id" = String, Path, description = "Source entity ID")
+    ),
+    request_body = CreateEntityRelationshipRequest,
+    responses(
+        (status = 201, description = "Relationship created successfully", body = RelationshipDto),
+        (status = 404, description = "Source or target entity not found"),
+        (status = 400, description = "Bad request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn create_entity_relationship(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    JsonExtractor(request): JsonExtractor<CreateEntityRelationshipRequest>,
+) -> ServerResult<(StatusCode, Json<RelationshipDto>)> {
+    use locai::storage::models::Relationship;
+
+    // Use id as source_id for clarity in the logic
+    let source_id = id;
+
+    // Validate that source entity exists
+    let _source_entity = state
+        .memory_manager
+        .get_entity(&source_id)
+        .await?
+        .ok_or_else(|| not_found("Entity", &source_id))?;
+
+    // Validate that target exists (can be entity OR memory)
+    let target_is_entity = state
+        .memory_manager
+        .get_entity(&request.target_id)
+        .await?
+        .is_some();
+    
+    let target_is_memory = if !target_is_entity {
+        state
+            .memory_manager
+            .get_memory(&request.target_id)
+            .await?
+            .is_some()
+    } else {
+        false
+    };
+
+    if !target_is_entity && !target_is_memory {
+        return Err(not_found("Entity or Memory", &request.target_id));
+    }
+
+    // Create the relationship
+    let now = Utc::now();
+    let relationship = Relationship {
+        id: uuid::Uuid::new_v4().to_string(),
+        source_id: source_id.clone(),
+        target_id: request.target_id.clone(),
+        relationship_type: request.relationship_type.clone(),
+        properties: request.properties,
+        created_at: now,
+        updated_at: now,
+    };
+
+    // Store the relationship
+    let created_relationship = state
+        .memory_manager
+        .create_relationship_entity(relationship)
+        .await?;
+
+    // Broadcast WebSocket message
+    let ws_message = WebSocketMessage::RelationshipCreated {
+        relationship_id: created_relationship.id.clone(),
+        source_id: created_relationship.source_id.clone(),
+        target_id: created_relationship.target_id.clone(),
+        relationship_type: created_relationship.relationship_type.clone(),
+        properties: serde_json::to_value(&created_relationship.properties).unwrap_or_default(),
+        node_id: None,
+    };
+    state.broadcast_message(ws_message);
+
+    let relationship_dto = RelationshipDto::from(created_relationship);
+    Ok((StatusCode::CREATED, Json(relationship_dto)))
+}
+
+/// Get relationships for an entity
+#[utoipa::path(
+    get,
+    path = "/api/entities/{id}/relationships",
+    tag = "entities",
+    params(
+        ("id" = String, Path, description = "Entity ID"),
+        ("relationship_type" = Option<String>, Query, description = "Filter by relationship type"),
+        ("direction" = Option<String>, Query, description = "Direction: outgoing, incoming, or both"),
+    ),
+    responses(
+        (status = 200, description = "List of relationships", body = Vec<RelationshipDto>),
+        (status = 404, description = "Entity not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_entity_relationships(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Query(params): Query<GetEntityRelationshipsParams>,
+) -> ServerResult<Json<Vec<RelationshipDto>>> {
+    // Validate that the entity exists
+    let _entity = state
+        .memory_manager
+        .get_entity(&id)
+        .await?
+        .ok_or_else(|| not_found("Entity", &id))?;
+
+    // Build filter based on direction
+    let direction = params.direction.as_str();
+    let mut all_relationships = Vec::new();
+
+    // Get outgoing relationships (where this entity is the source)
+    if direction == "outgoing" || direction == "both" {
+        let filter = RelationshipFilter {
+            source_id: Some(id.clone()),
+            relationship_type: params.relationship_type.clone(),
+            ..Default::default()
+        };
+
+        let outgoing = state
+            .memory_manager
+            .list_relationships(Some(filter), Some(100), None)
+            .await?;
+        all_relationships.extend(outgoing);
+    }
+
+    // Get incoming relationships (where this entity is the target)
+    if direction == "incoming" || direction == "both" {
+        let filter = RelationshipFilter {
+            target_id: Some(id.clone()),
+            relationship_type: params.relationship_type,
+            ..Default::default()
+        };
+
+        let incoming = state
+            .memory_manager
+            .list_relationships(Some(filter), Some(100), None)
+            .await?;
+        all_relationships.extend(incoming);
+    }
+
+    // Convert to DTOs
+    let relationship_dtos: Vec<RelationshipDto> = all_relationships
+        .into_iter()
+        .map(RelationshipDto::from)
+        .collect();
+
+    Ok(Json(relationship_dtos))
+}
+
+/// Query parameters for listing entity relationships
+#[derive(Debug, Deserialize)]
+pub struct GetEntityRelationshipsParams {
+    /// Filter by relationship type
+    pub relationship_type: Option<String>,
+
+    /// Relationship direction: "outgoing", "incoming", or "both" (default)
+    #[serde(default = "default_direction")]
+    pub direction: String,
+}
+
+fn default_direction() -> String {
+    "both".to_string()
+}
+
+/// Request to create a new relationship between entities (or entity→memory)
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct CreateEntityRelationshipRequest {
+    /// Type of relationship (e.g., "depends_on", "relates_to", "part_of", "contains")
+    #[schema(example = "depends_on")]
+    pub relationship_type: String,
+
+    /// Target ID - can be another entity ID or a memory ID
+    /// The system will automatically detect which type it is
+    pub target_id: String,
+
+    /// Properties associated with the relationship
+    #[serde(default)]
+    pub properties: serde_json::Value,
 }

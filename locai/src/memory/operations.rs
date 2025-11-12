@@ -19,7 +19,7 @@ use std::sync::Arc;
 /// Core memory operations handler
 #[derive(Debug, Clone)]
 pub struct MemoryOperations {
-    storage: Arc<dyn GraphStore>,
+    pub(crate) storage: Arc<dyn GraphStore>,
     ml_service: Option<Arc<EmbeddingManager>>,
     config: LocaiConfig,
     entity_extractors: Vec<Arc<dyn EntityExtractor>>,

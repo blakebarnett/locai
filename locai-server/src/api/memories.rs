@@ -18,7 +18,10 @@ use locai::{
 };
 
 use crate::{
-    api::dto::{CreateMemoryRequest, MemoryDto, SearchMode, SearchResultDto, UpdateMemoryRequest},
+    api::dto::{
+        CreateMemoryRelationshipRequest, CreateMemoryRequest, GetMemoryRelationshipsParams,
+        MemoryDto, RelationshipDto, SearchMode, SearchResultDto, ScoringConfigDto, UpdateMemoryRequest,
+    },
     error::{ServerError, ServerResult, not_found},
     state::AppState,
     websocket::WebSocketMessage,
@@ -56,6 +59,7 @@ pub async fn create_memory(
         .priority(priority)
         .tags(request.tags.iter().map(|s| s.as_str()).collect())
         .source(request.source)
+        .properties_json(request.properties)
         .build();
 
     // Store the memory
@@ -128,10 +132,13 @@ pub struct ListMemoriesParams {
     #[serde(default = "default_page_size")]
     pub size: usize,
 
-    /// Filter by memory type
+    /// Filter by memory type. For custom memory types, include the "custom:" prefix.
+    /// Examples: "custom:dialogue", "custom:quest"
+    #[param(example = "custom:dialogue")]
     pub memory_type: Option<String>,
 
-    /// Filter by priority
+    /// Filter by priority (capitalized values: "Low", "Normal", "High", "Critical")
+    #[param(example = "Normal")]
     pub priority: Option<String>,
 
     /// Filter by tags (comma-separated)
@@ -346,15 +353,41 @@ pub async fn delete_memory(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Search memories using semantic or keyword search
+/// Search memories using semantic or keyword search with optional lifecycle-aware scoring
+///
+/// Supports basic BM25 text search by default. When a scoring configuration is provided,
+/// results are ranked using a combination of:
+/// - BM25 keyword relevance
+/// - Vector similarity (if ML service configured)
+/// - Recency (time since last access)
+/// - Access frequency (how often the memory has been accessed)  
+/// - Priority level (explicit importance)
+///
+/// Supports temporal filtering via `created_after` and `created_before` parameters to search
+/// memories within specific time ranges.
+///
+/// The scoring parameter accepts JSON configuration. For simple queries, use GET with JSON-encoded
+/// query parameter. For complex scoring configs, consider POST endpoint (if implemented).
+///
+/// # Examples
+///
+/// Scoring:
+/// ```text
+/// GET /api/memories/search?q=spell&scoring={"recency_boost":2.0,"decay_function":"exponential"}
+/// ```
+///
+/// Temporal filtering:
+/// ```text
+/// GET /api/memories/search?q=battle&created_after=2025-11-01T00:00:00Z&created_before=2025-11-01T23:59:59Z
+/// ```
 #[utoipa::path(
     get,
     path = "/api/memories/search",
     tag = "memories",
     params(SearchParams),
     responses(
-        (status = 200, description = "Search results", body = Vec<SearchResultDto>),
-        (status = 400, description = "Bad request"),
+        (status = 200, description = "Search results with optional lifecycle-aware scoring", body = Vec<SearchResultDto>),
+        (status = 400, description = "Bad request (invalid query or scoring configuration)"),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     )
@@ -412,16 +445,63 @@ pub async fn search_memories(
         memory_filter.properties = Some(priority_properties);
     }
 
+    // Apply temporal filters if specified
+    if let Some(created_after_str) = params.created_after {
+        match chrono::DateTime::parse_from_rfc3339(&created_after_str) {
+            Ok(dt) => memory_filter.created_after = Some(dt.with_timezone(&chrono::Utc)),
+            Err(e) => {
+                return Err(ServerError::BadRequest(format!(
+                    "Invalid created_after timestamp: {}. Expected ISO 8601 format like: 2025-11-01T00:00:00Z",
+                    e
+                )));
+            }
+        }
+    }
+
+    if let Some(created_before_str) = params.created_before {
+        match chrono::DateTime::parse_from_rfc3339(&created_before_str) {
+            Ok(dt) => memory_filter.created_before = Some(dt.with_timezone(&chrono::Utc)),
+            Err(e) => {
+                return Err(ServerError::BadRequest(format!(
+                    "Invalid created_before timestamp: {}. Expected ISO 8601 format like: 2025-11-01T23:59:59Z",
+                    e
+                )));
+            }
+        }
+    }
+
     let semantic_filter = SemanticSearchFilter {
         similarity_threshold: params.threshold,
         memory_filter: Some(memory_filter),
     };
 
-    // Perform search
-    let search_results = state
-        .memory_manager
-        .search(&query, Some(limit), Some(semantic_filter), locai_mode)
-        .await?;
+    // Parse scoring configuration if provided
+    let scoring_config = if let Some(scoring_json) = params.scoring {
+        match serde_json::from_str::<ScoringConfigDto>(&scoring_json) {
+            Ok(config) => Some(config.into()),
+            Err(e) => {
+                return Err(ServerError::BadRequest(format!(
+                    "Invalid scoring configuration: {}. Expected JSON like: {{\"recency_boost\":2.0,\"decay_function\":\"exponential\"}}",
+                    e
+                )));
+            }
+        }
+    } else {
+        None
+    };
+
+    // Perform search (with or without scoring)
+    let search_results = if let Some(scoring) = scoring_config {
+        state
+            .memory_manager
+            .search_with_scoring(&query, Some(limit), scoring)
+            .await?
+    } else {
+        state
+            .memory_manager
+            .search(&query, Some(limit), Some(semantic_filter), locai_mode)
+            .await?
+    };
 
     // Convert to DTOs
     let result_dtos: Vec<SearchResultDto> = search_results
@@ -430,6 +510,170 @@ pub async fn search_memories(
         .collect();
 
     Ok(Json(result_dtos))
+}
+
+/// Create a relationship between memories
+#[utoipa::path(
+    post,
+    path = "/api/memories/{id}/relationships",
+    tag = "memories",
+    params(
+        ("id" = String, Path, description = "Source memory ID")
+    ),
+    request_body = CreateMemoryRelationshipRequest,
+    responses(
+        (status = 201, description = "Relationship created successfully", body = RelationshipDto),
+        (status = 404, description = "Source or target memory not found"),
+        (status = 400, description = "Bad request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn create_memory_relationship(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    JsonExtractor(request): JsonExtractor<CreateMemoryRelationshipRequest>,
+) -> ServerResult<(StatusCode, Json<RelationshipDto>)> {
+    use chrono::Utc;
+    use locai::storage::models::Relationship;
+    use uuid::Uuid;
+
+    // Use id as source_id for clarity in the logic
+    let source_id = id;
+
+    // Validate that source memory exists
+    let _source_memory = state
+        .memory_manager
+        .get_memory(&source_id)
+        .await?
+        .ok_or_else(|| not_found("Memory", &source_id))?;
+
+    // Validate that target exists (can be memory OR entity)
+    let target_is_memory = state
+        .memory_manager
+        .get_memory(&request.target_id)
+        .await?
+        .is_some();
+    
+    let target_is_entity = if !target_is_memory {
+        state
+            .memory_manager
+            .get_entity(&request.target_id)
+            .await?
+            .is_some()
+    } else {
+        false
+    };
+
+    if !target_is_memory && !target_is_entity {
+        return Err(not_found("Memory or Entity", &request.target_id));
+    }
+
+    // Create the relationship
+    let now = Utc::now();
+    let relationship = Relationship {
+        id: Uuid::new_v4().to_string(),
+        source_id: source_id.clone(),
+        target_id: request.target_id.clone(),
+        relationship_type: request.relationship_type.clone(),
+        properties: request.properties,
+        created_at: now,
+        updated_at: now,
+    };
+
+    // Store the relationship
+    let created_relationship = state
+        .memory_manager
+        .create_relationship_entity(relationship)
+        .await?;
+
+    // Broadcast WebSocket message
+    let ws_message = WebSocketMessage::RelationshipCreated {
+        relationship_id: created_relationship.id.clone(),
+        source_id: created_relationship.source_id.clone(),
+        target_id: created_relationship.target_id.clone(),
+        relationship_type: created_relationship.relationship_type.clone(),
+        properties: serde_json::to_value(&created_relationship.properties).unwrap_or_default(),
+        node_id: None,
+    };
+    state.broadcast_message(ws_message);
+
+    let relationship_dto = RelationshipDto::from(created_relationship);
+    Ok((StatusCode::CREATED, Json(relationship_dto)))
+}
+
+/// Get relationships for a memory
+#[utoipa::path(
+    get,
+    path = "/api/memories/{id}/relationships",
+    tag = "memories",
+    params(
+        ("id" = String, Path, description = "Memory ID"),
+        ("relationship_type" = Option<String>, Query, description = "Filter by relationship type"),
+        ("direction" = Option<String>, Query, description = "Direction: outgoing, incoming, or both"),
+    ),
+    responses(
+        (status = 200, description = "List of relationships", body = Vec<RelationshipDto>),
+        (status = 404, description = "Memory not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_memory_relationships(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Query(params): Query<GetMemoryRelationshipsParams>,
+) -> ServerResult<Json<Vec<RelationshipDto>>> {
+    use locai::storage::filters::RelationshipFilter;
+
+    // Validate that the memory exists
+    let _memory = state
+        .memory_manager
+        .get_memory(&id)
+        .await?
+        .ok_or_else(|| not_found("Memory", &id))?;
+
+    // Build filter based on direction
+    let direction = params.direction.as_str();
+    let mut all_relationships = Vec::new();
+
+    // Get outgoing relationships (where this memory is the source)
+    if direction == "outgoing" || direction == "both" {
+        let filter = RelationshipFilter {
+            source_id: Some(id.clone()),
+            relationship_type: params.relationship_type.clone(),
+            ..Default::default()
+        };
+
+        let outgoing = state
+            .memory_manager
+            .list_relationships(Some(filter), Some(100), None)
+            .await?;
+        all_relationships.extend(outgoing);
+    }
+
+    // Get incoming relationships (where this memory is the target)
+    if direction == "incoming" || direction == "both" {
+        let filter = RelationshipFilter {
+            target_id: Some(id.clone()),
+            relationship_type: params.relationship_type,
+            ..Default::default()
+        };
+
+        let incoming = state
+            .memory_manager
+            .list_relationships(Some(filter), Some(100), None)
+            .await?;
+        all_relationships.extend(incoming);
+    }
+
+    // Convert to DTOs
+    let relationship_dtos: Vec<RelationshipDto> = all_relationships
+        .into_iter()
+        .map(RelationshipDto::from)
+        .collect();
+
+    Ok(Json(relationship_dtos))
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -446,12 +690,44 @@ pub struct SearchParams {
     /// Similarity threshold for semantic search
     pub threshold: Option<f32>,
 
-    /// Filter by memory type
+    /// Filter by memory type. For custom memory types, include the "custom:" prefix.
+    /// 
+    /// Examples:
+    /// - "custom:dialogue"
+    /// - "custom:quest"
+    /// - "custom:observation"
+    /// 
+    /// Built-in types (if any) do not require a prefix.
+    #[param(example = "custom:dialogue")]
     pub memory_type: Option<String>,
 
     /// Filter by tags (comma-separated)
     pub tags: Option<String>,
 
-    /// Filter by priority
+    /// Filter by priority (capitalized values: "Low", "Normal", "High", "Critical")
+    #[param(example = "Normal")]
     pub priority: Option<String>,
+    
+    /// Optional JSON-encoded scoring configuration for enhanced search
+    ///
+    /// When provided, enables lifecycle-aware scoring that combines BM25, vector similarity,
+    /// recency, access frequency, and priority. If omitted, uses basic BM25 scoring.
+    ///
+    /// Example: `{"recency_boost":2.0,"access_boost":1.5,"decay_function":"exponential"}`
+    ///
+    /// For complex scoring configs, consider using POST /api/memories/search with JSON body instead.
+    #[param(example = r#"{"recency_boost":2.0,"decay_function":"exponential"}"#)]
+    pub scoring: Option<String>,
+
+    /// Filter by creation date - only memories created after this time (ISO 8601 format)
+    ///
+    /// Example: `2025-11-01T00:00:00Z`
+    #[param(example = "2025-11-01T00:00:00Z")]
+    pub created_after: Option<String>,
+
+    /// Filter by creation date - only memories created before this time (ISO 8601 format)
+    ///
+    /// Example: `2025-11-01T23:59:59Z`
+    #[param(example = "2025-11-01T23:59:59Z")]
+    pub created_before: Option<String>,
 }
