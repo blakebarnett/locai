@@ -76,83 +76,41 @@ where
         // First ensure system user exists
         self.ensure_system_user().await?;
 
-        // Validate source and target based on relationship type
-        match relationship.relationship_type.as_str() {
-            "contains" | "mentions" | "references_entity" | "has_entity" => {
-                // For memory->entity relationships: memory -> entity
-                // Verify source is a memory
-                if self.get_memory(&relationship.source_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Source memory with ID {} not found",
-                        relationship.source_id
-                    )));
-                }
+        // Validate source exists (can be memory or entity)
+        let source_is_memory = self.get_memory(&relationship.source_id).await?.is_some();
+        let source_is_entity = if !source_is_memory {
+            self.get_entity(&relationship.source_id).await?.is_some()
+        } else {
+            false
+        };
 
-                // Verify target is an entity
-                if self.get_entity(&relationship.target_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Target entity with ID {} not found",
-                        relationship.target_id
-                    )));
-                }
-            }
-            "references" => {
-                // For references relationships: memory -> relationship
-                // Verify source is a memory
-                if self.get_memory(&relationship.source_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Source memory with ID {} not found",
-                        relationship.source_id
-                    )));
-                }
+        if !source_is_memory && !source_is_entity {
+            return Err(StorageError::NotFound(format!(
+                "Source node (memory or entity) with ID {} not found",
+                relationship.source_id
+            )));
+        }
 
-                // Verify target is a relationship
-                if self
-                    .get_relationship(&relationship.target_id)
-                    .await?
-                    .is_none()
-                {
-                    return Err(StorageError::NotFound(format!(
-                        "Target relationship with ID {} not found",
-                        relationship.target_id
-                    )));
-                }
-            }
-            "entity_coreference" | "temporal_sequence" | "topic_similarity" => {
-                // For memory->memory relationships (automatic relationships): memory -> memory
-                // Verify source is a memory
-                if self.get_memory(&relationship.source_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Source memory with ID {} not found",
-                        relationship.source_id
-                    )));
-                }
+        // Validate target exists (can be memory, entity, or relationship depending on type)
+        let target_valid = if relationship.relationship_type == "references" {
+            // For "references" type, target must be another relationship
+            self.get_relationship(&relationship.target_id).await?.is_some()
+        } else {
+            // For all other types, target can be memory or entity
+            let is_memory = self.get_memory(&relationship.target_id).await?.is_some();
+            let is_entity = if !is_memory {
+                self.get_entity(&relationship.target_id).await?.is_some()
+            } else {
+                false
+            };
+            is_memory || is_entity
+        };
 
-                // Verify target is a memory
-                if self.get_memory(&relationship.target_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Target memory with ID {} not found",
-                        relationship.target_id
-                    )));
-                }
-            }
-            _ => {
-                // For all other relationships (like "relates", "emphasizes", etc.): entity -> entity
-                // Verify that both source and target entities exist
-                if self.get_entity(&relationship.source_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Source entity with ID {} not found",
-                        relationship.source_id
-                    )));
-                }
-
-                if self.get_entity(&relationship.target_id).await?.is_none() {
-                    return Err(StorageError::NotFound(format!(
-                        "Target entity with ID {} not found",
-                        relationship.target_id
-                    )));
-                }
-            }
+        if !target_valid {
+            return Err(StorageError::NotFound(format!(
+                "Target node with ID {} not found",
+                relationship.target_id
+            )));
         }
 
         // Create a struct for creation (timestamps handled by SurrealDB)

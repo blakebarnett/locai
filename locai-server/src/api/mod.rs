@@ -17,12 +17,15 @@ use crate::{state::AppState, websocket::websocket_handler};
 pub mod auth;
 pub mod auth_endpoints;
 pub mod auth_service;
+pub mod batch;
 pub mod dto;
 pub mod entities;
 pub mod graph;
 pub mod memories;
 pub mod relationships;
+pub mod relationship_types;
 pub mod versions;
+pub mod webhooks;
 
 use auth::auth_middleware;
 
@@ -36,6 +39,7 @@ use auth::auth_middleware;
         auth_endpoints::get_user,
         auth_endpoints::update_user,
         auth_endpoints::delete_user,
+        batch::batch_execute,
         memories::create_memory,
         memories::get_memory,
         memories::list_memories,
@@ -54,6 +58,13 @@ use auth::auth_middleware;
         relationships::update_relationship,
         relationships::delete_relationship,
         relationships::find_related_entities,
+        relationship_types::list_relationship_types,
+        relationship_types::get_relationship_type,
+        relationship_types::register_relationship_type,
+        relationship_types::update_relationship_type,
+        relationship_types::delete_relationship_type,
+        relationship_types::get_relationship_metrics,
+        relationship_types::seed_common_types,
         versions::list_versions,
         versions::create_version,
         versions::checkout_version,
@@ -65,6 +76,11 @@ use auth::auth_middleware;
         graph::find_similar_structures,
         graph::get_related_entities,
         graph::get_central_entities,
+        webhooks::create_webhook,
+        webhooks::list_webhooks,
+        webhooks::get_webhook,
+        webhooks::update_webhook,
+        webhooks::delete_webhook,
     ),
     components(
         schemas(
@@ -74,6 +90,7 @@ use auth::auth_middleware;
             auth_endpoints::UserDto,
             auth_endpoints::CreateUserRequest,
             auth_endpoints::UpdateUserRequest,
+            batch::BatchRequest,
             dto::MemoryDto,
             dto::CreateMemoryRequest,
             dto::UpdateMemoryRequest,
@@ -89,20 +106,36 @@ use auth::auth_middleware;
             dto::MemoryPathDto,
             dto::SearchRequest,
             dto::SearchResultDto,
+            dto::ScoringConfigDto,
+            dto::DecayFunctionDto,
             dto::GraphQueryRequest,
             dto::GraphMetricsDto,
+            dto::GraphMetadata,
+            dto::TemporalSpanDto,
+            dto::WebhookDto,
+            dto::CreateWebhookRequest,
+            dto::UpdateWebhookRequest,
+            dto::WebhookEvent,
+            dto::CentralMemoryDto,
             dto::PaginationParams,
             dto::ErrorResponse,
+            relationship_types::RegisterTypeRequest,
+            relationship_types::RelationshipTypeResponse,
+            relationship_types::MetricsResponse,
+            relationship_types::SeedResponse,
         )
     ),
     tags(
         (name = "auth", description = "Authentication and user management endpoints"),
+        (name = "batch", description = "Batch operations for bulk memory and relationship operations"),
         (name = "memories", description = "Memory management endpoints"),
         (name = "entities", description = "Manual entity management endpoints (CRUD operations)"),
         (name = "relationships", description = "Relationship management endpoints"),
+        (name = "relationship-types", description = "Dynamic relationship type management endpoints"),
         (name = "versions", description = "Version management endpoints"),
         (name = "graph", description = "Graph operations and traversal endpoints"),
         (name = "websocket", description = "WebSocket real-time updates"),
+        (name = "webhooks", description = "Webhook management endpoints"),
     ),
     info(
                     title = "Locai Memory Service API",
@@ -125,7 +158,8 @@ pub struct ApiDoc;
 
 /// Create the main router with all API endpoints
 pub fn create_router(state: Arc<AppState>) -> Router {
-    let api_router = Router::new()
+    // v1 API router with all endpoints under /v1
+    let v1_router = Router::new()
         // Authentication endpoints (public, no auth middleware)
         .route("/auth/signup", post(auth_endpoints::signup))
         .route("/auth/login", post(auth_endpoints::login))
@@ -133,6 +167,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/auth/users/{id}", get(auth_endpoints::get_user))
         .route("/auth/users/{id}", put(auth_endpoints::update_user))
         .route("/auth/users/{id}", delete(auth_endpoints::delete_user))
+        // Batch operations endpoint
+        .route("/batch", post(batch::batch_execute))
         // Memory endpoints
         .route("/memories", post(memories::create_memory))
         .route("/memories", get(memories::list_memories))
@@ -140,6 +176,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/memories/{id}", put(memories::update_memory))
         .route("/memories/{id}", delete(memories::delete_memory))
         .route("/memories/search", get(memories::search_memories))
+        // Memory relationship endpoints
+        .route(
+            "/memories/{id}/relationships",
+            get(memories::get_memory_relationships)
+                .post(memories::create_memory_relationship),
+        )
         // Entity endpoints
         .route("/entities", get(entities::list_entities))
         .route("/entities/{id}", get(entities::get_entity))
@@ -149,6 +191,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route(
             "/entities/{id}/memories",
             get(entities::get_entity_memories),
+        )
+        // Entity relationship endpoints
+        .route(
+            "/entities/{id}/relationships",
+            get(entities::get_entity_relationships)
+                .post(entities::create_entity_relationship),
         )
         // Relationship endpoints
         .route("/relationships", get(relationships::list_relationships))
@@ -166,6 +214,14 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/relationships/{id}/related",
             get(relationships::find_related_entities),
         )
+        // Relationship type endpoints
+        .route("/relationship-types", get(relationship_types::list_relationship_types))
+        .route("/relationship-types/{name}", get(relationship_types::get_relationship_type))
+        .route("/relationship-types", post(relationship_types::register_relationship_type))
+        .route("/relationship-types/{name}", put(relationship_types::update_relationship_type))
+        .route("/relationship-types/{name}", delete(relationship_types::delete_relationship_type))
+        .route("/relationship-types/metrics", get(relationship_types::get_relationship_metrics))
+        .route("/relationship-types/seed", post(relationship_types::seed_common_types))
         // Version endpoints
         .route("/versions", get(versions::list_versions))
         .route("/versions", post(versions::create_version))
@@ -185,6 +241,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(graph::get_related_entities),
         )
         .route("/entities/central", get(graph::get_central_entities))
+        // Webhook endpoints
+        .route("/webhooks", post(webhooks::create_webhook))
+        .route("/webhooks", get(webhooks::list_webhooks))
+        .route("/webhooks/{id}", get(webhooks::get_webhook))
+        .route("/webhooks/{id}", put(webhooks::update_webhook))
+        .route("/webhooks/{id}", delete(webhooks::delete_webhook))
         // WebSocket endpoints
         .route("/ws", get(websocket_handler))
         .route("/messaging/ws", get(messaging_websocket_handler))
@@ -195,12 +257,19 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             state.clone(),
             auth_middleware,
         ))
-        .with_state(state);
+        .with_state(state.clone());
 
-    // Main router with API prefix and documentation
+    // Legacy router for backward compatibility (redirects /api/* to /api/v1/*)
+    // Clone v1 router for /api (non-versioned) for backward compatibility
+    let legacy_router = v1_router.clone();
+
+    // Main router with both versioned and legacy paths
     let swagger_router = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
 
-    Router::new().nest("/api", api_router).merge(swagger_router)
+    Router::new()
+        .nest("/api/v1", v1_router)  // Primary versioned API
+        .nest("/api", legacy_router)  // Backward compatible non-versioned API
+        .merge(swagger_router)
 }
 
 /// Health check endpoint with capability reporting
@@ -226,6 +295,7 @@ async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Va
             "entity_management": true,  // Manual CRUD operations for entities via API
             "memory_management": true,  // CRUD operations for memories
             "relationship_management": true,  // CRUD operations for relationships between memories/entities
+            "dynamic_relationship_types": true,  // RFC 001: Dynamic type registration
             "graph_operations": true,
             "messaging": state.messaging_server.is_some(),
             "authentication": state.config.enable_auth
