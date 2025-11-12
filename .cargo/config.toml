@@ -1,5 +1,11 @@
 # Platform-specific optimizations applied automatically based on target triple
 
+# Build settings
+[build]
+rustc-wrapper = "sccache"
+# Incremental builds are disabled when using sccache for better cache efficiency
+incremental = false
+
 # x86_64 Linux optimizations
 [target.x86_64-unknown-linux-gnu.env]
 ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
