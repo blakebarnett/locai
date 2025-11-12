@@ -851,8 +851,12 @@ impl<'a> SearchBuilder<'a> {
         let query = self.query.clone();
         let limit = self.limit.unwrap_or(10);
 
-        // Create filter using helper function
-        let mut filter = helpers::memory_by_type("fact");
+        // Create filter - use memory_type if set, otherwise no type filter
+        let mut filter = if let Some(memory_type) = &self.memory_type {
+            helpers::memory_by_type(&memory_type.to_string())
+        } else {
+            crate::storage::filters::MemoryFilter::default()
+        };
         if let Some(tags) = &self.tags {
             filter.tags = Some(tags.clone());
         }

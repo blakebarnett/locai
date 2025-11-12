@@ -15,6 +15,7 @@
 pub mod config;
 pub mod errors;
 pub mod filters;
+pub mod lifecycle;
 pub mod models;
 pub mod shared_storage;
 pub mod traits;
@@ -255,6 +256,7 @@ pub async fn create_graph_storage(
             let shared_config = SharedStorageConfig {
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
+                lifecycle_tracking: Default::default(),
             };
 
             match config.engine {
@@ -309,6 +311,7 @@ pub async fn create_graph_storage(
             let shared_config = SharedStorageConfig {
                 namespace: "memory".to_string(),
                 database: "main".to_string(),
+                lifecycle_tracking: Default::default(),
             };
             let client = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
                 .await
@@ -338,6 +341,7 @@ pub async fn create_vector_storage(
             let shared_config = SharedStorageConfig {
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
+                lifecycle_tracking: Default::default(),
             };
 
             match config.engine {
@@ -422,6 +426,7 @@ pub async fn create_storage_service(
     let shared_config = SharedStorageConfig {
         namespace: config.storage.graph.surrealdb.namespace.clone(),
         database: config.storage.graph.surrealdb.database.clone(),
+        lifecycle_tracking: config.lifecycle_tracking.clone(),
     };
 
     // Create SharedStorage based on engine type

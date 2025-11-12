@@ -65,6 +65,7 @@ pub async fn create_shared_store(
             let shared_config = SharedStorageConfig {
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
+                lifecycle_tracking: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))
@@ -83,6 +84,7 @@ pub async fn create_shared_store(
             let shared_config = SharedStorageConfig {
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
+                lifecycle_tracking: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))
@@ -107,6 +109,7 @@ pub async fn create_shared_store(
             let shared_config = SharedStorageConfig {
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
+                lifecycle_tracking: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))
@@ -135,6 +138,7 @@ pub async fn create_shared_store(
             let shared_config = SharedStorageConfig {
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
+                lifecycle_tracking: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))

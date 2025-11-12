@@ -3,6 +3,18 @@
 //! This example shows how to use the new SharedStorage implementation that provides
 //! a consistent API across different SurrealDB connection types, demonstrating
 //! entity operations, relationship management, and vector similarity search.
+//!
+//! ## Hook System Integration
+//!
+//! This example demonstrates memory operations that automatically trigger hooks
+//! when lifecycle tracking is enabled. The hooks system allows you to:
+//! - React to memory creation, access, updates, and deletion
+//! - Implement custom logic via the MemoryHook trait
+//! - Send webhooks to remote endpoints for event notifications
+//! - Integrate with external systems
+//!
+//! See `locai/src/hooks/` for implementing custom hooks and
+//! `examples/memory_hooks.rs` for hook usage examples.
 
 use chrono::Utc;
 use locai::storage::{
@@ -22,6 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = SharedStorageConfig {
         namespace: "demo".to_string(),
         database: "locai_shared".to_string(),
+        lifecycle_tracking: Default::default(),
     };
 
     // Create a SurrealDB client with embedded RocksDB engine
@@ -345,6 +358,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • Advanced filtering across all data types");
     println!("   • Unified storage in a single SurrealDB instance");
     println!("   • BGE-M3 compatible 1024-dimensional vectors");
+
+    println!("\n🪝 Hook System Features:");
+    println!("   • Automatic hook execution on memory operations");
+    println!("   • Hook registry accessible via storage.hook_registry()");
+    println!("   • Non-blocking async hook execution with timeouts");
+    println!("   • Extensible MemoryHook trait for custom handlers");
 
     // Clean up demo database
     println!("\n🧹 Cleaning up demo database...");

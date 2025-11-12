@@ -10,12 +10,12 @@ use locai::prelude::{Locai, MemoryBuilder};
 // Mock Cohere client for demonstration
 // In real usage, you'd use the actual Cohere SDK
 struct MockCohereClient {
-    api_key: String,
+    _api_key: String,
 }
 
 impl MockCohereClient {
     fn new(api_key: String) -> Self {
-        Self { api_key }
+        Self { _api_key: api_key }
     }
 
     /// Generate embeddings using Cohere's embed-english-v3.0 model
@@ -56,21 +56,6 @@ impl MockCohereClient {
     /// Embed text as a query for search
     async fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
         self.embed_text(text, "search_query").await
-    }
-
-    /// Batch embed multiple texts as documents
-    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        println!(
-            "🧠 [Mock] Batch generating {} Cohere document embeddings",
-            texts.len()
-        );
-
-        let mut embeddings = Vec::new();
-        for text in texts {
-            embeddings.push(self.embed_document(text).await?);
-        }
-
-        Ok(embeddings)
     }
 }
 

@@ -10,12 +10,12 @@ use locai::prelude::{Locai, MemoryBuilder};
 // Mock OpenAI client for demonstration
 // In real usage, you'd use the actual OpenAI SDK
 struct MockOpenAIClient {
-    api_key: String,
+    _api_key: String,
 }
 
 impl MockOpenAIClient {
     fn new(api_key: String) -> Self {
-        Self { api_key }
+        Self { _api_key: api_key }
     }
 
     /// Generate embeddings using OpenAI's text-embedding-3-small model
@@ -37,21 +37,6 @@ impl MockOpenAIClient {
             .collect();
 
         Ok(mock_embedding)
-    }
-
-    /// Batch embed multiple texts (more efficient)
-    async fn embed_texts(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        println!(
-            "🤖 [Mock] Batch generating {} OpenAI embeddings",
-            texts.len()
-        );
-
-        let mut embeddings = Vec::new();
-        for text in texts {
-            embeddings.push(self.embed_text(text).await?);
-        }
-
-        Ok(embeddings)
     }
 }
 
