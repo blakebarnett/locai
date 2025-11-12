@@ -39,7 +39,9 @@ impl LifecycleUpdate {
 
     /// Merge another update into this one (combines deltas)
     pub fn merge(&mut self, other: LifecycleUpdate) {
-        self.access_count_delta = self.access_count_delta.saturating_add(other.access_count_delta);
+        self.access_count_delta = self
+            .access_count_delta
+            .saturating_add(other.access_count_delta);
         self.last_accessed = other.last_accessed; // Use the most recent timestamp
     }
 }
@@ -188,11 +190,19 @@ mod tests {
     async fn test_queue_overflow() {
         let queue = LifecycleUpdateQueue::new(2);
 
-        queue.queue_update(LifecycleUpdate::new("memory_1".to_string())).await.unwrap();
-        queue.queue_update(LifecycleUpdate::new("memory_2".to_string())).await.unwrap();
+        queue
+            .queue_update(LifecycleUpdate::new("memory_1".to_string()))
+            .await
+            .unwrap();
+        queue
+            .queue_update(LifecycleUpdate::new("memory_2".to_string()))
+            .await
+            .unwrap();
 
         // Next update should fail
-        let result = queue.queue_update(LifecycleUpdate::new("memory_3".to_string())).await;
+        let result = queue
+            .queue_update(LifecycleUpdate::new("memory_3".to_string()))
+            .await;
         assert!(result.is_err());
     }
 

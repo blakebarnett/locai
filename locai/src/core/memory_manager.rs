@@ -735,26 +735,30 @@ impl MemoryManager {
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to clear storage: {}", e)))
     }
-    
+
     /// Get the hook registry for registering memory hooks
-    /// 
+    ///
     /// Returns None if the storage backend doesn't support hooks
     pub fn hook_registry(&self) -> Option<std::sync::Arc<crate::hooks::HookRegistry>> {
         use crate::storage::shared_storage::SharedStorage;
-        
+
         // Access storage through memory_ops
         let storage_any = self.memory_ops.storage.as_any();
-        
+
         // Try local storage first
-        if let Some(shared_storage) = storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::local::Db>>>() {
+        if let Some(shared_storage) =
+            storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::local::Db>>>()
+        {
             return Some(shared_storage.hook_registry());
         }
-        
+
         // Try remote storage
-        if let Some(shared_storage) = storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::remote::ws::Client>>>() {
+        if let Some(shared_storage) =
+            storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::remote::ws::Client>>>()
+        {
             return Some(shared_storage.hook_registry());
         }
-        
+
         None
     }
 }

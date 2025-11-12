@@ -8,13 +8,13 @@
 //! - Configurable timeouts
 //! - Graceful error handling
 
+use super::traits::{HookResult, MemoryHook};
 use crate::models::Memory;
-use super::traits::{MemoryHook, HookResult};
 use async_trait::async_trait;
 use chrono::Utc;
-use std::time::Duration;
 use std::collections::HashMap;
-use tracing::{debug, warn, error};
+use std::time::Duration;
+use tracing::{debug, error, warn};
 
 /// Retry policy for webhook requests
 #[derive(Debug, Clone)]
@@ -43,8 +43,8 @@ impl Default for RetryPolicy {
 impl RetryPolicy {
     /// Calculate backoff duration for a given attempt number
     fn backoff_duration(&self, attempt: u32) -> Duration {
-        let backoff_ms = (self.initial_backoff_ms as f32
-            * self.backoff_multiplier.powi(attempt as i32)) as u64;
+        let backoff_ms =
+            (self.initial_backoff_ms as f32 * self.backoff_multiplier.powi(attempt as i32)) as u64;
         let backoff_ms = backoff_ms.min(self.max_backoff_ms);
         Duration::from_millis(backoff_ms)
     }
@@ -119,7 +119,11 @@ impl Webhook {
     }
 
     /// Send a webhook request with retry logic
-    async fn send_with_retry(&self, event_type: &str, payload: serde_json::Value) -> Result<(), String> {
+    async fn send_with_retry(
+        &self,
+        event_type: &str,
+        payload: serde_json::Value,
+    ) -> Result<(), String> {
         let client = reqwest::Client::builder()
             .timeout(self.timeout)
             .build()
@@ -133,13 +137,15 @@ impl Webhook {
                 Ok(_) => {
                     debug!(
                         "Webhook request succeeded (event: {}, url: {}, attempts: {})",
-                        event_type, self.url, attempt + 1
+                        event_type,
+                        self.url,
+                        attempt + 1
                     );
                     return Ok(());
                 }
                 Err(e) => {
                     last_error = Some(e.clone());
-                    
+
                     if attempt < self.retry_policy.max_retries {
                         let backoff = self.retry_policy.backoff_duration(attempt);
                         warn!(
@@ -215,7 +221,7 @@ impl MemoryHook for Webhook {
         // Serialize memory to JSON
         let memory_json = serde_json::to_value(memory)
             .unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize memory"}));
-        
+
         let payload = serde_json::json!({
             "event": "memory.created",
             "timestamp": Utc::now().to_rfc3339(),
@@ -226,7 +232,7 @@ impl MemoryHook for Webhook {
             Ok(_) => HookResult::Continue,
             Err(e) => {
                 error!("Webhook hook failed for on_memory_created: {}", e);
-                HookResult::Continue  // Don't fail the operation
+                HookResult::Continue // Don't fail the operation
             }
         }
     }
@@ -235,7 +241,7 @@ impl MemoryHook for Webhook {
         // Serialize memory to JSON
         let memory_json = serde_json::to_value(memory)
             .unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize memory"}));
-        
+
         let payload = serde_json::json!({
             "event": "memory.accessed",
             "timestamp": Utc::now().to_rfc3339(),
@@ -246,7 +252,7 @@ impl MemoryHook for Webhook {
             Ok(_) => HookResult::Continue,
             Err(e) => {
                 debug!("Webhook hook failed for on_memory_accessed: {}", e);
-                HookResult::Continue  // Don't fail the operation
+                HookResult::Continue // Don't fail the operation
             }
         }
     }
@@ -255,7 +261,7 @@ impl MemoryHook for Webhook {
         // Serialize new memory to JSON (spec says to send the updated memory)
         let memory_json = serde_json::to_value(new)
             .unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize memory"}));
-        
+
         let payload = serde_json::json!({
             "event": "memory.updated",
             "timestamp": Utc::now().to_rfc3339(),
@@ -266,7 +272,7 @@ impl MemoryHook for Webhook {
             Ok(_) => HookResult::Continue,
             Err(e) => {
                 error!("Webhook hook failed for on_memory_updated: {}", e);
-                HookResult::Continue  // Don't fail the operation
+                HookResult::Continue // Don't fail the operation
             }
         }
     }
@@ -275,7 +281,7 @@ impl MemoryHook for Webhook {
         // Serialize memory to JSON
         let memory_json = serde_json::to_value(memory)
             .unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize memory"}));
-        
+
         let payload = serde_json::json!({
             "event": "memory.deleted",
             "timestamp": Utc::now().to_rfc3339(),
@@ -286,7 +292,7 @@ impl MemoryHook for Webhook {
             Ok(_) => HookResult::Continue,
             Err(e) => {
                 error!("Webhook hook failed for before_memory_deleted: {}", e);
-                HookResult::Continue  // Don't prevent deletion on webhook failure
+                HookResult::Continue // Don't prevent deletion on webhook failure
             }
         }
     }
@@ -314,8 +320,8 @@ mod tests {
 
     #[test]
     fn test_webhook_with_method() {
-        let hook = Webhook::new("http://example.com/webhook".to_string())
-            .with_method("PUT".to_string());
+        let hook =
+            Webhook::new("http://example.com/webhook".to_string()).with_method("PUT".to_string());
         assert_eq!(hook.method, "PUT");
     }
 
@@ -324,16 +330,18 @@ mod tests {
         let hook = Webhook::new("http://example.com/webhook".to_string())
             .with_header("Authorization".to_string(), "Bearer token".to_string())
             .with_header("X-Custom".to_string(), "value".to_string());
-        
-        assert_eq!(hook.headers.get("Authorization"), Some(&"Bearer token".to_string()));
+
+        assert_eq!(
+            hook.headers.get("Authorization"),
+            Some(&"Bearer token".to_string())
+        );
         assert_eq!(hook.headers.get("X-Custom"), Some(&"value".to_string()));
     }
 
     #[test]
     fn test_webhook_with_timeout() {
         let timeout = Duration::from_secs(30);
-        let hook = Webhook::new("http://example.com/webhook".to_string())
-            .with_timeout(timeout);
+        let hook = Webhook::new("http://example.com/webhook".to_string()).with_timeout(timeout);
         assert_eq!(hook.timeout, timeout);
     }
 
@@ -349,16 +357,16 @@ mod tests {
     #[test]
     fn test_retry_policy_backoff_calculation() {
         let policy = RetryPolicy::default();
-        
+
         let backoff_0 = policy.backoff_duration(0);
         assert_eq!(backoff_0.as_millis(), 100);
-        
+
         let backoff_1 = policy.backoff_duration(1);
         assert_eq!(backoff_1.as_millis(), 200);
-        
+
         let backoff_2 = policy.backoff_duration(2);
         assert_eq!(backoff_2.as_millis(), 400);
-        
+
         let backoff_3 = policy.backoff_duration(3);
         assert_eq!(backoff_3.as_millis(), 800);
     }
@@ -366,7 +374,7 @@ mod tests {
     #[test]
     fn test_retry_policy_backoff_capped() {
         let policy = RetryPolicy::default();
-        
+
         // When backoff would exceed max, cap it
         let backoff_10 = policy.backoff_duration(10);
         assert!(backoff_10.as_millis() <= policy.max_backoff_ms as u128);
@@ -381,10 +389,10 @@ mod tests {
             backoff_multiplier: 1.5,
             max_backoff_ms: 5000,
         };
-        
+
         let hook = Webhook::new("http://example.com/webhook".to_string())
             .with_retry_policy(policy.clone());
-        
+
         assert_eq!(hook.retry_policy.max_retries, 5);
         assert_eq!(hook.retry_policy.initial_backoff_ms, 50);
     }
@@ -393,7 +401,7 @@ mod tests {
     fn test_webhook_timeout_ms() {
         let hook = Webhook::new("http://example.com/webhook".to_string())
             .with_timeout(Duration::from_secs(15));
-        
+
         assert_eq!(hook.timeout_ms(), 15000);
     }
 

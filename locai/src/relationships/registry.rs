@@ -178,12 +178,12 @@ impl RelationshipTypeRegistry {
         if let Some(ref storage) = self.storage {
             let stored_types = storage.load_all_types().await?;
             let count = stored_types.len();
-            
+
             let mut types = self.types.write().await;
             for def in stored_types {
                 types.insert(def.name.clone(), def);
             }
-            
+
             Ok(count)
         } else {
             Ok(0)
@@ -281,25 +281,21 @@ impl RelationshipTypeRegistry {
             RelationshipTypeDef::new("friendship".to_string())?
                 .symmetric()
                 .with_custom_metadata("category".to_string(), Value::String("social".to_string())),
-            RelationshipTypeDef::new("rivalry".to_string())?
-                .with_custom_metadata(
-                    "category".to_string(),
-                    Value::String("competitive".to_string()),
-                ),
+            RelationshipTypeDef::new("rivalry".to_string())?.with_custom_metadata(
+                "category".to_string(),
+                Value::String("competitive".to_string()),
+            ),
             RelationshipTypeDef::new("professional".to_string())?
-                .with_custom_metadata(
-                    "category".to_string(),
-                    Value::String("work".to_string()),
-                ),
+                .with_custom_metadata("category".to_string(), Value::String("work".to_string())),
             RelationshipTypeDef::new("mentorship".to_string())?
                 .with_inverse("mentee".to_string())
-                .with_custom_metadata("category".to_string(), Value::String("learning".to_string())),
-            RelationshipTypeDef::new("family".to_string())?
-                .symmetric()
                 .with_custom_metadata(
                     "category".to_string(),
-                    Value::String("kinship".to_string()),
+                    Value::String("learning".to_string()),
                 ),
+            RelationshipTypeDef::new("family".to_string())?
+                .symmetric()
+                .with_custom_metadata("category".to_string(), Value::String("kinship".to_string())),
             RelationshipTypeDef::new("romance".to_string())?
                 .symmetric()
                 .with_custom_metadata(
@@ -307,27 +303,20 @@ impl RelationshipTypeRegistry {
                     Value::String("intimate".to_string()),
                 ),
             RelationshipTypeDef::new("antagonistic".to_string())?
-                .with_custom_metadata(
-                    "category".to_string(),
-                    Value::String("hostile".to_string()),
-                ),
+                .with_custom_metadata("category".to_string(), Value::String("hostile".to_string())),
             RelationshipTypeDef::new("neutral".to_string())?
                 .symmetric()
-                .with_custom_metadata(
-                    "category".to_string(),
-                    Value::String("neutral".to_string()),
-                ),
+                .with_custom_metadata("category".to_string(), Value::String("neutral".to_string())),
             RelationshipTypeDef::new("alliance".to_string())?
                 .symmetric()
                 .with_custom_metadata(
                     "category".to_string(),
                     Value::String("collaborative".to_string()),
                 ),
-            RelationshipTypeDef::new("competition".to_string())?
-                .with_custom_metadata(
-                    "category".to_string(),
-                    Value::String("competitive".to_string()),
-                ),
+            RelationshipTypeDef::new("competition".to_string())?.with_custom_metadata(
+                "category".to_string(),
+                Value::String("competitive".to_string()),
+            ),
         ];
 
         for type_def in common_types {
@@ -495,13 +484,9 @@ mod tests {
         let reg1 = registry.clone();
         let reg2 = registry.clone();
 
-        let handle1 = tokio::spawn(async move {
-            reg1.get("custom_type").await.is_some()
-        });
+        let handle1 = tokio::spawn(async move { reg1.get("custom_type").await.is_some() });
 
-        let handle2 = tokio::spawn(async move {
-            reg2.get("custom_type").await.is_some()
-        });
+        let handle2 = tokio::spawn(async move { reg2.get("custom_type").await.is_some() });
 
         assert!(handle1.await.unwrap());
         assert!(handle2.await.unwrap());

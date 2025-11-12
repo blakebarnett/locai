@@ -7,7 +7,7 @@ use locai::config::LifecycleTrackingConfig;
 #[test]
 fn test_lifecycle_config_default() {
     let config = LifecycleTrackingConfig::default();
-    
+
     assert!(config.enabled);
     assert!(config.update_on_get);
     assert!(!config.update_on_search);

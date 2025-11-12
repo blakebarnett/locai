@@ -48,10 +48,9 @@ where
             DEFINE INDEX IF NOT EXISTS relationship_type_name_idx ON TABLE relationship_type COLUMNS name UNIQUE;
         "#;
 
-        self.client
-            .query(query)
-            .await
-            .map_err(|e| RegistryError::InternalError(format!("Failed to initialize schema: {}", e)))?;
+        self.client.query(query).await.map_err(|e| {
+            RegistryError::InternalError(format!("Failed to initialize schema: {}", e))
+        })?;
 
         Ok(())
     }
@@ -72,7 +71,7 @@ where
         let version = def.version;
         let created_at = def.created_at.to_rfc3339();
         let custom_metadata = def.custom_metadata.clone();
-        
+
         let record_id = RecordId::from(("relationship_type", name.as_str()));
 
         // Use UPSERT to handle both insert and update
@@ -111,19 +110,13 @@ where
     async fn load_all_types(&self) -> Result<Vec<RelationshipTypeDef>, RegistryError> {
         let query = "SELECT * FROM relationship_type";
 
-        let mut result = self
-            .client
-            .query(query)
-            .await
-            .map_err(|e| {
-                RegistryError::InternalError(format!("Failed to load relationship types: {}", e))
-            })?;
+        let mut result = self.client.query(query).await.map_err(|e| {
+            RegistryError::InternalError(format!("Failed to load relationship types: {}", e))
+        })?;
 
-        let types: Vec<SurrealRelationshipTypeDef> = result
-            .take(0)
-            .map_err(|e| {
-                RegistryError::InternalError(format!("Failed to parse relationship types: {}", e))
-            })?;
+        let types: Vec<SurrealRelationshipTypeDef> = result.take(0).map_err(|e| {
+            RegistryError::InternalError(format!("Failed to parse relationship types: {}", e))
+        })?;
 
         Ok(types.into_iter().map(|t| t.def).collect())
     }
@@ -156,15 +149,14 @@ mod tests {
         use crate::relationships::registry::RelationshipTypeDef;
 
         let _def = RelationshipTypeDef::new("test_type".to_string()).unwrap();
-        
+
         // Verify the struct compiles and has correct trait bounds
         #[allow(dead_code)]
         fn assert_storage_impl<T: RelationshipTypeStorage>(_: &T) {}
-        
+
         // This would require actual DB connection, so just a compile-time check
         // let client = Surreal::new::<surrealdb::engine::local::Mem>(()).await.unwrap();
         // let storage = SurrealRelationshipTypeStorage::new(client);
         // assert_storage_impl(&*storage);
     }
 }
-

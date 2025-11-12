@@ -22,8 +22,8 @@ pub mod dto;
 pub mod entities;
 pub mod graph;
 pub mod memories;
-pub mod relationships;
 pub mod relationship_types;
+pub mod relationships;
 pub mod versions;
 pub mod webhooks;
 
@@ -179,8 +179,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Memory relationship endpoints
         .route(
             "/memories/{id}/relationships",
-            get(memories::get_memory_relationships)
-                .post(memories::create_memory_relationship),
+            get(memories::get_memory_relationships).post(memories::create_memory_relationship),
         )
         // Entity endpoints
         .route("/entities", get(entities::list_entities))
@@ -195,8 +194,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Entity relationship endpoints
         .route(
             "/entities/{id}/relationships",
-            get(entities::get_entity_relationships)
-                .post(entities::create_entity_relationship),
+            get(entities::get_entity_relationships).post(entities::create_entity_relationship),
         )
         // Relationship endpoints
         .route("/relationships", get(relationships::list_relationships))
@@ -215,13 +213,34 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(relationships::find_related_entities),
         )
         // Relationship type endpoints
-        .route("/relationship-types", get(relationship_types::list_relationship_types))
-        .route("/relationship-types/{name}", get(relationship_types::get_relationship_type))
-        .route("/relationship-types", post(relationship_types::register_relationship_type))
-        .route("/relationship-types/{name}", put(relationship_types::update_relationship_type))
-        .route("/relationship-types/{name}", delete(relationship_types::delete_relationship_type))
-        .route("/relationship-types/metrics", get(relationship_types::get_relationship_metrics))
-        .route("/relationship-types/seed", post(relationship_types::seed_common_types))
+        .route(
+            "/relationship-types",
+            get(relationship_types::list_relationship_types),
+        )
+        .route(
+            "/relationship-types/{name}",
+            get(relationship_types::get_relationship_type),
+        )
+        .route(
+            "/relationship-types",
+            post(relationship_types::register_relationship_type),
+        )
+        .route(
+            "/relationship-types/{name}",
+            put(relationship_types::update_relationship_type),
+        )
+        .route(
+            "/relationship-types/{name}",
+            delete(relationship_types::delete_relationship_type),
+        )
+        .route(
+            "/relationship-types/metrics",
+            get(relationship_types::get_relationship_metrics),
+        )
+        .route(
+            "/relationship-types/seed",
+            post(relationship_types::seed_common_types),
+        )
         // Version endpoints
         .route("/versions", get(versions::list_versions))
         .route("/versions", post(versions::create_version))
@@ -267,8 +286,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     let swagger_router = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
 
     Router::new()
-        .nest("/api/v1", v1_router)  // Primary versioned API
-        .nest("/api", legacy_router)  // Backward compatible non-versioned API
+        .nest("/api/v1", v1_router) // Primary versioned API
+        .nest("/api", legacy_router) // Backward compatible non-versioned API
         .merge(swagger_router)
 }
 

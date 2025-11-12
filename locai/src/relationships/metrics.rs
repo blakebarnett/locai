@@ -5,8 +5,8 @@
 
 use super::registry::RelationshipTypeDef;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Metrics snapshot for a point in time
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,11 +58,7 @@ impl RelationshipMetrics {
     }
 
     /// Record a relationship creation event
-    pub fn record_relationship_created(
-        &self,
-        type_def: &RelationshipTypeDef,
-        enforced: bool,
-    ) {
+    pub fn record_relationship_created(&self, type_def: &RelationshipTypeDef, enforced: bool) {
         self.total_created.fetch_add(1, Ordering::SeqCst);
 
         if type_def.symmetric {

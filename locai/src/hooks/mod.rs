@@ -17,10 +17,10 @@
 //!
 //! See the examples directory for complete working examples of custom hooks.
 
-pub mod traits;
 pub mod registry;
+pub mod traits;
 pub mod webhook;
 
-pub use traits::{MemoryHook, HookResult};
 pub use registry::HookRegistry;
+pub use traits::{HookResult, MemoryHook};
 pub use webhook::Webhook;

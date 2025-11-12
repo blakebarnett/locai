@@ -54,9 +54,11 @@
 //! This crate provides the core library functionality that can be used directly
 //! in Rust applications or through the separate service crate.
 
+pub mod batch;
 pub mod config;
 pub mod core;
 pub mod entity_extraction;
+pub mod hooks;
 pub mod logging;
 pub mod memory;
 pub mod messaging;
@@ -64,11 +66,9 @@ pub mod ml;
 pub mod models;
 pub mod relationships;
 pub mod runtime;
+pub mod search;
 pub mod simple;
 pub mod storage;
-pub mod hooks;
-pub mod batch;
-pub mod search;
 
 /// The prelude re-exports commonly used types for convenience
 pub mod prelude {
@@ -105,13 +105,15 @@ pub mod prelude {
     };
 
     // Re-export hooks types for custom hook implementations
-    pub use crate::hooks::{MemoryHook, HookResult, HookRegistry};
+    pub use crate::hooks::{HookRegistry, HookResult, MemoryHook};
 
     // Re-export batch types for batch operations
-    pub use crate::batch::{BatchOperation, BatchResponse, BatchResult, BatchExecutor, BatchExecutorConfig};
+    pub use crate::batch::{
+        BatchExecutor, BatchExecutorConfig, BatchOperation, BatchResponse, BatchResult,
+    };
 
     // Re-export search scoring types
-    pub use crate::search::{ScoringConfig, DecayFunction, ScoreCalculator};
+    pub use crate::search::{DecayFunction, ScoreCalculator, ScoringConfig};
 
     // Re-export essential result type
     pub use crate::{LocaiError, Result};

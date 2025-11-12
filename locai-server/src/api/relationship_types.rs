@@ -12,9 +12,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use locai::relationships::{
-    RelationshipTypeDef, MetricsSnapshot,
-};
+use locai::relationships::{MetricsSnapshot, RelationshipTypeDef};
 
 use crate::{
     error::{ServerError, ServerResult},
@@ -86,10 +84,8 @@ pub async fn list_relationship_types(
     let registry = &state.relationship_type_registry;
     let types = registry.list().await;
 
-    let responses: Vec<RelationshipTypeResponse> = types
-        .into_iter()
-        .map(|def| def.into())
-        .collect();
+    let responses: Vec<RelationshipTypeResponse> =
+        types.into_iter().map(|def| def.into()).collect();
 
     Ok(Json(responses))
 }
@@ -116,7 +112,10 @@ pub async fn get_relationship_type(
 
     match registry.get(&name).await {
         Some(type_def) => Ok(Json(type_def.into())),
-        None => Err(ServerError::NotFound(format!("Relationship type '{}' not found", name))),
+        None => Err(ServerError::NotFound(format!(
+            "Relationship type '{}' not found",
+            name
+        ))),
     }
 }
 
@@ -253,15 +252,12 @@ pub async fn delete_relationship_type(
 ) -> ServerResult<StatusCode> {
     let registry = &state.relationship_type_registry;
 
-    registry
-        .delete(&name)
-        .await
-        .map_err(|e| match e {
-            locai::relationships::RegistryError::TypeNotFound(n) => {
-                ServerError::NotFound(format!("Relationship type '{}' not found", n))
-            }
-            _ => ServerError::Internal(e.to_string()),
-        })?;
+    registry.delete(&name).await.map_err(|e| match e {
+        locai::relationships::RegistryError::TypeNotFound(n) => {
+            ServerError::NotFound(format!("Relationship type '{}' not found", n))
+        }
+        _ => ServerError::Internal(e.to_string()),
+    })?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -283,7 +279,9 @@ pub struct MetricsResponse {
 }
 
 impl From<(MetricsSnapshot, locai::relationships::RelationshipMetrics)> for MetricsResponse {
-    fn from((snapshot, metrics): (MetricsSnapshot, locai::relationships::RelationshipMetrics)) -> Self {
+    fn from(
+        (snapshot, metrics): (MetricsSnapshot, locai::relationships::RelationshipMetrics),
+    ) -> Self {
         Self {
             symmetric_relationships_created: snapshot.symmetric_relationships_created,
             transitive_relationships_created: snapshot.transitive_relationships_created,

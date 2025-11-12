@@ -83,14 +83,14 @@ impl BatchExecutor {
         operations: Vec<BatchOperation>,
     ) -> Result<BatchResponse, BatchError> {
         let mut response = BatchResponse::new(true);
-        
+
         // Note: SurrealDB doesn't provide a traditional BEGIN/COMMIT API in the Rust SDK yet
         // We'll execute sequentially and track which operations succeeded for rollback
         // A proper implementation would wait for SurrealDB SDK to support transactions
-        
+
         let mut completed_operations: Vec<(usize, String)> = Vec::new();
         let mut had_error = false;
-        
+
         for (index, operation) in operations.into_iter().enumerate() {
             match self.execute_operation(index, operation).await {
                 Ok(resource_id) => {
@@ -105,11 +105,14 @@ impl BatchExecutor {
                 }
             }
         }
-        
+
         // If there was an error, attempt to rollback completed operations
         if had_error {
-            warn!("Transaction failed, attempting rollback of {} operations", completed_operations.len());
-            
+            warn!(
+                "Transaction failed, attempting rollback of {} operations",
+                completed_operations.len()
+            );
+
             for (index, resource_id) in completed_operations.iter().rev() {
                 // Attempt to delete the created resource
                 // This is a best-effort rollback
@@ -117,9 +120,10 @@ impl BatchExecutor {
                     warn!("Failed to rollback operation {}: {}", index, e);
                 }
             }
-            
+
             return Err(BatchError::TransactionFailed {
-                reason: "Transaction aborted due to operation failure, rollback attempted".to_string(),
+                reason: "Transaction aborted due to operation failure, rollback attempted"
+                    .to_string(),
             });
         }
 
@@ -150,32 +154,28 @@ impl BatchExecutor {
     }
 
     /// Attempt to rollback a completed operation
-    async fn rollback_operation(
-        &self,
-        _index: usize,
-        resource_id: &str,
-    ) -> Result<(), BatchError> {
+    async fn rollback_operation(&self, _index: usize, resource_id: &str) -> Result<(), BatchError> {
         // Determine resource type from ID format and attempt deletion
         // This is a best-effort operation
-        
+
         // Try to delete as memory
         if let Ok(_) = self.storage.delete_memory(resource_id).await {
             debug!("Rolled back memory {}", resource_id);
             return Ok(());
         }
-        
+
         // Try to delete as entity
         if let Ok(_) = self.storage.delete_entity(resource_id).await {
             debug!("Rolled back entity {}", resource_id);
             return Ok(());
         }
-        
+
         // Try to delete as relationship
         if let Ok(_) = self.storage.delete_relationship(resource_id).await {
             debug!("Rolled back relationship {}", resource_id);
             return Ok(());
         }
-        
+
         Err(BatchError::RollbackFailed {
             resource_id: resource_id.to_string(),
         })
@@ -220,13 +220,11 @@ impl BatchExecutor {
                     embedding: None,
                 };
 
-                let created = self
-                    .storage
-                    .create_memory(memory)
-                    .await
-                    .map_err(|e| BatchError::StorageError {
+                let created = self.storage.create_memory(memory).await.map_err(|e| {
+                    BatchError::StorageError {
                         message: e.to_string(),
-                    })?;
+                    }
+                })?;
 
                 Ok(created.id)
             }
@@ -270,25 +268,21 @@ impl BatchExecutor {
                     memory.properties = new_properties;
                 }
 
-                let updated = self
-                    .storage
-                    .update_memory(memory)
-                    .await
-                    .map_err(|e| BatchError::StorageError {
+                let updated = self.storage.update_memory(memory).await.map_err(|e| {
+                    BatchError::StorageError {
                         message: e.to_string(),
-                    })?;
+                    }
+                })?;
 
                 Ok(updated.id)
             }
 
             BatchOperation::DeleteMemory { id } => {
-                let success = self
-                    .storage
-                    .delete_memory(&id)
-                    .await
-                    .map_err(|e| BatchError::StorageError {
+                let success = self.storage.delete_memory(&id).await.map_err(|e| {
+                    BatchError::StorageError {
                         message: e.to_string(),
-                    })?;
+                    }
+                })?;
 
                 if success {
                     Ok(id)
@@ -355,13 +349,11 @@ impl BatchExecutor {
             }
 
             BatchOperation::DeleteRelationship { id } => {
-                let success = self
-                    .storage
-                    .delete_relationship(&id)
-                    .await
-                    .map_err(|e| BatchError::StorageError {
+                let success = self.storage.delete_relationship(&id).await.map_err(|e| {
+                    BatchError::StorageError {
                         message: e.to_string(),
-                    })?;
+                    }
+                })?;
 
                 if success {
                     Ok(id)
@@ -396,13 +388,11 @@ impl BatchExecutor {
                     }
                 }
 
-                let updated = self
-                    .storage
-                    .update_memory(memory)
-                    .await
-                    .map_err(|e| BatchError::StorageError {
+                let updated = self.storage.update_memory(memory).await.map_err(|e| {
+                    BatchError::StorageError {
                         message: e.to_string(),
-                    })?;
+                    }
+                })?;
 
                 Ok(updated.id)
             }
@@ -428,10 +418,7 @@ mod tests {
             submitted: 2000,
             max_size: 1000,
         };
-        assert_eq!(
-            error.to_string(),
-            "Batch size 2000 exceeds maximum 1000"
-        );
+        assert_eq!(error.to_string(), "Batch size 2000 exceeds maximum 1000");
     }
 
     #[test]

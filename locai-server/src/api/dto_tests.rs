@@ -42,7 +42,11 @@ mod tests {
                 .build();
 
             let dto = MemoryDto::from(memory);
-            assert_eq!(dto.priority, expected, "Priority {:?} should serialize to '{}'", priority, expected);
+            assert_eq!(
+                dto.priority, expected,
+                "Priority {:?} should serialize to '{}'",
+                priority, expected
+            );
         }
     }
 
@@ -116,7 +120,7 @@ mod tests {
     #[test]
     fn test_search_result_dto_score_unbounded() {
         let memory = MemoryBuilder::new_with_content("Test").build();
-        
+
         // Test various score values including > 1.0
         let test_scores = vec![0.0, 0.5, 0.87, 1.0, 1.5, 2.3, 10.0];
 
@@ -152,30 +156,44 @@ mod tests {
     #[test]
     fn test_openapi_schema_generation() {
         use crate::api::ApiDoc;
-        
+
         // This will panic if the OpenAPI schema has errors
         let openapi = ApiDoc::openapi();
-        
+
         // Verify basic structure
         assert_eq!(openapi.info.title, "Locai Memory Service API");
-        
+
         // Verify our key schemas are present
         let schemas = &openapi.components.as_ref().unwrap().schemas;
-        assert!(schemas.contains_key("MemoryDto"), "MemoryDto schema should exist");
-        assert!(schemas.contains_key("EntityDto"), "EntityDto schema should exist");
-        assert!(schemas.contains_key("SearchResultDto"), "SearchResultDto schema should exist");
-        assert!(schemas.contains_key("CreateMemoryRequest"), "CreateMemoryRequest schema should exist");
+        assert!(
+            schemas.contains_key("MemoryDto"),
+            "MemoryDto schema should exist"
+        );
+        assert!(
+            schemas.contains_key("EntityDto"),
+            "EntityDto schema should exist"
+        );
+        assert!(
+            schemas.contains_key("SearchResultDto"),
+            "SearchResultDto schema should exist"
+        );
+        assert!(
+            schemas.contains_key("CreateMemoryRequest"),
+            "CreateMemoryRequest schema should exist"
+        );
     }
 
     /// Test that MemoryDto schema includes our documentation improvements
     #[test]
     fn test_memory_dto_schema_examples() {
         use crate::api::ApiDoc;
-        
+
         let openapi = ApiDoc::openapi();
         let schemas = &openapi.components.as_ref().unwrap().schemas;
-        let memory_dto = schemas.get("MemoryDto").expect("MemoryDto schema should exist");
-        
+        let memory_dto = schemas
+            .get("MemoryDto")
+            .expect("MemoryDto schema should exist");
+
         // Verify schema is defined (detailed checks would require walking the schema tree)
         // At minimum, verify it exists and can be serialized
         let _json = serde_json::to_string(&memory_dto).unwrap();
@@ -200,9 +218,9 @@ mod tests {
     #[test]
     fn test_update_memory_request_all_optional() {
         let json = json!({});
-        
+
         let request: UpdateMemoryRequest = serde_json::from_value(json).unwrap();
-        
+
         assert!(request.content.is_none());
         assert!(request.memory_type.is_none());
         assert!(request.priority.is_none());
@@ -224,7 +242,9 @@ mod tests {
         let request: UpdateMemoryRequest = serde_json::from_value(json).unwrap();
         assert_eq!(request.memory_type, Some("custom:quest".to_string()));
         assert_eq!(request.priority, Some("Critical".to_string()));
-        assert_eq!(request.tags, Some(vec!["important".to_string(), "quest".to_string()]));
+        assert_eq!(
+            request.tags,
+            Some(vec!["important".to_string(), "quest".to_string()])
+        );
     }
 }
-

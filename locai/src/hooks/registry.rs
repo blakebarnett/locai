@@ -7,8 +7,8 @@
 //! - Timeout enforcement for individual hooks
 //! - Safe failure handling (failed hooks don't stop operations)
 
+use super::traits::{HookResult, MemoryHook};
 use crate::models::Memory;
-use super::traits::{MemoryHook, HookResult};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
@@ -70,15 +70,16 @@ impl HookRegistry {
         let priority = hook.priority();
         let name = hook.name().to_string();
         let mut hooks = self.hooks.write().await;
-        
+
         hooks.push(HookEntry::new(hook, priority));
-        
+
         // Keep hooks sorted by priority (highest first)
         hooks.sort_by(|a, b| {
-            b.priority.cmp(&a.priority)
+            b.priority
+                .cmp(&a.priority)
                 .then_with(|| a.hook.name().cmp(b.hook.name()))
         });
-        
+
         debug!("Hook registered: {} (priority: {})", name, priority);
     }
 
@@ -95,20 +96,15 @@ impl HookRegistry {
     /// failures don't cause this to return an error
     pub async fn execute_on_created(&self, memory: &Memory) -> Result<(), String> {
         let hooks = self.hooks.read().await;
-        
+
         for entry in hooks.iter() {
             let hook = entry.hook.clone();
             let timeout_ms = hook.timeout_ms();
             let name = hook.name();
-            
-            let future = async {
-                hook.on_memory_created(memory).await
-            };
-            
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(timeout_ms),
-                future
-            ).await {
+
+            let future = async { hook.on_memory_created(memory).await };
+
+            match tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), future).await {
                 Ok(HookResult::Continue) => {
                     debug!("Hook '{}' completed successfully", name);
                 }
@@ -117,14 +113,11 @@ impl HookRegistry {
                     debug!("Hook '{}' returned veto (ignored): {}", name, reason);
                 }
                 Err(_) => {
-                    warn!(
-                        "Hook '{}' timed out after {}ms",
-                        name, timeout_ms
-                    );
+                    warn!("Hook '{}' timed out after {}ms", name, timeout_ms);
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -134,20 +127,15 @@ impl HookRegistry {
     /// * `memory` - The accessed memory
     pub async fn execute_on_accessed(&self, memory: &Memory) -> Result<(), String> {
         let hooks = self.hooks.read().await;
-        
+
         for entry in hooks.iter() {
             let hook = entry.hook.clone();
             let timeout_ms = hook.timeout_ms();
             let name = hook.name();
-            
-            let future = async {
-                hook.on_memory_accessed(memory).await
-            };
-            
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(timeout_ms),
-                future
-            ).await {
+
+            let future = async { hook.on_memory_accessed(memory).await };
+
+            match tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), future).await {
                 Ok(HookResult::Continue) => {
                     debug!("Hook '{}' completed successfully", name);
                 }
@@ -156,14 +144,11 @@ impl HookRegistry {
                     debug!("Hook '{}' returned veto (ignored): {}", name, reason);
                 }
                 Err(_) => {
-                    warn!(
-                        "Hook '{}' timed out after {}ms",
-                        name, timeout_ms
-                    );
+                    warn!("Hook '{}' timed out after {}ms", name, timeout_ms);
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -174,20 +159,15 @@ impl HookRegistry {
     /// * `new` - The memory after the update
     pub async fn execute_on_updated(&self, old: &Memory, new: &Memory) -> Result<(), String> {
         let hooks = self.hooks.read().await;
-        
+
         for entry in hooks.iter() {
             let hook = entry.hook.clone();
             let timeout_ms = hook.timeout_ms();
             let name = hook.name();
-            
-            let future = async {
-                hook.on_memory_updated(old, new).await
-            };
-            
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(timeout_ms),
-                future
-            ).await {
+
+            let future = async { hook.on_memory_updated(old, new).await };
+
+            match tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), future).await {
                 Ok(result) => {
                     if let HookResult::Continue = result {
                         debug!("Hook '{}' completed successfully", name);
@@ -197,14 +177,11 @@ impl HookRegistry {
                     }
                 }
                 Err(_) => {
-                    warn!(
-                        "Hook '{}' timed out after {}ms",
-                        name, timeout_ms
-                    );
+                    warn!("Hook '{}' timed out after {}ms", name, timeout_ms);
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -220,20 +197,15 @@ impl HookRegistry {
     /// `Ok(true)` if deletion should proceed, `Ok(false)` if deletion is vetoed
     pub async fn execute_before_deleted(&self, memory: &Memory) -> Result<bool, String> {
         let hooks = self.hooks.read().await;
-        
+
         for entry in hooks.iter() {
             let hook = entry.hook.clone();
             let timeout_ms = hook.timeout_ms();
             let name = hook.name();
-            
-            let future = async {
-                hook.before_memory_deleted(memory).await
-            };
-            
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(timeout_ms),
-                future
-            ).await {
+
+            let future = async { hook.before_memory_deleted(memory).await };
+
+            match tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), future).await {
                 Ok(HookResult::Continue) => {
                     debug!("Hook '{}' allowed deletion", name);
                 }
@@ -251,7 +223,7 @@ impl HookRegistry {
                 }
             }
         }
-        
+
         Ok(true)
     }
 

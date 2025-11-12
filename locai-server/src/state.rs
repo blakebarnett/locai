@@ -2,11 +2,11 @@
 
 use dashmap::DashMap;
 use locai::core::MemoryManager;
-use locai::relationships::{RelationshipTypeRegistry, RelationshipMetrics};
-use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
-use uuid::Uuid;
+use locai::relationships::{RelationshipMetrics, RelationshipTypeRegistry};
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{RwLock, broadcast};
+use uuid::Uuid;
 
 use crate::api::auth_service::AuthService;
 use crate::config::ServerConfig;

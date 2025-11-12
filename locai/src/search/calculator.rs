@@ -73,8 +73,7 @@ impl ScoreCalculator {
     /// This encourages recent memories to rank higher.
     fn calculate_recency_boost(&self, memory: &Memory) -> f32 {
         // Calculate age in hours
-        let age_duration = Utc::now()
-            .signed_duration_since(memory.created_at);
+        let age_duration = Utc::now().signed_duration_since(memory.created_at);
         let age_hours = age_duration.num_hours() as f32;
 
         match self.config.decay_function {
@@ -172,14 +171,14 @@ mod tests {
     #[should_panic]
     fn test_calculator_creation_invalid_config() {
         let mut config = ScoringConfig::default();
-        config.decay_rate = 0.0;  // Invalid
+        config.decay_rate = 0.0; // Invalid
         let _calc = ScoreCalculator::new(config);
     }
 
     #[test]
     fn test_try_new_invalid_config() {
         let mut config = ScoringConfig::default();
-        config.decay_rate = 0.0;  // Invalid
+        config.decay_rate = 0.0; // Invalid
         assert!(ScoreCalculator::try_new(config).is_err());
     }
 
@@ -247,7 +246,7 @@ mod tests {
             access_boost: 0.0,
             priority_boost: 0.0,
             decay_function: DecayFunction::Linear,
-            decay_rate: 0.1,  // 10% per hour
+            decay_rate: 0.1, // 10% per hour
             ..Default::default()
         };
         let calc = ScoreCalculator::new(config);
@@ -255,10 +254,15 @@ mod tests {
         // Fresh memory (created now)
         let fresh = create_test_memory("fresh", Utc::now(), 0, MemoryPriority::Normal);
         let score_fresh = calc.calculate_final_score(0.0, None, &fresh);
-        assert!(score_fresh > 9.0);  // Close to max
+        assert!(score_fresh > 9.0); // Close to max
 
         // Old memory (24 hours old)
-        let old = create_test_memory("old", Utc::now() - chrono::Duration::hours(24), 0, MemoryPriority::Normal);
+        let old = create_test_memory(
+            "old",
+            Utc::now() - chrono::Duration::hours(24),
+            0,
+            MemoryPriority::Normal,
+        );
         let score_old = calc.calculate_final_score(0.0, None, &old);
         // At 0.1 decay rate, 24 hours = 2.4 decay, so max is 0
         assert!(score_old <= 0.0);
@@ -284,7 +288,12 @@ mod tests {
         assert!(score_fresh > 9.0);
 
         // 10 hours old
-        let old = create_test_memory("old", Utc::now() - chrono::Duration::hours(10), 0, MemoryPriority::Normal);
+        let old = create_test_memory(
+            "old",
+            Utc::now() - chrono::Duration::hours(10),
+            0,
+            MemoryPriority::Normal,
+        );
         let score_old = calc.calculate_final_score(0.0, None, &old);
         // exp(-0.1 * 10) = exp(-1) ≈ 0.368
         assert!(score_old > 3.0 && score_old < 4.0);
@@ -310,7 +319,12 @@ mod tests {
         assert!(score_fresh > 5.0);
 
         // 100 hours old
-        let old = create_test_memory("old", Utc::now() - chrono::Duration::hours(100), 0, MemoryPriority::Normal);
+        let old = create_test_memory(
+            "old",
+            Utc::now() - chrono::Duration::hours(100),
+            0,
+            MemoryPriority::Normal,
+        );
         let score_old = calc.calculate_final_score(0.0, None, &old);
         // Should still have meaningful score with logarithmic decay (slower)
         assert!(score_old > 0.0);
@@ -401,6 +415,6 @@ mod tests {
 
         let score = calc.calculate_final_score(10.0, Some(5.0), &memory);
         // Should combine all factors meaningfully
-        assert!(score > 5.0);  // Base scores are 4.0 + 3.0 = 7.0
+        assert!(score > 5.0); // Base scores are 4.0 + 3.0 = 7.0
     }
 }

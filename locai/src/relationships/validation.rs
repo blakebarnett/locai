@@ -3,7 +3,7 @@
 //! Provides schema validation for relationship metadata using JSON Schema format.
 //! Supports validation of metadata against type-specific schemas defined in the registry.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Error types for validation operations
 #[derive(Debug, Clone, thiserror::Error)]
@@ -44,9 +44,9 @@ impl SchemaValidator {
 
     /// Validate a single property against its schema definition
     fn validate_against_schema(schema: &Value, data: &Value) -> Result<(), ValidationError> {
-        let schema_obj = schema
-            .as_object()
-            .ok_or_else(|| ValidationError::InvalidSchema("Schema must be an object".to_string()))?;
+        let schema_obj = schema.as_object().ok_or_else(|| {
+            ValidationError::InvalidSchema("Schema must be an object".to_string())
+        })?;
 
         // Check type constraint
         if let Some(expected_type) = schema_obj.get("type") {

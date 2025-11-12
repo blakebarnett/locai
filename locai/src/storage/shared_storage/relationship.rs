@@ -94,7 +94,9 @@ where
         // Validate target exists (can be memory, entity, or relationship depending on type)
         let target_valid = if relationship.relationship_type == "references" {
             // For "references" type, target must be another relationship
-            self.get_relationship(&relationship.target_id).await?.is_some()
+            self.get_relationship(&relationship.target_id)
+                .await?
+                .is_some()
         } else {
             // For all other types, target can be memory or entity
             let is_memory = self.get_memory(&relationship.target_id).await?.is_some();

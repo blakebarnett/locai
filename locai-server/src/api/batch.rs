@@ -3,26 +3,23 @@
 //! This module provides REST endpoints for executing batch operations
 //! on memories and relationships in bulk.
 
-use axum::{
-    extract::State,
-    response::Json,
-};
+use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::debug;
 use utoipa::ToSchema;
 
-use locai::batch::{BatchOperation, BatchResponse, BatchExecutor, BatchExecutorConfig};
+use locai::batch::{BatchExecutor, BatchExecutorConfig, BatchOperation, BatchResponse};
 
-use crate::state::AppState;
 use crate::error::{ServerError, ServerResult};
+use crate::state::AppState;
 
 /// Request to execute a batch of operations
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BatchRequest {
     /// List of operations to execute
     pub operations: Vec<serde_json::Value>,
-    
+
     /// If true, execute operations as a single transaction (all or nothing)
     #[serde(default)]
     pub transaction: bool,
@@ -127,21 +124,18 @@ mod tests {
     #[test]
     fn test_batch_request_serialization() {
         let request = BatchRequest {
-            operations: vec![
-                serde_json::json!({
-                    "op": "CreateMemory",
-                    "data": {
-                        "content": "Test",
-                        "memory_type": "fact",
-                        "priority": 1
-                    }
-                }),
-            ],
+            operations: vec![serde_json::json!({
+                "op": "CreateMemory",
+                "data": {
+                    "content": "Test",
+                    "memory_type": "fact",
+                    "priority": 1
+                }
+            })],
             transaction: false,
         };
 
         let json = serde_json::to_string(&request).expect("Should serialize");
-        let _deserialized: BatchRequest =
-            serde_json::from_str(&json).expect("Should deserialize");
+        let _deserialized: BatchRequest = serde_json::from_str(&json).expect("Should deserialize");
     }
 }

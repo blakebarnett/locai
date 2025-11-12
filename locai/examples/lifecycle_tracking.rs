@@ -26,11 +26,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let default_config = LifecycleTrackingConfig::default();
     println!("Lifecycle tracking enabled: {}", default_config.enabled);
     println!("Track memory retrieval: {}", default_config.update_on_get);
-    println!("Track search operations: {}", default_config.update_on_search);
+    println!(
+        "Track search operations: {}",
+        default_config.update_on_search
+    );
     println!("Track list operations: {}", default_config.update_on_list);
     println!("Batching enabled: {}", default_config.batched);
-    println!("Flush interval: {} seconds", default_config.flush_interval_secs);
-    println!("Flush threshold: {} updates", default_config.flush_threshold_count);
+    println!(
+        "Flush interval: {} seconds",
+        default_config.flush_interval_secs
+    );
+    println!(
+        "Flush threshold: {} updates",
+        default_config.flush_threshold_count
+    );
     println!("└───────────────────────────────────────────────────────────────┘\n");
 
     // ===== Example 2: High-Performance Configuration =====
@@ -46,8 +55,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         flush_threshold_count: 200,
     };
     println!("✓ Optimized for throughput");
-    println!("  - Longer flush interval: {} seconds", perf_config.flush_interval_secs);
-    println!("  - Higher batch threshold: {} updates", perf_config.flush_threshold_count);
+    println!(
+        "  - Longer flush interval: {} seconds",
+        perf_config.flush_interval_secs
+    );
+    println!(
+        "  - Higher batch threshold: {} updates",
+        perf_config.flush_threshold_count
+    );
     println!("  - Async non-blocking: {}", !perf_config.blocking);
     println!("└───────────────────────────────────────────────────────────────┘\n");
 
@@ -66,8 +81,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ Ensures real-time accuracy");
     println!("  - Blocking updates: {}", strict_config.blocking);
     println!("  - No batching: {}", !strict_config.batched);
-    println!("  - Track all operations: get={}, search={}, list={}", 
-        strict_config.update_on_get, strict_config.update_on_search, strict_config.update_on_list);
+    println!(
+        "  - Track all operations: get={}, search={}, list={}",
+        strict_config.update_on_get, strict_config.update_on_search, strict_config.update_on_list
+    );
     println!("└───────────────────────────────────────────────────────────────┘\n");
 
     // ===== Example 4: Configuration Validation =====

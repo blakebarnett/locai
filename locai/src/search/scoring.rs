@@ -154,7 +154,7 @@ impl ScoringConfig {
             access_boost: 0.2,
             priority_boost: 0.1,
             decay_function: DecayFunction::Exponential,
-            decay_rate: 0.2,  // Faster decay
+            decay_rate: 0.2, // Faster decay
         }
     }
 
@@ -182,9 +182,9 @@ impl ScoringConfig {
             bm25_weight: 0.7,
             vector_weight: 0.7,
             recency_boost: 0.2,
-            access_boost: 1.0,  // High weight for access frequency
-            priority_boost: 0.8,  // High weight for priority
-            decay_function: DecayFunction::Logarithmic,  // Slow decay
+            access_boost: 1.0,   // High weight for access frequency
+            priority_boost: 0.8, // High weight for priority
+            decay_function: DecayFunction::Logarithmic, // Slow decay
             decay_rate: 0.05,
         }
     }
@@ -346,8 +346,3 @@ mod tests {
         assert_eq!(DecayFunction::Logarithmic.to_string(), "logarithmic");
     }
 }
-
-
-
-
-

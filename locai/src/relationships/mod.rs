@@ -20,7 +20,9 @@ pub use dynamics::{AlliancePattern, ConflictZone, GroupDynamics, InfluenceNetwor
 pub use enforcement::{ConstraintEnforcer, EnforcementError, EnforcementResult};
 pub use manager::RelationshipManager;
 pub use metrics::{MetricsSnapshot, RelationshipMetrics};
-pub use registry::{RegistryError, RelationshipTypeDef, RelationshipTypeRegistry, RelationshipTypeStorage};
+pub use registry::{
+    RegistryError, RelationshipTypeDef, RelationshipTypeRegistry, RelationshipTypeStorage,
+};
 pub use storage::RelationshipStorage;
 pub use type_storage::SurrealRelationshipTypeStorage;
 pub use types::{

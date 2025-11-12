@@ -18,9 +18,7 @@ use locai::storage::{
 };
 
 use crate::{
-    api::dto::{
-        CreateEntityRequest, EntityDto, MemoryDto, RelationshipDto, UpdateEntityRequest,
-    },
+    api::dto::{CreateEntityRequest, EntityDto, MemoryDto, RelationshipDto, UpdateEntityRequest},
     error::{ServerResult, not_found},
     state::AppState,
     websocket::WebSocketMessage,
@@ -360,7 +358,7 @@ pub async fn create_entity_relationship(
         .get_entity(&request.target_id)
         .await?
         .is_some();
-    
+
     let target_is_memory = if !target_is_entity {
         state
             .memory_manager

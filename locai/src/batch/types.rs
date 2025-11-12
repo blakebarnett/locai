@@ -241,13 +241,11 @@ impl std::fmt::Display for BatchError {
             Self::TooLarge {
                 submitted,
                 max_size,
-            } => write!(
-                f,
-                "Batch size {} exceeds maximum {}",
-                submitted, max_size
-            ),
+            } => write!(f, "Batch size {} exceeds maximum {}", submitted, max_size),
             Self::TransactionFailed { reason } => write!(f, "Transaction failed: {}", reason),
-            Self::RollbackFailed { resource_id } => write!(f, "Failed to rollback resource: {}", resource_id),
+            Self::RollbackFailed { resource_id } => {
+                write!(f, "Failed to rollback resource: {}", resource_id)
+            }
             Self::InvalidOperation { index, reason } => {
                 write!(f, "Operation {} invalid: {}", index, reason)
             }
@@ -319,8 +317,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&op).expect("Should serialize");
-        let deserialized: BatchOperation =
-            serde_json::from_str(&json).expect("Should deserialize");
+        let deserialized: BatchOperation = serde_json::from_str(&json).expect("Should deserialize");
 
         match deserialized {
             BatchOperation::CreateMemory {

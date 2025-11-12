@@ -6,9 +6,7 @@
 //! - Sequential vs transactional modes
 //! - Error handling and partial failures
 
-use locai::batch::{
-    BatchExecutorConfig, BatchOperation, BatchResponse, BatchError,
-};
+use locai::batch::{BatchError, BatchExecutorConfig, BatchOperation, BatchResponse};
 use locai::models::{MemoryPriority, MemoryType};
 
 #[test]
@@ -24,11 +22,12 @@ fn test_batch_operation_serialization() {
     };
 
     let json = serde_json::to_string(&op).expect("Should serialize");
-    let deserialized: BatchOperation =
-        serde_json::from_str(&json).expect("Should deserialize");
+    let deserialized: BatchOperation = serde_json::from_str(&json).expect("Should deserialize");
 
     match deserialized {
-        BatchOperation::CreateMemory { content, priority, .. } => {
+        BatchOperation::CreateMemory {
+            content, priority, ..
+        } => {
             assert_eq!(content, "Test memory");
             assert_eq!(priority, Some(2));
         }
@@ -63,10 +62,7 @@ fn test_batch_error_messages() {
         submitted: 2000,
         max_size: 1000,
     };
-    assert_eq!(
-        error.to_string(),
-        "Batch size 2000 exceeds maximum 1000"
-    );
+    assert_eq!(error.to_string(), "Batch size 2000 exceeds maximum 1000");
 
     let error = BatchError::ValidationError {
         message: "Invalid field".to_string(),
@@ -94,11 +90,7 @@ fn test_batch_executor_config() {
 #[test]
 fn test_batch_response_with_messages() {
     let mut response = BatchResponse::new(true);
-    response.add_success_with_message(
-        0,
-        "mem_123".to_string(),
-        "Created successfully".to_string(),
-    );
+    response.add_success_with_message(0, "mem_123".to_string(), "Created successfully".to_string());
 
     assert_eq!(response.results.len(), 1);
     match &response.results[0] {
@@ -109,7 +101,10 @@ fn test_batch_response_with_messages() {
         } => {
             assert_eq!(*operation_index, 0);
             assert_eq!(resource_id, "mem_123");
-            assert_eq!(message.as_ref().map(|m| m.as_str()), Some("Created successfully"));
+            assert_eq!(
+                message.as_ref().map(|m| m.as_str()),
+                Some("Created successfully")
+            );
         }
         _ => panic!("Expected success result"),
     }
@@ -118,11 +113,7 @@ fn test_batch_response_with_messages() {
 #[test]
 fn test_batch_response_with_error_codes() {
     let mut response = BatchResponse::new(false);
-    response.add_error_with_code(
-        0,
-        "Resource not found".to_string(),
-        "NOT_FOUND".to_string(),
-    );
+    response.add_error_with_code(0, "Resource not found".to_string(), "NOT_FOUND".to_string());
 
     assert_eq!(response.results.len(), 1);
     match &response.results[0] {
@@ -180,8 +171,7 @@ fn test_batch_response_serialization() {
     response.add_error(1, "Failed".to_string());
 
     let json = serde_json::to_string(&response).expect("Should serialize");
-    let deserialized: BatchResponse =
-        serde_json::from_str(&json).expect("Should deserialize");
+    let deserialized: BatchResponse = serde_json::from_str(&json).expect("Should deserialize");
 
     assert_eq!(deserialized.completed, 1);
     assert_eq!(deserialized.failed, 1);
@@ -327,8 +317,7 @@ fn test_batch_response_json_serialization() {
     response.transaction_id = Some("tx_123".to_string());
 
     let json = serde_json::to_string(&response).expect("Should serialize");
-    let parsed: serde_json::Value =
-        serde_json::from_str(&json).expect("Should parse as JSON");
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("Should parse as JSON");
 
     // Verify structure
     assert_eq!(parsed["completed"], 1);
@@ -367,8 +356,7 @@ fn test_batch_operation_with_complex_properties() {
     };
 
     let json = serde_json::to_string(&op).expect("Should serialize");
-    let deserialized: BatchOperation =
-        serde_json::from_str(&json).expect("Should deserialize");
+    let deserialized: BatchOperation = serde_json::from_str(&json).expect("Should deserialize");
 
     match deserialized {
         BatchOperation::CreateMemory { properties, .. } => {

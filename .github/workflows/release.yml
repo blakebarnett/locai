@@ -52,6 +52,8 @@ jobs:
 
       - name: Verify package builds
         if: ${{ matrix.package.released }}
+        env:
+          RUSTC_WRAPPER: ""
         run: |
           cd ${{ matrix.package.path }}
           cargo check
@@ -59,6 +61,8 @@ jobs:
 
       - name: Publish to crates.io
         if: ${{ matrix.package.released }}
+        env:
+          RUSTC_WRAPPER: ""
         run: |
           cd ${{ matrix.package.path }}
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -80,12 +84,16 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Verify locai package builds
+        env:
+          RUSTC_WRAPPER: ""
         run: |
           cd locai
           cargo check --all-features
           cargo test
 
       - name: Publish locai to crates.io
+        env:
+          RUSTC_WRAPPER: ""
         run: |
           cd locai
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -96,6 +104,8 @@ jobs:
 
       - name: Publish locai-server
         if: ${{ needs.release-please.outputs.locai_server_released }}
+        env:
+          RUSTC_WRAPPER: ""
         run: |
           cd locai-server
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -103,6 +113,8 @@ jobs:
 
       - name: Publish locai-cli
         if: ${{ needs.release-please.outputs.locai_cli_released }}
+        env:
+          RUSTC_WRAPPER: ""
         run: |
           cd locai-cli
           cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}

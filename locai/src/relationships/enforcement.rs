@@ -101,9 +101,10 @@ impl ConstraintEnforcer {
                 metadata: relationship.metadata.clone(),
             };
 
-            enforcement_description =
-                format!("Created symmetric inverse relationship: {} ↔ {}", 
-                    relationship.entity_a, relationship.entity_b);
+            enforcement_description = format!(
+                "Created symmetric inverse relationship: {} ↔ {}",
+                relationship.entity_a, relationship.entity_b
+            );
             additional.push(inverse);
         }
 
@@ -146,7 +147,10 @@ impl ConstraintEnforcer {
     }
 
     /// Validate that a relationship type exists in the registry
-    pub async fn validate_type(&self, type_name: &str) -> Result<RelationshipTypeDef, EnforcementError> {
+    pub async fn validate_type(
+        &self,
+        type_name: &str,
+    ) -> Result<RelationshipTypeDef, EnforcementError> {
         self.registry
             .get(type_name)
             .await
@@ -210,10 +214,11 @@ mod tests {
 
         // Note: This test shows that we need to integrate with the actual relationship storage
         // For now, just verify the enforcer works
-        assert!(enforcer
-            .is_symmetric(&rel.relationship_type.to_string())
-            .await
-            .is_err() // Type not found in registry since it's an enum variant
+        assert!(
+            enforcer
+                .is_symmetric(&rel.relationship_type.to_string())
+                .await
+                .is_err() // Type not found in registry since it's an enum variant
         );
     }
 
@@ -229,7 +234,8 @@ mod tests {
     #[tokio::test]
     async fn test_validate_existing_type() {
         let registry = RelationshipTypeRegistry::new();
-        let type_def = super::super::registry::RelationshipTypeDef::new("custom".to_string()).unwrap();
+        let type_def =
+            super::super::registry::RelationshipTypeDef::new("custom".to_string()).unwrap();
         registry.register(type_def).await.unwrap();
 
         let enforcer = ConstraintEnforcer::new(registry);

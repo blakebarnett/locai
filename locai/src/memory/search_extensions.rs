@@ -302,7 +302,7 @@ impl SearchExtensions {
             .storage
             .search_memories_with_scoring(query_text, Some(scoring_config), limit)
             .await?;
-        
+
         // Convert from (Memory, f32) to SearchResult
         Ok(scored_results
             .into_iter()
@@ -409,7 +409,10 @@ impl SearchExtensions {
                     search_results
                         .into_iter()
                         .filter(|(memory, _score, _highlight)| {
-                            crate::memory::utils::matches_memory_filter_detailed(memory, &memory_filter)
+                            crate::memory::utils::matches_memory_filter_detailed(
+                                memory,
+                                &memory_filter,
+                            )
                         })
                         .collect()
                 } else {
@@ -562,7 +565,10 @@ impl SearchExtensions {
                     combined_memories
                         .into_iter()
                         .filter(|memory| {
-                            crate::memory::utils::matches_memory_filter_detailed(memory, &memory_filter)
+                            crate::memory::utils::matches_memory_filter_detailed(
+                                memory,
+                                &memory_filter,
+                            )
                         })
                         .collect()
                 } else {

@@ -272,9 +272,13 @@ where
             .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract updated memory: {}", e)))?;
 
-        let updated_memory = updated.into_iter().next().map(Memory::from).ok_or_else(|| {
-            StorageError::NotFound(format!("Memory with id {} not found", memory.id))
-        })?;
+        let updated_memory = updated
+            .into_iter()
+            .next()
+            .map(Memory::from)
+            .ok_or_else(|| {
+                StorageError::NotFound(format!("Memory with id {} not found", memory.id))
+            })?;
 
         // Execute on_memory_updated hooks (non-blocking, fire-and-forget)
         if let Some(old_mem) = old_memory {
@@ -648,11 +652,13 @@ where
             .into_iter()
             .map(|(memory, bm25_score, _highlighted)| {
                 // Look up vector score if available
-                let vector_score = vector_results.as_ref()
+                let vector_score = vector_results
+                    .as_ref()
                     .and_then(|results| results.iter().find(|(m, _)| m.id == memory.id))
                     .map(|(_, score)| *score);
 
-                let final_score = calculator.calculate_final_score(bm25_score, vector_score, &memory);
+                let final_score =
+                    calculator.calculate_final_score(bm25_score, vector_score, &memory);
                 (memory, final_score)
             })
             .collect();
@@ -1127,10 +1133,15 @@ where
         self.client
             .query(query)
             .bind(("id", record_id))
-            .bind(("last_accessed", memory.last_accessed.map(|dt| dt.to_rfc3339())))
+            .bind((
+                "last_accessed",
+                memory.last_accessed.map(|dt| dt.to_rfc3339()),
+            ))
             .bind(("access_count", memory.access_count))
             .await
-            .map_err(|e| StorageError::Query(format!("Failed to update lifecycle metadata: {}", e)))?;
+            .map_err(|e| {
+                StorageError::Query(format!("Failed to update lifecycle metadata: {}", e))
+            })?;
 
         Ok(())
     }
@@ -1158,7 +1169,9 @@ where
 
         // Track lifecycle if enabled (but don't trigger hooks)
         if let Some(ref mut mem) = memory {
-            if self.config.lifecycle_tracking.enabled && self.config.lifecycle_tracking.update_on_get {
+            if self.config.lifecycle_tracking.enabled
+                && self.config.lifecycle_tracking.update_on_get
+            {
                 if self.config.lifecycle_tracking.batched {
                     // For batched mode: queue the update BEFORE modifying in-memory
                     // The delta represents this access

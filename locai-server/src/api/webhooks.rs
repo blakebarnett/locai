@@ -3,17 +3,17 @@
 use std::sync::Arc;
 
 use axum::{
+    Json as JsonExtractor,
     extract::{Path, State},
     http::StatusCode,
     response::Json,
-    Json as JsonExtractor,
 };
 use chrono::Utc;
 use uuid::Uuid;
 
+use async_trait::async_trait;
 use locai::hooks::{MemoryHook, Webhook};
 use locai::models::Memory;
-use async_trait::async_trait;
 
 use crate::{
     api::dto::{CreateWebhookRequest, UpdateWebhookRequest, WebhookDto},
@@ -101,7 +101,12 @@ pub async fn create_webhook(
     JsonExtractor(request): JsonExtractor<CreateWebhookRequest>,
 ) -> Result<(StatusCode, Json<WebhookDto>), ServerError> {
     // Validate event type
-    let valid_events = ["memory.created", "memory.updated", "memory.accessed", "memory.deleted"];
+    let valid_events = [
+        "memory.created",
+        "memory.updated",
+        "memory.accessed",
+        "memory.deleted",
+    ];
     if !valid_events.contains(&request.event.as_str()) {
         return Err(ServerError::BadRequest(format!(
             "Invalid event type: {}. Valid events: {}",
@@ -144,14 +149,18 @@ pub async fn create_webhook(
     };
 
     // Register the hook
-    let hook_registry = state.memory_manager.hook_registry()
+    let hook_registry = state
+        .memory_manager
+        .hook_registry()
         .ok_or_else(|| ServerError::Internal("Hook registry not available".to_string()))?;
-    hook_registry
-        .register(Arc::new(filtered_webhook))
-        .await;
+    hook_registry.register(Arc::new(filtered_webhook)).await;
 
     // Store webhook config
-    state.webhook_registry.write().await.insert(webhook_id.clone(), config.clone());
+    state
+        .webhook_registry
+        .write()
+        .await
+        .insert(webhook_id.clone(), config.clone());
 
     // Convert to DTO
     let dto = WebhookDto {
@@ -218,9 +227,7 @@ pub async fn get_webhook(
     Path(id): Path<String>,
 ) -> Result<Json<WebhookDto>, ServerError> {
     let registry = state.webhook_registry.read().await;
-    let config = registry
-        .get(&id)
-        .ok_or_else(|| not_found("Webhook", &id))?;
+    let config = registry.get(&id).ok_or_else(|| not_found("Webhook", &id))?;
 
     let dto = WebhookDto {
         id: config.id.clone(),

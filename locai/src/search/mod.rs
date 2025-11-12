@@ -43,8 +43,3 @@ pub mod scoring;
 
 pub use calculator::ScoreCalculator;
 pub use scoring::{DecayFunction, ScoringConfig};
-
-
-
-
-

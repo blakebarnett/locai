@@ -19,12 +19,12 @@ pub struct MemoryDto {
     pub content: String,
 
     /// Type of memory. Custom types are prefixed with "custom:".
-    /// 
+    ///
     /// Examples:
     /// - "custom:dialogue"
     /// - "custom:quest"
     /// - "custom:observation"
-    /// 
+    ///
     /// Built-in types (if any) do not require a prefix.
     #[schema(example = "custom:dialogue")]
     pub memory_type: String,
@@ -39,7 +39,7 @@ pub struct MemoryDto {
     pub access_count: u32,
 
     /// Priority/importance of the memory. Values are capitalized.
-    /// 
+    ///
     /// Possible values: "Low", "Normal", "High", "Critical"
     #[schema(example = "Normal")]
     pub priority: String,
@@ -172,7 +172,7 @@ pub struct EntityDto {
     /// Custom properties for the entity. Common conventions include:
     /// - "name": A human-readable name for the entity
     /// - Store any domain-specific fields here
-    /// 
+    ///
     /// Example: {"name": "Thorin Oakenshield", "race": "dwarf", "class": "warrior"}
     #[schema(example = json!({"name": "Thorin Oakenshield", "race": "dwarf", "class": "warrior"}))]
     pub properties: serde_json::Value,
@@ -498,7 +498,7 @@ pub struct SearchResultDto {
 
     /// Relevance score for the search result. Higher scores indicate better matches.
     /// Scores are non-negative and have no upper bound.
-    /// 
+    ///
     /// Typical ranges:
     /// - 0.0-1.0: Standard semantic similarity scores
     /// - >1.0: Boosted scores from exact matches or other factors
@@ -727,16 +727,16 @@ pub struct TemporalSpanDto {
 pub enum DecayFunctionDto {
     /// No decay - all memories have equal recency weight
     None,
-    
+
     /// Linear decay: importance decreases linearly with age
     /// Formula: `boost * max(0, 1 - age_hours * decay_rate)`
     Linear,
-    
+
     /// Exponential decay: importance decreases exponentially with age
     /// Formula: `boost * exp(-decay_rate * age_hours)`
     /// This closely models human memory and forgetting curves
     Exponential,
-    
+
     /// Logarithmic decay: importance decreases logarithmically with age
     /// Formula: `boost / (1 + age_hours * decay_rate).ln()`
     /// Slower decay than exponential, useful for long-term memory
@@ -851,13 +851,27 @@ impl From<ScoringConfigDto> for locai::search::ScoringConfig {
 }
 
 // Default functions for ScoringConfigDto
-fn default_bm25_weight() -> f32 { 1.0 }
-fn default_vector_weight() -> f32 { 1.0 }
-fn default_recency_boost() -> f32 { 0.5 }
-fn default_access_boost() -> f32 { 0.3 }
-fn default_priority_boost() -> f32 { 0.2 }
-fn default_decay_function() -> DecayFunctionDto { DecayFunctionDto::Exponential }
-fn default_decay_rate() -> f32 { 0.1 }
+fn default_bm25_weight() -> f32 {
+    1.0
+}
+fn default_vector_weight() -> f32 {
+    1.0
+}
+fn default_recency_boost() -> f32 {
+    0.5
+}
+fn default_access_boost() -> f32 {
+    0.3
+}
+fn default_priority_boost() -> f32 {
+    0.2
+}
+fn default_decay_function() -> DecayFunctionDto {
+    DecayFunctionDto::Exponential
+}
+fn default_decay_rate() -> f32 {
+    0.1
+}
 
 /// Webhook event type
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

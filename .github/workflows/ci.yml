@@ -29,6 +29,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run cargo test
+        env:
+          RUSTC_WRAPPER: ""
         run: cargo test --all-features --workspace
 
   fmt:
@@ -67,6 +69,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run cargo clippy
+        env:
+          RUSTC_WRAPPER: ""
         run: cargo clippy --all-features --workspace -- -D warnings
 
   check:
@@ -88,6 +92,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run cargo check
+        env:
+          RUSTC_WRAPPER: ""
         run: cargo check --all-features --workspace
 
   examples:
@@ -109,4 +115,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check examples compile
+        env:
+          RUSTC_WRAPPER: ""
         run: cargo check --examples --all-features

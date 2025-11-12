@@ -1,9 +1,9 @@
 //! Base shared storage implementation
 
 use async_trait::async_trait;
-use surrealdb::{Connection, Surreal, RecordId};
 use std::sync::Arc;
 use std::time::Duration;
+use surrealdb::{Connection, RecordId, Surreal};
 use tokio::sync::Notify;
 
 use super::config::SharedStorageConfig;
@@ -49,7 +49,7 @@ where
 
         // Initialize the intelligence layer
         let intelligence = SearchIntelligence::new(client.clone());
-        
+
         let shutdown = Arc::new(Notify::new());
         let lifecycle_queue = LifecycleUpdateQueue::new(1000);
 
@@ -72,14 +72,17 @@ where
             let queue_clone = lifecycle_queue.clone();
             let client_clone = client.clone();
             let shutdown_clone = shutdown.clone();
-            
+
             tokio::spawn(async move {
-                tracing::info!("Lifecycle flush task started (interval: {:?}, threshold: {})", 
-                    flush_interval, flush_threshold);
-                
+                tracing::info!(
+                    "Lifecycle flush task started (interval: {:?}, threshold: {})",
+                    flush_interval,
+                    flush_threshold
+                );
+
                 let mut interval = tokio::time::interval(flush_interval);
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                
+
                 loop {
                     tokio::select! {
                         _ = interval.tick() => {
@@ -107,19 +110,24 @@ where
                             break;
                         }
                     }
-                    
+
                     // Also check threshold-based flush
                     if queue_clone.len().await >= flush_threshold {
                         let updates = queue_clone.drain().await;
                         if !updates.is_empty() {
-                            tracing::debug!("Flushing {} lifecycle updates (threshold-based)", updates.len());
-                            if let Err(e) = Self::flush_lifecycle_updates(&client_clone, updates).await {
+                            tracing::debug!(
+                                "Flushing {} lifecycle updates (threshold-based)",
+                                updates.len()
+                            );
+                            if let Err(e) =
+                                Self::flush_lifecycle_updates(&client_clone, updates).await
+                            {
                                 tracing::error!("Failed to flush lifecycle updates: {}", e);
                             }
                         }
                     }
                 }
-                
+
                 tracing::info!("Lifecycle flush task stopped");
             });
         }
@@ -150,13 +158,13 @@ where
     /// Gracefully shutdown the storage, flushing any pending updates
     pub async fn shutdown(&self) -> Result<(), StorageError> {
         tracing::info!("Initiating graceful shutdown");
-        
+
         // Signal shutdown to background tasks
         self.shutdown.notify_waiters();
-        
+
         // Give background tasks a moment to finish
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         // Flush any remaining lifecycle updates
         if self.config.lifecycle_tracking.enabled && self.config.lifecycle_tracking.batched {
             let updates = self.lifecycle_queue.drain().await;
@@ -165,7 +173,7 @@ where
                 Self::flush_lifecycle_updates(&self.client, updates).await?;
             }
         }
-        
+
         tracing::info!("Graceful shutdown complete");
         Ok(())
     }
@@ -184,7 +192,7 @@ where
         // For each update, we use += operator to atomically increment
         for update in updates {
             let record_id = RecordId::from(("memory", update.memory_id.as_str()));
-            
+
             let query = r#"
                 UPDATE $id SET 
                     metadata.access_count += $delta,
@@ -192,7 +200,7 @@ where
                     updated_at = time::now()
                 WHERE id = $id
             "#;
-            
+
             if let Err(e) = client
                 .query(query)
                 .bind(("id", record_id))
@@ -200,7 +208,11 @@ where
                 .bind(("last_accessed", update.last_accessed.to_rfc3339()))
                 .await
             {
-                tracing::warn!("Failed to flush lifecycle update for {}: {}", update.memory_id, e);
+                tracing::warn!(
+                    "Failed to flush lifecycle update for {}: {}",
+                    update.memory_id,
+                    e
+                );
                 // Continue with other updates even if one fails
             }
         }

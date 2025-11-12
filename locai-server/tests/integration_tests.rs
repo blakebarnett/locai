@@ -146,16 +146,19 @@ mod memories {
         response.assert_status(StatusCode::CREATED);
 
         let json: Value = response.json();
-        
+
         // Verify the response contains the memory ID
         assert!(json["id"].is_string());
         let memory_id = json["id"].as_str().unwrap();
-        
+
         // Verify the response contains the content
         assert_eq!(json["content"], "Test memory with properties");
-        
+
         // Verify the response contains the properties (this is the key test)
-        assert!(json["properties"].is_object(), "Properties should be an object");
+        assert!(
+            json["properties"].is_object(),
+            "Properties should be an object"
+        );
         assert_eq!(json["properties"]["speaker"], "TestSpeaker");
         assert_eq!(json["properties"]["mood"], "friendly");
         assert_eq!(json["properties"]["location"], "tavern");
@@ -165,9 +168,12 @@ mod memories {
         get_response.assert_status_ok();
 
         let fetched_json: Value = get_response.json();
-        
+
         // Verify the fetched memory still has properties
-        assert!(fetched_json["properties"].is_object(), "Fetched properties should be an object");
+        assert!(
+            fetched_json["properties"].is_object(),
+            "Fetched properties should be an object"
+        );
         assert_eq!(fetched_json["properties"]["speaker"], "TestSpeaker");
         assert_eq!(fetched_json["properties"]["mood"], "friendly");
         assert_eq!(fetched_json["properties"]["location"], "tavern");
@@ -221,7 +227,7 @@ mod memories {
             .put(&format!("/api/memories/{}", memory_id))
             .json(&update_data)
             .await;
-        
+
         update_response.assert_status_ok();
         let updated_json: Value = update_response.json();
 
@@ -262,37 +268,55 @@ mod memories {
         });
 
         // Create all memories and verify they were created
-        server.post("/api/memories").json(&obs1).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&obs2).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&dia1).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&evt1).await.assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&obs1)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&obs2)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&dia1)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&evt1)
+            .await
+            .assert_status(StatusCode::CREATED);
 
-        // Verify memories exist via list endpoint  
+        // Verify memories exist via list endpoint
         let list_response = server.get("/api/memories").await;
         list_response.assert_status_ok();
         let all_memories: Value = list_response.json();
         let all_memories_array = all_memories.as_array().unwrap();
-        
+
         // Filter using GET parameters with memory_type filter
-        let filtered_response = server
-            .get("/api/memories?memory_type=observation")
-            .await;
-        
+        let filtered_response = server.get("/api/memories?memory_type=observation").await;
+
         filtered_response.assert_status_ok();
         let filtered_results: Value = filtered_response.json();
         let filtered_array = filtered_results.as_array().unwrap();
-        
+
         // Should have exactly 2 observation memories
-        assert!(filtered_array.len() >= 2, "Should find at least 2 observation memories via list filter. Total memories: {}, filtered: {}", 
-            all_memories_array.len(), filtered_array.len());
-        
+        assert!(
+            filtered_array.len() >= 2,
+            "Should find at least 2 observation memories via list filter. Total memories: {}, filtered: {}",
+            all_memories_array.len(),
+            filtered_array.len()
+        );
+
         // All results should be observation type
         for result in filtered_array {
             let memory_type = result["memory_type"].as_str().unwrap();
             // Memory type might be returned as "observation" or "custom:observation"
             assert!(
                 memory_type == "observation" || memory_type == "custom:observation",
-                "Expected 'observation' but got '{}'", 
+                "Expected 'observation' but got '{}'",
                 memory_type
             );
         }
@@ -314,22 +338,31 @@ mod memories {
             "memory_type": "observation"
         });
 
-        server.post("/api/memories").json(&mem1).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&mem2).await.assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem1)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem2)
+            .await
+            .assert_status(StatusCode::CREATED);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // Search without filter should return all matching memories
-        let response = server
-            .get("/api/memories/search?q=test&limit=10")
-            .await;
+        let response = server.get("/api/memories/search?q=test&limit=10").await;
 
         response.assert_status_ok();
         let results: Value = response.json();
         let results_array = results.as_array().unwrap();
-        
+
         // Should find multiple types
-        assert!(results_array.len() >= 2, "Should find memories without filter");
+        assert!(
+            results_array.len() >= 2,
+            "Should find memories without filter"
+        );
     }
 
     /// Test that tags filter continues to work correctly
@@ -348,8 +381,16 @@ mod memories {
             "tags": ["quest"]
         });
 
-        server.post("/api/memories").json(&mem1).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&mem2).await.assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem1)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem2)
+            .await
+            .assert_status(StatusCode::CREATED);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -361,7 +402,7 @@ mod memories {
         response.assert_status_ok();
         let results: Value = response.json();
         let results_array = results.as_array().unwrap();
-        
+
         // All results should have the "important" tag
         for result in results_array {
             let tags = result["memory"]["tags"].as_array().unwrap();
@@ -400,9 +441,21 @@ mod memories {
             "tags": ["temple"]
         });
 
-        server.post("/api/memories").json(&mem1).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&mem2).await.assert_status(StatusCode::CREATED);
-        server.post("/api/memories").json(&mem3).await.assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem1)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem2)
+            .await
+            .assert_status(StatusCode::CREATED);
+        server
+            .post("/api/memories")
+            .json(&mem3)
+            .await
+            .assert_status(StatusCode::CREATED);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -414,12 +467,12 @@ mod memories {
         response.assert_status_ok();
         let results: Value = response.json();
         let results_array = results.as_array().unwrap();
-        
+
         // Should only return observation with important tag
         for result in results_array {
             let memory_type = result["memory"]["memory_type"].as_str().unwrap();
             assert_eq!(memory_type, "observation");
-            
+
             let tags = result["memory"]["tags"].as_array().unwrap();
             let tag_strings: Vec<String> = tags
                 .iter()
@@ -797,39 +850,49 @@ async fn test_search_with_temporal_filters() {
             "memory_type": "custom:temporal_test",
             "tags": ["temporal"]
         });
-        
+
         let response = server.post("/api/memories").json(&memory_data).await;
         response.assert_status(StatusCode::CREATED);
         let json: Value = response.json();
         memory_ids.push(json["id"].as_str().unwrap().to_string());
-        
+
         // Wait to ensure different timestamps
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 
     // Get the first and last memory to extract timestamps
-    let first_memory_response = server.get(&format!("/api/memories/{}", memory_ids[0])).await;
+    let first_memory_response = server
+        .get(&format!("/api/memories/{}", memory_ids[0]))
+        .await;
     let first_memory: Value = first_memory_response.json();
     let first_timestamp = first_memory["created_at"].as_str().unwrap();
 
-    let last_memory_response = server.get(&format!("/api/memories/{}", memory_ids[4])).await;
+    let last_memory_response = server
+        .get(&format!("/api/memories/{}", memory_ids[4]))
+        .await;
     let last_memory: Value = last_memory_response.json();
     let last_timestamp = last_memory["created_at"].as_str().unwrap();
 
     // Test 1: Search with created_after filter (should get all 5)
     let response = server
-        .get(&format!("/api/memories/search?q=temporal&created_after={}", first_timestamp))
+        .get(&format!(
+            "/api/memories/search?q=temporal&created_after={}",
+            first_timestamp
+        ))
         .await;
-    
+
     response.assert_status_ok();
     let results: Value = response.json();
     assert!(results.as_array().unwrap().len() >= 5);
 
     // Test 2: Search with created_before filter (should get all 5)
     let response = server
-        .get(&format!("/api/memories/search?q=temporal&created_before={}", last_timestamp))
+        .get(&format!(
+            "/api/memories/search?q=temporal&created_before={}",
+            last_timestamp
+        ))
         .await;
-    
+
     response.assert_status_ok();
     let results: Value = response.json();
     assert!(results.as_array().unwrap().len() >= 5);
@@ -841,7 +904,7 @@ async fn test_search_with_temporal_filters() {
             first_timestamp, last_timestamp
         ))
         .await;
-    
+
     response.assert_status_ok();
     let results: Value = response.json();
     assert!(results.as_array().unwrap().len() >= 5);
@@ -856,19 +919,29 @@ async fn test_search_with_invalid_temporal_filters() {
     let response = server
         .get("/api/memories/search?q=test&created_after=invalid-timestamp")
         .await;
-    
+
     response.assert_status(StatusCode::BAD_REQUEST);
     let json: Value = response.json();
-    assert!(json["message"].as_str().unwrap().contains("Invalid created_after timestamp"));
+    assert!(
+        json["message"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid created_after timestamp")
+    );
 
     // Test invalid created_before timestamp
     let response = server
         .get("/api/memories/search?q=test&created_before=not-a-date")
         .await;
-    
+
     response.assert_status(StatusCode::BAD_REQUEST);
     let json: Value = response.json();
-    assert!(json["message"].as_str().unwrap().contains("Invalid created_before timestamp"));
+    assert!(
+        json["message"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid created_before timestamp")
+    );
 }
 
 /// Test temporal search combined with other filters
@@ -882,7 +955,7 @@ async fn test_search_temporal_with_combined_filters() {
         "memory_type": "custom:observation",
         "tags": ["tavern", "quest"]
     });
-    
+
     let response = server.post("/api/memories").json(&memory_data).await;
     response.assert_status(StatusCode::CREATED);
     let json: Value = response.json();
@@ -895,11 +968,11 @@ async fn test_search_temporal_with_combined_filters() {
             timestamp
         ))
         .await;
-    
+
     response.assert_status_ok();
     let results: Value = response.json();
     assert!(results.as_array().unwrap().len() >= 1);
-    
+
     // Verify the result matches all filters
     // Note: results are SearchResultDto with "memory" field
     let result = &results[0];
@@ -923,7 +996,7 @@ async fn test_graph_with_temporal_span() {
         "content": "First memory in graph",
         "memory_type": "custom:test"
     });
-    
+
     let response = server.post("/api/memories").json(&memory1_data).await;
     response.assert_status(StatusCode::CREATED);
     let memory1: Value = response.json();
@@ -937,7 +1010,7 @@ async fn test_graph_with_temporal_span() {
         "content": "Second memory in graph",
         "memory_type": "custom:test"
     });
-    
+
     let response = server.post("/api/memories").json(&memory2_data).await;
     response.assert_status(StatusCode::CREATED);
     let memory2: Value = response.json();
@@ -948,7 +1021,7 @@ async fn test_graph_with_temporal_span() {
         "target_id": memory2_id,
         "relationship_type": "leads_to"
     });
-    
+
     let response = server
         .post(&format!("/api/memories/{}/relationships", memory1_id))
         .json(&relationship_data)
@@ -959,10 +1032,10 @@ async fn test_graph_with_temporal_span() {
     let response = server
         .get(&format!("/api/memories/{}/graph?depth=2", memory1_id))
         .await;
-    
+
     response.assert_status_ok();
     let graph: Value = response.json();
-    
+
     assert_eq!(graph["center_id"], memory1_id);
     // Note: node_count reflects memories collection, which may be empty if no relationships
     // Just verify the structure exists
@@ -971,17 +1044,20 @@ async fn test_graph_with_temporal_span() {
 
     // Test 2: Get graph WITH temporal span enabled
     let response = server
-        .get(&format!("/api/memories/{}/graph?depth=2&include_temporal_span=true", memory1_id))
+        .get(&format!(
+            "/api/memories/{}/graph?depth=2&include_temporal_span=true",
+            memory1_id
+        ))
         .await;
-    
+
     response.assert_status_ok();
     let graph: Value = response.json();
-    
+
     assert_eq!(graph["center_id"], memory1_id);
-    
+
     // Verify temporal span is present and has correct structure
     let temporal_span = &graph["metadata"]["temporal_span"];
-    
+
     // Temporal span may be null if graph has no memories
     if !temporal_span.is_null() {
         assert!(temporal_span["start"].is_string());
@@ -989,7 +1065,7 @@ async fn test_graph_with_temporal_span() {
         assert!(temporal_span["duration_days"].is_number());
         assert!(temporal_span["duration_seconds"].is_number());
         assert!(temporal_span["memory_count"].is_number());
-        
+
         // Verify memory count is reasonable
         let memory_count = temporal_span["memory_count"].as_u64().unwrap();
         assert!(memory_count >= 1);
@@ -1008,7 +1084,7 @@ async fn test_entity_graph_with_temporal_span() {
             "name": "Test Character"
         }
     });
-    
+
     let response = server.post("/api/entities").json(&entity_data).await;
     response.assert_status(StatusCode::CREATED);
     let entity: Value = response.json();
@@ -1016,12 +1092,15 @@ async fn test_entity_graph_with_temporal_span() {
 
     // Test entity graph with temporal span
     let response = server
-        .get(&format!("/api/entities/{}/graph?depth=2&include_temporal_span=true", entity_id))
+        .get(&format!(
+            "/api/entities/{}/graph?depth=2&include_temporal_span=true",
+            entity_id
+        ))
         .await;
-    
+
     response.assert_status_ok();
     let graph: Value = response.json();
-    
+
     // Entity graphs should also support temporal_span when requested
     assert_eq!(graph["center_id"], entity_id);
 }
@@ -1036,7 +1115,7 @@ async fn test_temporal_span_calculation() {
         "content": "Memory 1 for temporal span",
         "memory_type": "custom:test"
     });
-    
+
     let response = server.post("/api/memories").json(&memory1_data).await;
     response.assert_status(StatusCode::CREATED);
     let memory1: Value = response.json();
@@ -1050,7 +1129,7 @@ async fn test_temporal_span_calculation() {
         "content": "Memory 2 for temporal span",
         "memory_type": "custom:test"
     });
-    
+
     let response = server.post("/api/memories").json(&memory2_data).await;
     response.assert_status(StatusCode::CREATED);
     let memory2: Value = response.json();
@@ -1061,7 +1140,7 @@ async fn test_temporal_span_calculation() {
         "target_id": memory2_id,
         "relationship_type": "connects_to"
     });
-    
+
     let rel_response = server
         .post(&format!("/api/memories/{}/relationships", memory1_id))
         .json(&relationship_data)
@@ -1070,40 +1149,64 @@ async fn test_temporal_span_calculation() {
 
     // Get graph with temporal span
     let response = server
-        .get(&format!("/api/memories/{}/graph?depth=2&include_temporal_span=true", memory1_id))
+        .get(&format!(
+            "/api/memories/{}/graph?depth=2&include_temporal_span=true",
+            memory1_id
+        ))
         .await;
-    
+
     response.assert_status_ok();
     let graph: Value = response.json();
-    
+
     // Debug: print the graph to see what's in it
     let memories_count = graph["memories"].as_array().map(|a| a.len()).unwrap_or(0);
     let temporal_span = &graph["metadata"]["temporal_span"];
-    
+
     // Verify temporal span is present (only if graph has memories)
     if memories_count > 0 && !temporal_span.is_null() {
         // Verify basic structure
-        assert!(temporal_span["start"].is_string(), "start should be a string");
+        assert!(
+            temporal_span["start"].is_string(),
+            "start should be a string"
+        );
         assert!(temporal_span["end"].is_string(), "end should be a string");
-        assert!(temporal_span["duration_seconds"].is_number(), "duration_seconds should be a number");
-        assert!(temporal_span["memory_count"].is_number(), "memory_count should be a number");
-        
+        assert!(
+            temporal_span["duration_seconds"].is_number(),
+            "duration_seconds should be a number"
+        );
+        assert!(
+            temporal_span["memory_count"].is_number(),
+            "memory_count should be a number"
+        );
+
         let duration_seconds = temporal_span["duration_seconds"].as_i64().unwrap();
         let memory_count = temporal_span["memory_count"].as_u64().unwrap();
-        
+
         // If we have multiple memories in the graph, verify the duration makes sense
         if memory_count >= 2 {
             // Duration should reflect the time between memories
             // Note: Due to timing variations in tests, we'll just verify it's non-negative
-            assert!(duration_seconds >= 0, "Duration should be non-negative, got {}", duration_seconds);
+            assert!(
+                duration_seconds >= 0,
+                "Duration should be non-negative, got {}",
+                duration_seconds
+            );
         }
-        
+
         // Verify memory count is at least 1
-        assert!(memory_count >= 1, "Memory count should be at least 1, got {}", memory_count);
+        assert!(
+            memory_count >= 1,
+            "Memory count should be at least 1, got {}",
+            memory_count
+        );
     } else {
         // If no memories in graph, that's okay - the feature is working, just no connected memories
         // This can happen if the graph implementation doesn't include the center memory
-        println!("Note: Graph has {} memories, temporal_span is null: {}", memories_count, temporal_span.is_null());
+        println!(
+            "Note: Graph has {} memories, temporal_span is null: {}",
+            memories_count,
+            temporal_span.is_null()
+        );
     }
 }
 
@@ -1117,7 +1220,7 @@ async fn test_graph_backward_compatibility() {
         "content": "Backward compatibility test",
         "memory_type": "custom:test"
     });
-    
+
     let response = server.post("/api/memories").json(&memory_data).await;
     let memory: Value = response.json();
     let memory_id = memory["id"].as_str().unwrap();
@@ -1126,10 +1229,10 @@ async fn test_graph_backward_compatibility() {
     let response = server
         .get(&format!("/api/memories/{}/graph", memory_id))
         .await;
-    
+
     response.assert_status_ok();
     let graph: Value = response.json();
-    
+
     // Should work exactly as before - no temporal_span in response
     assert_eq!(graph["center_id"], memory_id);
     assert!(graph["memories"].is_array());

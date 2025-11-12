@@ -20,7 +20,8 @@ use locai::{
 use crate::{
     api::dto::{
         CreateMemoryRelationshipRequest, CreateMemoryRequest, GetMemoryRelationshipsParams,
-        MemoryDto, RelationshipDto, SearchMode, SearchResultDto, ScoringConfigDto, UpdateMemoryRequest,
+        MemoryDto, RelationshipDto, ScoringConfigDto, SearchMode, SearchResultDto,
+        UpdateMemoryRequest,
     },
     error::{ServerError, ServerResult, not_found},
     state::AppState,
@@ -554,7 +555,7 @@ pub async fn create_memory_relationship(
         .get_memory(&request.target_id)
         .await?
         .is_some();
-    
+
     let target_is_entity = if !target_is_memory {
         state
             .memory_manager
@@ -691,12 +692,12 @@ pub struct SearchParams {
     pub threshold: Option<f32>,
 
     /// Filter by memory type. For custom memory types, include the "custom:" prefix.
-    /// 
+    ///
     /// Examples:
     /// - "custom:dialogue"
     /// - "custom:quest"
     /// - "custom:observation"
-    /// 
+    ///
     /// Built-in types (if any) do not require a prefix.
     #[param(example = "custom:dialogue")]
     pub memory_type: Option<String>,
@@ -707,7 +708,7 @@ pub struct SearchParams {
     /// Filter by priority (capitalized values: "Low", "Normal", "High", "Critical")
     #[param(example = "Normal")]
     pub priority: Option<String>,
-    
+
     /// Optional JSON-encoded scoring configuration for enhanced search
     ///
     /// When provided, enables lifecycle-aware scoring that combines BM25, vector similarity,
