@@ -47,7 +47,7 @@ impl MockEmbeddingService {
 #[derive(Debug)]
 struct SearchBenchmark {
     mode: SearchMode,
-    query: String,
+    _query: String,
     duration: std::time::Duration,
     result_count: usize,
     embedding_time: Option<std::time::Duration>,
@@ -200,7 +200,7 @@ async fn main() -> Result<()> {
 
         let text_benchmark = SearchBenchmark {
             mode: SearchMode::Text,
-            query: query.to_string(),
+            _query: query.to_string(),
             duration: text_duration,
             result_count: text_results.len(),
             embedding_time: None,
@@ -234,7 +234,7 @@ async fn main() -> Result<()> {
 
         let vector_benchmark = SearchBenchmark {
             mode: SearchMode::Vector,
-            query: query.to_string(),
+            _query: query.to_string(),
             duration: total_vector_duration,
             result_count: vector_results.len(),
             embedding_time: Some(vector_embed_duration),
@@ -269,7 +269,7 @@ async fn main() -> Result<()> {
 
         let hybrid_benchmark = SearchBenchmark {
             mode: SearchMode::Hybrid,
-            query: query.to_string(),
+            _query: query.to_string(),
             duration: total_hybrid_duration,
             result_count: hybrid_results.len(),
             embedding_time: Some(hybrid_embed_duration),

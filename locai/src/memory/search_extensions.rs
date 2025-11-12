@@ -275,22 +275,83 @@ impl SearchExtensions {
         }
     }
 
+    /// Perform a search with lifecycle-aware scoring
+    ///
+    /// This method enables enhanced search results ranked by multiple factors:
+    /// - BM25 keyword relevance
+    /// - Vector similarity (if embeddings available)
+    /// - Recency (time since last access with configurable decay)
+    /// - Access frequency (how often memory has been retrieved)
+    /// - Priority level (explicit importance)
+    ///
+    /// # Arguments
+    /// * `query_text` - The natural language query string
+    /// * `limit` - The maximum number of results to return
+    /// * `scoring_config` - Configuration for multi-factor scoring
+    ///
+    /// # Returns
+    /// A list of `SearchResult` objects, ranked by combined lifecycle-aware scores.
+    pub async fn search_with_scoring(
+        &self,
+        query_text: &str,
+        limit: Option<usize>,
+        scoring_config: crate::search::ScoringConfig,
+    ) -> Result<Vec<SearchResult>> {
+        // Delegate to storage layer which implements the scoring logic
+        let scored_results = self
+            .storage
+            .search_memories_with_scoring(query_text, Some(scoring_config), limit)
+            .await?;
+        
+        // Convert from (Memory, f32) to SearchResult
+        Ok(scored_results
+            .into_iter()
+            .map(|(memory, score)| SearchResult {
+                memory,
+                score: Some(score),
+            })
+            .collect())
+    }
+
     /// Perform BM25 text search
     async fn text_search(
         &self,
         query_text: &str,
         limit: Option<usize>,
-        _filter: Option<SemanticSearchFilter>,
+        filter: Option<SemanticSearchFilter>,
     ) -> Result<Vec<SearchResult>> {
-        // Use SharedStorage BM25 search
+        // Use SharedStorage BM25 search (fetch more results for filtering)
+        let fetch_limit = limit.map(|l| l * 3); // Fetch more to account for filtering
         let search_results = self
             .storage
-            .bm25_search_memories(query_text, limit)
+            .bm25_search_memories(query_text, fetch_limit)
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to perform BM25 search: {}", e)))?;
 
+        // Apply memory filter if provided
+        let filtered_results = if let Some(semantic_filter) = filter {
+            if let Some(memory_filter) = semantic_filter.memory_filter {
+                search_results
+                    .into_iter()
+                    .filter(|(memory, _score, _highlight)| {
+                        crate::memory::utils::matches_memory_filter_detailed(memory, &memory_filter)
+                    })
+                    .collect()
+            } else {
+                search_results
+            }
+        } else {
+            search_results
+        };
+
+        // Apply limit after filtering
+        let limited_results: Vec<_> = filtered_results
+            .into_iter()
+            .take(limit.unwrap_or(50))
+            .collect();
+
         // Convert to SearchResult format
-        Ok(search_results
+        Ok(limited_results
             .into_iter()
             .map(|(memory, score, _highlight)| SearchResult {
                 memory,
@@ -326,12 +387,14 @@ impl SearchExtensions {
         &self,
         query_embedding: Option<&[f32]>,
         limit: Option<usize>,
-        _filter: Option<SemanticSearchFilter>,
+        filter: Option<SemanticSearchFilter>,
     ) -> Result<Vec<SearchResult>> {
         if let Some(embedding) = query_embedding {
+            // Fetch more results to account for filtering
+            let fetch_limit = limit.map(|l| l * 3);
             let search_results = self
                 .storage
-                .vector_search_memories(embedding, limit)
+                .vector_search_memories(embedding, fetch_limit)
                 .await
                 .map_err(|e| {
                     LocaiError::Storage(format!(
@@ -340,8 +403,30 @@ impl SearchExtensions {
                     ))
                 })?;
 
+            // Apply memory filter if provided
+            let filtered_results = if let Some(semantic_filter) = filter {
+                if let Some(memory_filter) = semantic_filter.memory_filter {
+                    search_results
+                        .into_iter()
+                        .filter(|(memory, _score, _highlight)| {
+                            crate::memory::utils::matches_memory_filter_detailed(memory, &memory_filter)
+                        })
+                        .collect()
+                } else {
+                    search_results
+                }
+            } else {
+                search_results
+            };
+
+            // Apply limit after filtering
+            let limited_results: Vec<_> = filtered_results
+                .into_iter()
+                .take(limit.unwrap_or(50))
+                .collect();
+
             // Convert to SearchResult format
-            Ok(search_results
+            Ok(limited_results
                 .into_iter()
                 .map(|(memory, score, _highlight)| SearchResult {
                     memory,
@@ -367,24 +452,27 @@ impl SearchExtensions {
         &self,
         query_text: &str,
         limit: Option<usize>,
-        _filter: Option<SemanticSearchFilter>,
+        filter: Option<SemanticSearchFilter>,
     ) -> Result<Vec<SearchResult>> {
         let limit = limit.unwrap_or(10);
 
         // TODO: For full BYOE implementation, would need query embedding to be provided
         // For now, demonstrate hybrid search by combining different text search strategies
 
+        // Fetch more results to account for filtering
+        let fetch_limit = limit * 6;
+
         // Get BM25 text results
         let text_results = self
             .storage
-            .bm25_search_memories(query_text, Some(limit * 2))
+            .bm25_search_memories(query_text, Some(fetch_limit))
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to perform BM25 search: {}", e)))?;
 
         // Get fuzzy search results for typo tolerance
         let fuzzy_results = self
             .storage
-            .fuzzy_search_memories(query_text, Some(0.3), Some(limit * 2))
+            .fuzzy_search_memories(query_text, Some(0.3), Some(fetch_limit))
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to perform fuzzy search: {}", e)))?;
 
@@ -399,8 +487,24 @@ impl SearchExtensions {
         // Combine using RRF with k=60 (standard value)
         let combined_memories = reciprocal_rank_fusion(text_tuples, fuzzy_tuples, 60.0);
 
+        // Apply memory filter if provided
+        let filtered_memories: Vec<Memory> = if let Some(semantic_filter) = filter {
+            if let Some(memory_filter) = semantic_filter.memory_filter {
+                combined_memories
+                    .into_iter()
+                    .filter(|memory| {
+                        crate::memory::utils::matches_memory_filter_detailed(memory, &memory_filter)
+                    })
+                    .collect()
+            } else {
+                combined_memories
+            }
+        } else {
+            combined_memories
+        };
+
         // Take only the requested number of results and convert to SearchResult format
-        let final_results: Vec<SearchResult> = combined_memories
+        let final_results: Vec<SearchResult> = filtered_memories
             .into_iter()
             .take(limit)
             .map(|memory| SearchResult {
@@ -418,15 +522,18 @@ impl SearchExtensions {
         query_text: &str,
         query_embedding: Option<&[f32]>,
         limit: Option<usize>,
-        _filter: Option<SemanticSearchFilter>,
+        filter: Option<SemanticSearchFilter>,
     ) -> Result<Vec<SearchResult>> {
         let limit = limit.unwrap_or(10);
 
         if let Some(_embedding) = query_embedding {
+            // Fetch more results to account for filtering
+            let fetch_limit = limit * 6;
+
             // Combine Text and Vector with RRF using the provided embedding
             let text_results = self
                 .storage
-                .bm25_search_memories(query_text, Some(limit * 2))
+                .bm25_search_memories(query_text, Some(fetch_limit))
                 .await
                 .map_err(|e| {
                     LocaiError::Storage(format!("Failed to perform BM25 search: {}", e))
@@ -434,7 +541,7 @@ impl SearchExtensions {
 
             let fuzzy_results = self
                 .storage
-                .fuzzy_search_memories(query_text, Some(0.3), Some(limit * 2))
+                .fuzzy_search_memories(query_text, Some(0.3), Some(fetch_limit))
                 .await
                 .map_err(|e| {
                     LocaiError::Storage(format!("Failed to perform fuzzy search: {}", e))
@@ -449,7 +556,23 @@ impl SearchExtensions {
 
             let combined_memories = reciprocal_rank_fusion(text_tuples, fuzzy_tuples, 60.0);
 
-            let final_results: Vec<SearchResult> = combined_memories
+            // Apply memory filter if provided
+            let filtered_memories: Vec<Memory> = if let Some(semantic_filter) = filter {
+                if let Some(memory_filter) = semantic_filter.memory_filter {
+                    combined_memories
+                        .into_iter()
+                        .filter(|memory| {
+                            crate::memory::utils::matches_memory_filter_detailed(memory, &memory_filter)
+                        })
+                        .collect()
+                } else {
+                    combined_memories
+                }
+            } else {
+                combined_memories
+            };
+
+            let final_results: Vec<SearchResult> = filtered_memories
                 .into_iter()
                 .take(limit)
                 .map(|memory| SearchResult {
@@ -612,10 +735,9 @@ impl SearchExtensions {
         limit: Option<usize>,
         options: &UniversalSearchOptions,
     ) -> Result<Vec<UniversalSearchResult>> {
-        let mut filter = MemoryFilter {
-            content: Some(query.to_string()),
-            ..Default::default()
-        };
+        // Create filter - don't use content filter as BM25 search already handles query matching
+        // The content filter is for exact substring matching, not BM25 queries
+        let mut filter = MemoryFilter::default();
 
         // Apply memory type filter if specified
         if let Some(memory_type) = &options.memory_type_filter {
