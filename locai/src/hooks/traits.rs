@@ -11,6 +11,7 @@
 //! use locai::hooks::{MemoryHook, HookResult};
 //! use locai::models::Memory;
 //!
+//! #[derive(Debug)]
 //! struct LoggingHook;
 //!
 //! #[async_trait]
