@@ -194,36 +194,48 @@ where
             .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract created memory: {}", e)))?;
 
-        created
+        let created_memory = created
             .into_iter()
             .next()
             .map(Memory::from)
-            .ok_or_else(|| StorageError::Internal("No memory created".to_string()))
+            .ok_or_else(|| StorageError::Internal("No memory created".to_string()))?;
+
+        // Execute on_memory_created hooks (non-blocking, fire-and-forget)
+        let hooks = self.hook_registry.clone();
+        let memory_clone = created_memory.clone();
+        tokio::spawn(async move {
+            if let Err(e) = hooks.execute_on_created(&memory_clone).await {
+                tracing::warn!("Hook execution failed for on_memory_created: {}", e);
+            }
+        });
+
+        Ok(created_memory)
     }
 
     /// Get a memory by its ID
     async fn get_memory(&self, id: &str) -> Result<Option<Memory>, StorageError> {
-        let record_id = RecordId::from(("memory", id));
+        let memory = self.get_memory_internal(id).await?;
 
-        let query = "SELECT * FROM $id";
+        // Execute on_memory_accessed hooks (non-blocking, fire-and-forget)
+        if let Some(ref mem) = memory {
+            let hooks = self.hook_registry.clone();
+            let memory_clone = mem.clone();
+            tokio::spawn(async move {
+                if let Err(e) = hooks.execute_on_accessed(&memory_clone).await {
+                    tracing::warn!("Hook execution failed for on_memory_accessed: {}", e);
+                }
+            });
+        }
 
-        let mut result = self
-            .client
-            .query(query)
-            .bind(("id", record_id))
-            .await
-            .map_err(|e| StorageError::Query(format!("Failed to get memory: {}", e)))?;
-
-        let memories: Vec<SurrealMemory> = result
-            .take(0)
-            .map_err(|e| StorageError::Query(format!("Failed to extract memory: {}", e)))?;
-
-        Ok(memories.into_iter().next().map(Memory::from))
+        Ok(memory)
     }
 
     /// Update an existing memory
     async fn update_memory(&self, memory: Memory) -> Result<Memory, StorageError> {
         let record_id = RecordId::from(("memory", memory.id.as_str()));
+
+        // Get the old memory before updating (use internal to avoid hook recursion)
+        let old_memory = self.get_memory_internal(&memory.id).await?;
 
         // Build metadata exactly like create_memory
         let metadata = serde_json::json!({
@@ -260,13 +272,48 @@ where
             .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract updated memory: {}", e)))?;
 
-        updated.into_iter().next().map(Memory::from).ok_or_else(|| {
+        let updated_memory = updated.into_iter().next().map(Memory::from).ok_or_else(|| {
             StorageError::NotFound(format!("Memory with id {} not found", memory.id))
-        })
+        })?;
+
+        // Execute on_memory_updated hooks (non-blocking, fire-and-forget)
+        if let Some(old_mem) = old_memory {
+            let hooks = self.hook_registry.clone();
+            let updated_clone = updated_memory.clone();
+            tokio::spawn(async move {
+                if let Err(e) = hooks.execute_on_updated(&old_mem, &updated_clone).await {
+                    tracing::warn!("Hook execution failed for on_memory_updated: {}", e);
+                }
+            });
+        }
+
+        Ok(updated_memory)
     }
 
     /// Delete a memory by its ID
     async fn delete_memory(&self, id: &str) -> Result<bool, StorageError> {
+        // Get memory before deletion (use internal to avoid hook recursion)
+        let memory_to_delete = self.get_memory_internal(id).await?;
+
+        // Execute before_memory_deleted hooks (blocking for veto support)
+        if let Some(mem) = &memory_to_delete {
+            match self.hook_registry.execute_before_deleted(mem).await {
+                Ok(true) => {
+                    // Hooks allowed deletion, proceed
+                    tracing::debug!("Deletion allowed by hooks for memory {}", id);
+                }
+                Ok(false) => {
+                    // Hooks vetoed deletion
+                    tracing::warn!("Deletion vetoed by hooks for memory {}", id);
+                    return Ok(false);
+                }
+                Err(e) => {
+                    // Hook execution error - log but continue (don't fail the operation)
+                    tracing::warn!("Hook execution failed during deletion check: {}", e);
+                }
+            }
+        }
+
         // Use SDK method directly like VectorStore for consistency
         let deleted: Option<SurrealMemory> = self
             .client
@@ -289,6 +336,16 @@ where
 
         // Add filter conditions
         if let Some(f) = &filter {
+            if let Some(memory_type) = &f.memory_type {
+                // Memory type can be stored as either a string or an enum variant
+                // Try both representations for compatibility
+                let mt_lower = memory_type.to_lowercase();
+                conditions.push(format!(
+                    "(type::string(metadata.memory_type) = '{}' OR string::lowercase(type::string(metadata.memory_type)) CONTAINS '{}')",
+                    mt_lower, mt_lower
+                ));
+            }
+
             if let Some(content) = &f.content {
                 conditions.push(format!("content CONTAINS '{}'", content));
             }
@@ -556,6 +613,57 @@ where
                 )
             })
             .collect())
+    }
+
+    /// Search memories with configurable multi-factor scoring
+    async fn search_memories_with_scoring(
+        &self,
+        query: &str,
+        scoring: Option<crate::search::ScoringConfig>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(Memory, f32)>, StorageError> {
+        use crate::search::ScoreCalculator;
+
+        let limit = limit.unwrap_or(10);
+        let mut config = scoring.unwrap_or_default();
+        config.normalize_weights();
+
+        let calculator = ScoreCalculator::try_new(config)
+            .map_err(|e| StorageError::Query(format!("Invalid scoring config: {}", e)))?;
+
+        // Get BM25 results - this is our primary search mechanism
+        let bm25_results = self.bm25_search_memories(query, Some(limit * 2)).await?;
+
+        // If vector scoring is needed and embeddings are available, also search vectors
+        let vector_results = if calculator.config().vector_weight > 0.0 {
+            // Try to get query embedding (this would require embedding service integration)
+            // For now, we collect memory embeddings that exist
+            self.collect_vector_search_results(query, limit).await.ok()
+        } else {
+            None
+        };
+
+        // Calculate final scores
+        let mut scored_results: Vec<(Memory, f32)> = bm25_results
+            .into_iter()
+            .map(|(memory, bm25_score, _highlighted)| {
+                // Look up vector score if available
+                let vector_score = vector_results.as_ref()
+                    .and_then(|results| results.iter().find(|(m, _)| m.id == memory.id))
+                    .map(|(_, score)| *score);
+
+                let final_score = calculator.calculate_final_score(bm25_score, vector_score, &memory);
+                (memory, final_score)
+            })
+            .collect();
+
+        // Sort by score descending
+        scored_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Return top results
+        scored_results.truncate(limit);
+
+        Ok(scored_results)
     }
 }
 
@@ -982,5 +1090,125 @@ where
         })?;
 
         Ok(memories.into_iter().map(Memory::from).collect())
+    }
+
+    /// Helper to collect vector search results for scoring integration
+    async fn collect_vector_search_results(
+        &self,
+        _query: &str,
+        _limit: usize,
+    ) -> Result<Vec<(Memory, f32)>, StorageError> {
+        // This would integrate with the embedding service to:
+        // 1. Get an embedding for the query
+        // 2. Perform vector search
+        // 3. Return (Memory, vector_score) tuples
+        // For now, return empty to indicate no vector results available
+        Ok(Vec::new())
+    }
+}
+
+/// Private implementation for lifecycle tracking
+impl<C> SharedStorage<C>
+where
+    C: Connection + Clone + Send + Sync + std::fmt::Debug + 'static,
+{
+    /// Update only the lifecycle metadata for a memory (access_count and last_accessed)
+    /// This is used internally for non-blocking lifecycle tracking updates
+    async fn update_lifecycle_metadata(&self, memory: &Memory) -> Result<(), StorageError> {
+        let record_id = RecordId::from(("memory", memory.id.as_str()));
+
+        let query = r#"
+            UPDATE $id SET 
+                metadata.last_accessed = $last_accessed,
+                metadata.access_count = $access_count,
+                updated_at = time::now()
+        "#;
+
+        self.client
+            .query(query)
+            .bind(("id", record_id))
+            .bind(("last_accessed", memory.last_accessed.map(|dt| dt.to_rfc3339())))
+            .bind(("access_count", memory.access_count))
+            .await
+            .map_err(|e| StorageError::Query(format!("Failed to update lifecycle metadata: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Internal get without hook execution (used for internal operations like update/delete)
+    /// This method retrieves a memory and updates its lifecycle metadata, but does NOT
+    /// execute on_memory_accessed hooks to avoid recursion.
+    async fn get_memory_internal(&self, id: &str) -> Result<Option<Memory>, StorageError> {
+        let record_id = RecordId::from(("memory", id));
+
+        let query = "SELECT * FROM $id";
+
+        let mut result = self
+            .client
+            .query(query)
+            .bind(("id", record_id))
+            .await
+            .map_err(|e| StorageError::Query(format!("Failed to get memory: {}", e)))?;
+
+        let memories: Vec<SurrealMemory> = result
+            .take(0)
+            .map_err(|e| StorageError::Query(format!("Failed to extract memory: {}", e)))?;
+
+        let mut memory = memories.into_iter().next().map(Memory::from);
+
+        // Track lifecycle if enabled (but don't trigger hooks)
+        if let Some(ref mut mem) = memory {
+            if self.config.lifecycle_tracking.enabled && self.config.lifecycle_tracking.update_on_get {
+                if self.config.lifecycle_tracking.batched {
+                    // For batched mode: queue the update BEFORE modifying in-memory
+                    // The delta represents this access
+                    let update = crate::storage::lifecycle::LifecycleUpdate::new(mem.id.clone());
+                    if let Err(e) = self.lifecycle_queue.queue_update(update).await {
+                        tracing::warn!("Failed to queue lifecycle update: {}", e);
+                    }
+                    // Update in-memory for the return value
+                    mem.record_access();
+                } else if self.config.lifecycle_tracking.blocking {
+                    // Update in-memory counts first
+                    mem.record_access();
+                    // Immediate blocking update with absolute values
+                    if let Err(e) = self.update_lifecycle_metadata(mem).await {
+                        tracing::warn!("Failed to update lifecycle metadata: {}", e);
+                    }
+                } else {
+                    // Update in-memory counts first
+                    mem.record_access();
+                    // Spawn async update (fire-and-forget) - Fixed to use MERGE
+                    let memory_id = mem.id.clone();
+                    let access_count = mem.access_count;
+                    let last_accessed = mem.last_accessed;
+                    let self_clone = self.client.clone();
+                    tokio::spawn(async move {
+                        let record_id = RecordId::from(("memory", memory_id.as_str()));
+                        // Use MERGE to avoid overwriting concurrent updates
+                        let update_query = r#"
+                            UPDATE $id MERGE {
+                                metadata: {
+                                    access_count: $access_count,
+                                    last_accessed: $last_accessed
+                                },
+                                updated_at: time::now()
+                            }
+                        "#;
+                        if let Err(e) = self_clone
+                            .query(update_query)
+                            .bind(("id", record_id))
+                            .bind(("access_count", access_count))
+                            .bind(("last_accessed", last_accessed.map(|dt| dt.to_rfc3339())))
+                            .await
+                        {
+                            tracing::warn!("Failed to update lifecycle in background: {}", e);
+                        }
+                    });
+                }
+            }
+        }
+
+        Ok(memory)
     }
 }

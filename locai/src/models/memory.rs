@@ -346,6 +346,12 @@ impl MemoryBuilder {
         self
     }
 
+    /// Set properties from a JSON value directly
+    pub fn properties_json(mut self, properties: serde_json::Value) -> Self {
+        self.memory.properties = properties;
+        self
+    }
+
     /// Set a single property (convenience method)
     pub fn property(mut self, key: &str, value: serde_json::Value) -> Self {
         self.memory.set_property(key, value);

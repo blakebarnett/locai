@@ -23,6 +23,79 @@ pub struct LocaiConfig {
 
     /// Entity extraction configuration
     pub entity_extraction: crate::entity_extraction::EntityExtractionConfig,
+
+    /// Memory lifecycle tracking configuration
+    pub lifecycle_tracking: LifecycleTrackingConfig,
+}
+
+/// Configuration for automatic memory lifecycle tracking.
+///
+/// Lifecycle tracking automatically updates memory metadata (access_count, last_accessed)
+/// when memories are retrieved or accessed. This enables forgetting curves, importance
+/// calculation, and other time-based memory dynamics.
+///
+/// # Performance Considerations
+///
+/// - `enabled: true` means every memory retrieval becomes a write operation
+/// - Use `batched: true` to defer updates, reducing write load
+/// - Set `flush_interval_secs` and `flush_threshold_count` to balance consistency vs. performance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LifecycleTrackingConfig {
+    /// Whether lifecycle tracking is enabled globally
+    pub enabled: bool,
+
+    /// Whether to update access count and last_accessed on get_memory()
+    pub update_on_get: bool,
+
+    /// Whether to update access count on search operations
+    /// (Usually false - searching shouldn't count as accessing)
+    pub update_on_search: bool,
+
+    /// Whether to update access count on list operations
+    /// (Usually false - browsing shouldn't count as accessing)
+    pub update_on_list: bool,
+
+    /// Whether lifecycle updates should block the get_memory() call
+    /// If false, updates are queued asynchronously
+    pub blocking: bool,
+
+    /// Whether to batch lifecycle updates instead of updating immediately
+    pub batched: bool,
+
+    /// Time interval (in seconds) between batch flushes when batched=true
+    pub flush_interval_secs: u64,
+
+    /// Number of pending updates before force-flushing the batch
+    pub flush_threshold_count: usize,
+}
+
+impl Default for LifecycleTrackingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            update_on_get: true,
+            update_on_search: false,
+            update_on_list: false,
+            blocking: false,
+            batched: true,
+            flush_interval_secs: 60,
+            flush_threshold_count: 100,
+        }
+    }
+}
+
+impl LifecycleTrackingConfig {
+    /// Validate the configuration, returning an error if invalid
+    pub fn validate(&self) -> Result<(), String> {
+        if self.flush_interval_secs == 0 {
+            return Err("flush_interval_secs must be greater than 0".to_string());
+        }
+        if self.flush_threshold_count == 0 {
+            return Err("flush_threshold_count must be greater than 0".to_string());
+        }
+        Ok(())
+    }
 }
 
 /// Configuration for storage components.

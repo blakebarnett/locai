@@ -310,6 +310,51 @@ impl MemoryManager {
             .await
     }
 
+    /// Search memories with lifecycle-aware scoring
+    ///
+    /// This method enables enhanced search results ranked by multiple factors:
+    /// - BM25 keyword relevance
+    /// - Vector similarity (if embeddings available)
+    /// - Recency (time since last access with configurable decay)
+    /// - Access frequency (how often memory has been retrieved)
+    /// - Priority level (explicit importance)
+    ///
+    /// # Arguments
+    /// * `query_text` - The natural language query string
+    /// * `limit` - The maximum number of results to return
+    /// * `scoring_config` - Configuration for multi-factor scoring
+    ///
+    /// # Returns
+    /// A list of `SearchResult` objects, ranked by combined lifecycle-aware scores.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use locai::prelude::*;
+    /// use locai::search::ScoringConfig;
+    ///
+    /// # async fn example() -> Result<()> {
+    /// let locai = Locai::new().await?;
+    /// let manager = locai.manager();
+    /// let scoring = ScoringConfig::recency_focused(); // Pre-configured profile
+    /// let results = manager.search_with_scoring(
+    ///     "dragon battle",
+    ///     Some(10),
+    ///     scoring
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn search_with_scoring(
+        &self,
+        query_text: &str,
+        limit: Option<usize>,
+        scoring_config: crate::search::ScoringConfig,
+    ) -> Result<Vec<SearchResult>> {
+        self.search
+            .search_with_scoring(query_text, limit, scoring_config)
+            .await
+    }
+
     /// Legacy method for backward compatibility - use search() instead
     #[deprecated(note = "Use search() instead")]
     pub async fn semantic_search(
@@ -689,6 +734,28 @@ impl MemoryManager {
             .clear_storage()
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to clear storage: {}", e)))
+    }
+    
+    /// Get the hook registry for registering memory hooks
+    /// 
+    /// Returns None if the storage backend doesn't support hooks
+    pub fn hook_registry(&self) -> Option<std::sync::Arc<crate::hooks::HookRegistry>> {
+        use crate::storage::shared_storage::SharedStorage;
+        
+        // Access storage through memory_ops
+        let storage_any = self.memory_ops.storage.as_any();
+        
+        // Try local storage first
+        if let Some(shared_storage) = storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::local::Db>>>() {
+            return Some(shared_storage.hook_registry());
+        }
+        
+        // Try remote storage
+        if let Some(shared_storage) = storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::remote::ws::Client>>>() {
+            return Some(shared_storage.hook_registry());
+        }
+        
+        None
     }
 }
 

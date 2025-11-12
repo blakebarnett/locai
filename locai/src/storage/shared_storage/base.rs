@@ -1,13 +1,18 @@
 //! Base shared storage implementation
 
 use async_trait::async_trait;
-use surrealdb::{Connection, Surreal};
+use surrealdb::{Connection, Surreal, RecordId};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Notify;
 
 use super::config::SharedStorageConfig;
 use super::intelligence::{
     IntelligentSearch, IntelligentSearchResult, QueryAnalysis, SearchIntelligence, SearchSuggestion,
 };
+use crate::hooks::HookRegistry;
 use crate::storage::errors::StorageError;
+use crate::storage::lifecycle::{LifecycleUpdate, LifecycleUpdateQueue};
 use crate::storage::traits::BaseStore;
 
 /// Main shared storage manager
@@ -19,6 +24,9 @@ where
     pub(crate) client: Surreal<C>,
     pub(crate) config: SharedStorageConfig,
     pub(crate) intelligence: SearchIntelligence<C>,
+    pub(crate) lifecycle_queue: LifecycleUpdateQueue,
+    pub(crate) hook_registry: Arc<HookRegistry>,
+    pub(crate) shutdown: Arc<Notify>,
 }
 
 impl<C> SharedStorage<C>
@@ -41,15 +49,80 @@ where
 
         // Initialize the intelligence layer
         let intelligence = SearchIntelligence::new(client.clone());
+        
+        let shutdown = Arc::new(Notify::new());
+        let lifecycle_queue = LifecycleUpdateQueue::new(1000);
 
         let storage = Self {
-            client,
-            config,
+            client: client.clone(),
+            config: config.clone(),
             intelligence,
+            lifecycle_queue: lifecycle_queue.clone(),
+            hook_registry: Arc::new(HookRegistry::new()),
+            shutdown: shutdown.clone(),
         };
 
         // Initialize schema
         storage.initialize_schema().await?;
+
+        // Start background flush task if lifecycle tracking is enabled and batched
+        if config.lifecycle_tracking.enabled && config.lifecycle_tracking.batched {
+            let flush_interval = Duration::from_secs(config.lifecycle_tracking.flush_interval_secs);
+            let flush_threshold = config.lifecycle_tracking.flush_threshold_count;
+            let queue_clone = lifecycle_queue.clone();
+            let client_clone = client.clone();
+            let shutdown_clone = shutdown.clone();
+            
+            tokio::spawn(async move {
+                tracing::info!("Lifecycle flush task started (interval: {:?}, threshold: {})", 
+                    flush_interval, flush_threshold);
+                
+                let mut interval = tokio::time::interval(flush_interval);
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Time-based flush
+                            if queue_clone.len().await > 0 {
+                                let updates = queue_clone.drain().await;
+                                if !updates.is_empty() {
+                                    tracing::debug!("Flushing {} lifecycle updates (time-based)", updates.len());
+                                    if let Err(e) = Self::flush_lifecycle_updates(&client_clone, updates).await {
+                                        tracing::error!("Failed to flush lifecycle updates: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                        _ = shutdown_clone.notified() => {
+                            // Shutdown requested - flush remaining updates
+                            tracing::info!("Lifecycle flush task shutting down, flushing remaining updates");
+                            let updates = queue_clone.drain().await;
+                            if !updates.is_empty() {
+                                tracing::info!("Flushing {} lifecycle updates on shutdown", updates.len());
+                                if let Err(e) = Self::flush_lifecycle_updates(&client_clone, updates).await {
+                                    tracing::error!("Failed to flush lifecycle updates on shutdown: {}", e);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    
+                    // Also check threshold-based flush
+                    if queue_clone.len().await >= flush_threshold {
+                        let updates = queue_clone.drain().await;
+                        if !updates.is_empty() {
+                            tracing::debug!("Flushing {} lifecycle updates (threshold-based)", updates.len());
+                            if let Err(e) = Self::flush_lifecycle_updates(&client_clone, updates).await {
+                                tracing::error!("Failed to flush lifecycle updates: {}", e);
+                            }
+                        }
+                    }
+                }
+                
+                tracing::info!("Lifecycle flush task stopped");
+            });
+        }
 
         Ok(storage)
     }
@@ -67,6 +140,72 @@ where
     /// Get the intelligence layer for advanced search
     pub fn intelligence(&self) -> &SearchIntelligence<C> {
         &self.intelligence
+    }
+
+    /// Get the hook registry for registering memory lifecycle hooks
+    pub fn hook_registry(&self) -> Arc<HookRegistry> {
+        self.hook_registry.clone()
+    }
+
+    /// Gracefully shutdown the storage, flushing any pending updates
+    pub async fn shutdown(&self) -> Result<(), StorageError> {
+        tracing::info!("Initiating graceful shutdown");
+        
+        // Signal shutdown to background tasks
+        self.shutdown.notify_waiters();
+        
+        // Give background tasks a moment to finish
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        // Flush any remaining lifecycle updates
+        if self.config.lifecycle_tracking.enabled && self.config.lifecycle_tracking.batched {
+            let updates = self.lifecycle_queue.drain().await;
+            if !updates.is_empty() {
+                tracing::info!("Final flush of {} lifecycle updates", updates.len());
+                Self::flush_lifecycle_updates(&self.client, updates).await?;
+            }
+        }
+        
+        tracing::info!("Graceful shutdown complete");
+        Ok(())
+    }
+
+    /// Flush a batch of lifecycle updates to the database
+    /// Uses atomic increment operations to avoid race conditions
+    async fn flush_lifecycle_updates(
+        client: &Surreal<C>,
+        updates: Vec<LifecycleUpdate>,
+    ) -> Result<(), StorageError> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        // Batch updates in a single transaction-like query
+        // For each update, we use += operator to atomically increment
+        for update in updates {
+            let record_id = RecordId::from(("memory", update.memory_id.as_str()));
+            
+            let query = r#"
+                UPDATE $id SET 
+                    metadata.access_count += $delta,
+                    metadata.last_accessed = $last_accessed,
+                    updated_at = time::now()
+                WHERE id = $id
+            "#;
+            
+            if let Err(e) = client
+                .query(query)
+                .bind(("id", record_id))
+                .bind(("delta", update.access_count_delta))
+                .bind(("last_accessed", update.last_accessed.to_rfc3339()))
+                .await
+            {
+                tracing::warn!("Failed to flush lifecycle update for {}: {}", update.memory_id, e);
+                // Continue with other updates even if one fails
+            }
+        }
+
+        Ok(())
     }
 
     /// Ensure the system user exists (needed for owner fields)

@@ -94,6 +94,26 @@ pub trait MemoryStore: BaseStore {
         query_vector: &[f32],
         limit: Option<usize>,
     ) -> std::result::Result<Vec<(Memory, f32, String)>, StorageError>;
+
+    /// Search memories with configurable multi-factor scoring
+    ///
+    /// Combines BM25 keyword matching, vector similarity (if available), and
+    /// memory lifecycle metadata (recency, access count, priority) to produce
+    /// comprehensive relevance rankings.
+    ///
+    /// # Arguments
+    /// * `query` - The search query string
+    /// * `scoring` - Optional scoring configuration. If None, uses default
+    /// * `limit` - Maximum number of results to return
+    ///
+    /// # Returns
+    /// A vector of (Memory, final_score) tuples, sorted by score (highest first)
+    async fn search_memories_with_scoring(
+        &self,
+        query: &str,
+        scoring: Option<crate::search::ScoringConfig>,
+        limit: Option<usize>,
+    ) -> std::result::Result<Vec<(Memory, f32)>, StorageError>;
 }
 
 /// Trait for entity operations
