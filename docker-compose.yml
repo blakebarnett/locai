@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  locai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Use BuildKit for sccache support and better caching
+      # Make sure to set: export DOCKER_BUILDKIT=1
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: locai-server:latest
+    container_name: locai-server
+    restart: unless-stopped
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    ports:
+      - "3000:3000"
+    
+    volumes:
+      # Persist data outside the container
+      # This stores RocksDB files in /data/graph/
+      - locai-data:/data
+      
+      # Optional: Mount a custom config file
+      # - ./config.json:/data/config.json:ro
+      
+      # Alternative: Use bind mount for development
+      # - ./locai-data:/data  # Host directory mount
+    
+    environment:
+      # Server configuration
+      - LOCAI_HOST=0.0.0.0
+      - LOCAI_PORT=3000
+      - LOCAI_DATA_DIR=/data
+      
+      # Logging configuration
+      - RUST_LOG=info,locai=debug,locai_server=debug
+      - RUST_BACKTRACE=1
+      
+      # Database configuration (embedded SurrealDB)
+      - LOCAI_STORAGE_TYPE=embedded
+      
+      # Optional: Authentication (disable for testing)
+      - LOCAI_ENABLE_AUTH=false
+      
+      # Optional: ML service endpoint (if using external embeddings)
+      # - LOCAI_ML_SERVICE_URL=http://ml-service:8080
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    networks:
+      - locai-network
+    
+    # Optional: Add labels for container management
+    labels:
+      - "com.locai.service=server"
+      - "com.locai.version=0.2.0"
+
+  # Optional: Add a web UI or admin interface here
+  # locai-ui:
+  #   image: locai-ui:latest
+  #   ports:
+  #     - "8080:80"
+  #   depends_on:
+  #     - locai-server
+  #   environment:
+  #     - LOCAI_API_URL=http://locai-server:3000
+  #   networks:
+  #     - locai-network
+
+volumes:
+  locai-data:
+    driver: local
+    # Docker-managed volume (recommended for production)
+    # Data persists even if container is removed
+    # Location: /var/lib/docker/volumes/locai-data/_data (Linux)
+    
+    # Optional: Use specific host path
+    # driver_opts:
+    #   type: none
+    #   device: /mnt/storage/locai-data  # Your custom path
+    #   o: bind
+
+networks:
+  locai-network:
+    driver: bridge
+

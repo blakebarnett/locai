@@ -1,0 +1,89 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock for libraries (keep for applications)
+# Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+*.md
+docs/
+LICENSE
+CONTRIBUTING.md
+CHANGELOG.md
+
+# Test files and fixtures
+tests/fixtures/
+**/test-data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Development databases and data
+*.db
+*.db-shm
+*.db-wal
+data/
+storage/
+
+# Docker files (don't copy into the build context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Example files (optional - uncomment if you don't want them in the image)
+# examples/
+
+# Frontend build artifacts (if any)
+node_modules/
+dist/
+build/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Python cache (if any Python tooling)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.bak
+*.backup
+
+

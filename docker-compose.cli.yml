@@ -1,0 +1,74 @@
+version: '3.8'
+
+# Docker Compose setup demonstrating CLI + Server interaction
+services:
+  # Locai server
+  locai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: locai-server:latest
+    container_name: locai-server
+    restart: unless-stopped
+    
+    ports:
+      - "3000:3000"
+    
+    volumes:
+      - locai-data:/data
+    
+    environment:
+      - LOCAI_HOST=0.0.0.0
+      - LOCAI_PORT=3000
+      - LOCAI_DATA_DIR=/data
+      - RUST_LOG=info,locai=debug
+      - LOCAI_ENABLE_AUTH=false
+    
+    networks:
+      - locai-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Locai CLI - can be used to interact with the server or work standalone
+  locai-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    image: locai-cli:latest
+    container_name: locai-cli
+    
+    volumes:
+      # Share data with server for embedded mode
+      - locai-data:/data
+      # Mount current directory for scripts
+      - ./scripts:/scripts:ro
+    
+    environment:
+      - LOCAI_DATA_DIR=/data
+      - RUST_LOG=info
+    
+    networks:
+      - locai-network
+    
+    # Don't run by default - use docker-compose run locai-cli <command>
+    profiles:
+      - tools
+    
+    labels:
+      - "com.locai.service=cli"
+      - "com.locai.version=0.2.0"
+
+volumes:
+  locai-data:
+    driver: local
+
+networks:
+  locai-network:
+    driver: bridge
+
+

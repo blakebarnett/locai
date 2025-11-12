@@ -1,0 +1,68 @@
+# Docker Compose for Locai Server with host sccache support
+# 
+# This configuration leverages the host's sccache cache for faster Docker builds
+# 
+# Usage:
+#   DOCKER_BUILDKIT=1 docker-compose -f docker-compose.sccache.yml build
+#   docker-compose -f docker-compose.sccache.yml up
+
+version: '3.8'
+
+services:
+  locai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.sccache
+      # Enable BuildKit for cache mount support
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: locai-server:latest
+    container_name: locai-server
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist database data
+      - locai-data:/data
+      # Optional: Mount config file
+      # - ./locai.yaml:/data/locai.yaml:ro
+    environment:
+      - RUST_LOG=info
+      - LOCAI_HOST=0.0.0.0
+      - LOCAI_PORT=3000
+      # Optional: Override config location
+      # - LOCAI_CONFIG=/data/locai.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+  # Optional: SurrealDB instance
+  # Uncomment if you want to use SurrealDB instead of embedded RocksDB
+  # surrealdb:
+  #   image: surrealdb/surrealdb:latest
+  #   container_name: locai-surrealdb
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - surrealdb-data:/data
+  #   command: start --log trace --user root --pass root file:/data/database.db
+  #   restart: unless-stopped
+
+volumes:
+  locai-data:
+    driver: local
+  # surrealdb-data:
+  #   driver: local
+
+networks:
+  default:
+    name: locai-network
+
+
+
+
+
+

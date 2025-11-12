@@ -1,0 +1,169 @@
+# Multi-stage Dockerfile for Locai Server - Host sccache mode
+# This version shares the host's sccache cache for MAXIMUM speed
+#
+# Prerequisites:
+#   1. You've already built on the host: cargo build --release
+#   2. Host sccache is at: ~/.cache/sccache
+#
+# Build with:
+#   DOCKER_BUILDKIT=1 docker build \
+#     --build-arg HOST_SCCACHE_DIR=$HOME/.cache/sccache \
+#     -f Dockerfile.host-cache \
+#     -t locai-server:latest .
+#
+# Note: Uses Rust nightly because Locai requires edition 2024
+
+# ============================================================================
+# Stage 1: Build dependencies and cache them
+# ============================================================================
+FROM rustlang/rust:nightly-bookworm AS chef
+
+# Install cargo-chef and sccache for caching
+RUN cargo install cargo-chef --locked && \
+    cargo install sccache --locked
+
+WORKDIR /app
+
+# ============================================================================
+# Stage 2: Prepare the dependency recipe
+# ============================================================================
+FROM chef AS planner
+
+# Copy all source files to prepare the build plan
+COPY . .
+
+# Analyze dependencies to create a recipe for caching
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ============================================================================
+# Stage 3: Build dependencies (cached layer) with HOST sccache
+# ============================================================================
+FROM chef AS dependencies
+
+# Install build dependencies for native libraries (RocksDB, etc.)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libclang-dev \
+    clang \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the dependency recipe and cargo config
+COPY --from=planner /app/recipe.json recipe.json
+COPY .cargo/config.toml .cargo/config.toml
+
+# Configure sccache to use host cache
+ENV RUSTC_WRAPPER=sccache
+ENV SCCACHE_DIR=/host-sccache
+ENV SCCACHE_CACHE_SIZE="10G"
+
+# Build dependencies with HOST sccache
+# This mounts your host's sccache directory as read-write
+# If you've already built on host, this will be INSTANT!
+ARG HOST_SCCACHE_DIR
+RUN --mount=type=bind,source=${HOST_SCCACHE_DIR:-/tmp/empty},target=/host-sccache \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo chef cook --release --recipe-path recipe.json && \
+    echo "=== sccache statistics (using HOST cache) ===" && \
+    sccache --show-stats
+
+# ============================================================================
+# Stage 4: Build the application with HOST sccache
+# ============================================================================
+FROM chef AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libclang-dev \
+    clang \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy cached dependencies from previous stage
+COPY --from=dependencies /app/target target
+COPY --from=dependencies /usr/local/cargo /usr/local/cargo
+
+# Copy source code and cargo config
+COPY . .
+
+# Configure sccache to use host cache
+ENV RUSTC_WRAPPER=sccache
+ENV SCCACHE_DIR=/host-sccache
+ENV SCCACHE_CACHE_SIZE="10G"
+
+# Build the application with HOST sccache
+# This will reuse compilation cache from your host builds!
+ARG HOST_SCCACHE_DIR
+RUN --mount=type=bind,source=${HOST_SCCACHE_DIR:-/tmp/empty},target=/host-sccache \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo build --release --bin locai-server && \
+    echo "=== sccache statistics (using HOST cache) ===" && \
+    sccache --show-stats
+
+# Verify the binary exists and is executable
+RUN ls -lh /app/target/release/locai-server && \
+    file /app/target/release/locai-server && \
+    /app/target/release/locai-server --help
+
+# ============================================================================
+# Stage 5: Runtime image (final, minimal)
+# ============================================================================
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    bash \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create a non-root user for security
+RUN groupadd -r locai && useradd -r -g locai -u 1000 locai
+
+# Create data directory with proper permissions
+RUN mkdir -p /data && chown -R locai:locai /data
+
+# Copy the compiled binary from builder
+COPY --from=builder /app/target/release/locai-server /usr/local/bin/locai-server
+
+# Verify binary is executable
+RUN chmod +x /usr/local/bin/locai-server
+
+# Switch to non-root user
+USER locai
+
+# Set working directory
+WORKDIR /data
+
+# Expose default port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Default command
+CMD ["locai-server"]
+
+# ============================================================================
+# Metadata
+# ============================================================================
+LABEL org.opencontainers.image.title="Locai Server"
+LABEL org.opencontainers.image.description="Memory management service with graph-centric design (HOST sccache mode)"
+LABEL org.opencontainers.image.version="0.2.0"
+LABEL org.opencontainers.image.source="https://github.com/blakebarnett/locai"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.documentation="See DOCKER_BUILD_GUIDE.md - Host cache mode"
+
+
+
+
+
+
