@@ -329,8 +329,8 @@ The Rust library provides pre-configured profiles. To use in API, send the JSON 
 
 ## See Also
 
-- [Enhanced Search Documentation](./ENHANCED_SEARCH.md) - Full technical details
-- [Lifecycle Tracking](./LIFECYCLE_TRACKING.md) - How access counts and timestamps work
+- [Enhanced Search Documentation](./guides/ENHANCED_SEARCH.md) - Full technical details
+- [Lifecycle Tracking](./guides/LIFECYCLE_TRACKING.md) - How access counts and timestamps work
 - [API Reference](./API.md) - Complete API documentation
 - Swagger UI: `http://localhost:3000/docs` - Interactive API explorer
 

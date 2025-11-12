@@ -11,10 +11,10 @@ We use [release-please](https://github.com/googleapis/release-please) for fully 
 1. **Conventional Commits**: Developers use conventional commit messages
 2. **Release PR Creation**: release-please analyzes commits and creates a release PR with:
    - Version bumps in all `Cargo.toml` files
-   - Updated `CHANGELOG.md` 
    - Git tags preparation
-3. **Review & Merge**: Maintainers review and merge the release PR
-4. **Automatic Publishing**: GitHub Actions publishes all crates to crates.io
+3. **Changelog Management**: The `docs/CHANGELOG.md` is manually maintained with detailed release notes. release-please does not automatically update it to preserve the detailed formatting and organization.
+4. **Review & Merge**: Maintainers review and merge the release PR
+5. **Automatic Publishing**: GitHub Actions publishes all crates to crates.io
 
 ### Configuration Files
 
@@ -62,8 +62,8 @@ cargo set-version --workspace 0.2.0
 ### 2. Update Changelog
 
 ```bash
-# Add new version section to CHANGELOG.md
-# Follow Keep a Changelog format
+# Add new version section to docs/CHANGELOG.md
+# Follow Keep a Changelog format with detailed subsections
 ```
 
 ### 3. Create Git Tag

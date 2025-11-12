@@ -21,19 +21,20 @@ This directory contains technical documentation for the Locai project. For gener
 
 ### User Guides
 
-- [**Temporal Features**](guides/TEMPORAL_FEATURES.md) - Guide to temporal search and graph analysis
-- [**Docker Deployment**](DOCKER.md) - Docker build and deployment guide
-- [**Docker CLI**](DOCKER_CLI.md) - Command-line interface for Docker operations
-- [**Data Directory Guide**](DATA_DIRECTORY_GUIDE.md) - Configuration for data storage
+- [**Docker Quick Start**](guides/DOCKER_QUICK_START.md) - Get started with Docker in under 2 minutes
+- [**Docker Deployment**](guides/DOCKER.md) - Complete Docker build and deployment guide
+- [**Docker CLI**](guides/DOCKER_CLI.md) - Using the Locai CLI in Docker containers
+- [**Data Directory Guide**](guides/DATA_DIRECTORY_GUIDE.md) - Configuring data storage locations
+- [**Temporal Features**](guides/TEMPORAL_FEATURES.md) - Using temporal search and graph analysis
+- [**Lifecycle Tracking**](guides/LIFECYCLE_TRACKING.md) - Configuring and using memory lifecycle tracking
+- [**Batch Operations**](guides/BATCH_OPERATIONS.md) - Using the batch API for bulk operations
+- [**Enhanced Search**](guides/ENHANCED_SEARCH.md) - Customizing search scoring and ranking
 
 ### Development
 
 - [**Design Document**](DESIGN.md) - Detailed technical design and implementation notes
 - [**Release Process**](RELEASE.md) - Release automation and versioning strategy
 - [**Live Queries**](LIVE_QUERIES.md) - Real-time subscription system design
-- [**Lifecycle Tracking**](LIFECYCLE_TRACKING.md) - Memory lifecycle tracking implementation
-- [**Batch Operations**](BATCH_OPERATIONS.md) - Batch API reference
-- [**Enhanced Search**](ENHANCED_SEARCH.md) - Search scoring system documentation
 
 ## Getting Started
 

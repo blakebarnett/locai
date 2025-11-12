@@ -1,7 +1,7 @@
 # Batch Operations API
 
-**Version**: 0.2.0-alpha  
-**Status**: Implementation in Progress
+**Version**: 0.2.0+  
+**Status**: ✅ Implemented
 
 ## Overview
 

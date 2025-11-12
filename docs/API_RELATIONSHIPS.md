@@ -1,7 +1,7 @@
 # Locai Relationship API Guide
 
-**Version:** 0.1.0-alpha.1  
-**Last Updated:** 2025-10-25
+**Version:** 0.2.1  
+**Last Updated:** 2025-11-01
 
 ---
 

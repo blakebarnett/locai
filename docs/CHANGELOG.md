@@ -114,7 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New trait method: `search_memories_with_scoring()`
 - New API methods: `MemoryManager::search_with_scoring()`, `SearchExtensions::search_with_scoring()`
 - 23 unit tests for scoring functionality
-- Comprehensive documentation in `docs/ENHANCED_SEARCH.md` and `docs/API_ENHANCED_SEARCH_EXAMPLES.md`
+- Comprehensive documentation in `docs/guides/ENHANCED_SEARCH.md` and `docs/API_ENHANCED_SEARCH_EXAMPLES.md`
 
 #### Integration & Testing (RFC 001 - Work Stream 6)
 - **15 comprehensive integration tests** covering end-to-end workflows
@@ -129,10 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic sccache usage via `.cargo/config.toml`
 
 #### Documentation
-- `docs/LIFECYCLE_TRACKING.md` - Comprehensive lifecycle tracking guide
-- `docs/ENHANCED_SEARCH.md` - Search scoring documentation with examples
-- `docs/HOOKS.md` - Hook system usage guide
-- `docs/BATCH_OPERATIONS.md` - Batch API reference
+- `docs/guides/LIFECYCLE_TRACKING.md` - Comprehensive lifecycle tracking guide
+- `docs/guides/ENHANCED_SEARCH.md` - Search scoring documentation with examples
+- `docs/guides/BATCH_OPERATIONS.md` - Batch API reference
 - Working examples for all new features
 
 ### Changed
