@@ -13,12 +13,27 @@ This directory contains technical documentation for the Locai project. For gener
 - [**Search Architecture**](SEARCH.md) - BM25 search implementation and capabilities
 - [**Entity Extraction**](ENTITY_EXTRACTION.md) - Entity extraction pipeline architecture
 - [**Feature Flags**](FEATURES.md) - Compilation features and configuration options
+- [**Changelog**](CHANGELOG.md) - Project history and version changes
+
+### Architecture Decision Records
+
+- [**Architecture Decisions**](architecture/) - ADRs documenting major architectural decisions
+
+### User Guides
+
+- [**Temporal Features**](guides/TEMPORAL_FEATURES.md) - Guide to temporal search and graph analysis
+- [**Docker Deployment**](DOCKER.md) - Docker build and deployment guide
+- [**Docker CLI**](DOCKER_CLI.md) - Command-line interface for Docker operations
+- [**Data Directory Guide**](DATA_DIRECTORY_GUIDE.md) - Configuration for data storage
 
 ### Development
 
 - [**Design Document**](DESIGN.md) - Detailed technical design and implementation notes
 - [**Release Process**](RELEASE.md) - Release automation and versioning strategy
 - [**Live Queries**](LIVE_QUERIES.md) - Real-time subscription system design
+- [**Lifecycle Tracking**](LIFECYCLE_TRACKING.md) - Memory lifecycle tracking implementation
+- [**Batch Operations**](BATCH_OPERATIONS.md) - Batch API reference
+- [**Enhanced Search**](ENHANCED_SEARCH.md) - Search scoring system documentation
 
 ## Getting Started
 

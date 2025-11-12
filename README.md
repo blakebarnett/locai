@@ -21,7 +21,7 @@ Add Locai to your Rust project:
 
 ```toml
 [dependencies]
-locai = "0.1.0-alpha.1"
+locai = "0.2.1"
 ```
 
 Basic usage:
