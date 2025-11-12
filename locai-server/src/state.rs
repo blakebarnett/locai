@@ -2,9 +2,11 @@
 
 use dashmap::DashMap;
 use locai::core::MemoryManager;
+use locai::relationships::{RelationshipTypeRegistry, RelationshipMetrics};
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 use uuid::Uuid;
+use std::collections::HashMap;
 
 use crate::api::auth_service::AuthService;
 use crate::config::ServerConfig;
@@ -42,6 +44,15 @@ pub struct AppState {
 
     /// Broadcast channel for real-time updates
     pub broadcast_tx: broadcast::Sender<WebSocketMessage>,
+
+    /// Relationship type registry for dynamic type management
+    pub relationship_type_registry: RelationshipTypeRegistry,
+
+    /// Metrics collector for relationship operations
+    pub relationship_metrics: RelationshipMetrics,
+
+    /// Webhook registry (in-memory storage for Phase 1)
+    pub webhook_registry: Arc<RwLock<HashMap<String, crate::api::webhooks::WebhookConfig>>>,
 }
 
 impl AppState {
@@ -57,6 +68,9 @@ impl AppState {
             websocket_connections: DashMap::new(),
             websocket_subscriptions: DashMap::new(),
             broadcast_tx,
+            relationship_type_registry: RelationshipTypeRegistry::new(),
+            relationship_metrics: RelationshipMetrics::new(),
+            webhook_registry: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 

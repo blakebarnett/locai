@@ -66,6 +66,9 @@ pub mod relationships;
 pub mod runtime;
 pub mod simple;
 pub mod storage;
+pub mod hooks;
+pub mod batch;
+pub mod search;
 
 /// The prelude re-exports commonly used types for convenience
 pub mod prelude {
@@ -100,6 +103,15 @@ pub mod prelude {
         StorageError,
         models::{MemoryGraph, MemoryPath},
     };
+
+    // Re-export hooks types for custom hook implementations
+    pub use crate::hooks::{MemoryHook, HookResult, HookRegistry};
+
+    // Re-export batch types for batch operations
+    pub use crate::batch::{BatchOperation, BatchResponse, BatchResult, BatchExecutor, BatchExecutorConfig};
+
+    // Re-export search scoring types
+    pub use crate::search::{ScoringConfig, DecayFunction, ScoreCalculator};
 
     // Re-export essential result type
     pub use crate::{LocaiError, Result};
