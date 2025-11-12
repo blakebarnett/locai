@@ -1,4 +1,8 @@
 //! Integration tests for SharedStorage VersionStore implementation
+//!
+//! Tests verify memory versioning, memory store operations, and hook system integration.
+//! The hook registry is automatically initialized for each SharedStorage instance and
+//! executes hooks asynchronously during memory lifecycle operations.
 
 use chrono::Utc;
 use locai::models::{Memory, MemoryPriority, MemoryType};
@@ -12,6 +16,7 @@ async fn create_test_store() -> SharedStorage<surrealdb::engine::local::Db> {
     let config = SharedStorageConfig {
         namespace: "test_version".to_string(),
         database: "test_version".to_string(),
+        lifecycle_tracking: Default::default(),
     };
 
     let client = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())

@@ -2,6 +2,12 @@
 //!
 //! This test suite verifies that the SharedStorage implementation works correctly
 //! across all storage operations including entities, relationships, and vectors.
+//!
+//! ## Hook System Integration
+//!
+//! These tests verify that memory operations correctly trigger the hook system when
+//! lifecycle tracking is enabled. The hook registry is automatically created for each
+//! SharedStorage instance and executes hooks asynchronously without blocking operations.
 
 use chrono::Utc;
 use locai::storage::{
@@ -18,6 +24,7 @@ async fn create_test_storage() -> Result<TestStorage, Box<dyn std::error::Error>
     let config = SharedStorageConfig {
         namespace: "test".to_string(),
         database: "locai_test".to_string(),
+        lifecycle_tracking: Default::default(),
     };
 
     let client = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(()).await?;

@@ -1,4 +1,4 @@
-use locai::ml::model_manager::{EmbeddingManager, EmbeddingManagerBuilder};
+use locai::ml::model_manager::EmbeddingManagerBuilder;
 
 #[test]
 fn test_embedding_manager_creation() {
