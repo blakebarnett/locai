@@ -68,10 +68,10 @@ impl MessagingStorage {
                 serde_json::to_value(expires_at).unwrap_or_default(),
             );
         }
-        if let Some(importance) = message.importance {
-            if let Some(number) = serde_json::Number::from_f64(importance) {
-                memory.set_property("importance", serde_json::Value::Number(number));
-            }
+        if let Some(importance) = message.importance
+            && let Some(number) = serde_json::Number::from_f64(importance)
+        {
+            memory.set_property("importance", serde_json::Value::Number(number));
         }
 
         self.shared_storage

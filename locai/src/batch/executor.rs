@@ -159,19 +159,19 @@ impl BatchExecutor {
         // This is a best-effort operation
 
         // Try to delete as memory
-        if let Ok(_) = self.storage.delete_memory(resource_id).await {
+        if self.storage.delete_memory(resource_id).await.is_ok() {
             debug!("Rolled back memory {}", resource_id);
             return Ok(());
         }
 
         // Try to delete as entity
-        if let Ok(_) = self.storage.delete_entity(resource_id).await {
+        if self.storage.delete_entity(resource_id).await.is_ok() {
             debug!("Rolled back entity {}", resource_id);
             return Ok(());
         }
 
         // Try to delete as relationship
-        if let Ok(_) = self.storage.delete_relationship(resource_id).await {
+        if self.storage.delete_relationship(resource_id).await.is_ok() {
             debug!("Rolled back relationship {}", resource_id);
             return Ok(());
         }
@@ -380,11 +380,11 @@ impl BatchExecutor {
                     })?;
 
                 // Merge metadata into properties
-                if let serde_json::Value::Object(ref mut props) = memory.properties {
-                    if let serde_json::Value::Object(new_props) = metadata {
-                        for (k, v) in new_props {
-                            props.insert(k, v);
-                        }
+                if let serde_json::Value::Object(ref mut props) = memory.properties
+                    && let serde_json::Value::Object(new_props) = metadata
+                {
+                    for (k, v) in new_props {
+                        props.insert(k, v);
                     }
                 }
 

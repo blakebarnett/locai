@@ -172,12 +172,11 @@ impl EntityResolver {
 
         if let Ok(exact_matches) = storage.list_entities(Some(filter), None, None).await {
             for entity in exact_matches {
-                if let Some(name) = self.extract_entity_name(&entity) {
-                    if name == extracted.text
-                        && self.entity_types_compatible(&extracted.entity_type, &entity.entity_type)
-                    {
-                        matches.push((entity, 1.0));
-                    }
+                if let Some(name) = self.extract_entity_name(&entity)
+                    && name == extracted.text
+                    && self.entity_types_compatible(&extracted.entity_type, &entity.entity_type)
+                {
+                    matches.push((entity, 1.0));
                 }
             }
         }
@@ -382,10 +381,10 @@ impl EntityResolver {
             MergeStrategy::Conservative => {
                 // Only add new properties, don't overwrite existing ones
                 for (key, value) in extracted.metadata {
-                    if let Some(props) = merged.properties.as_object_mut() {
-                        if !props.contains_key(&key) {
-                            props.insert(key, serde_json::Value::String(value));
-                        }
+                    if let Some(props) = merged.properties.as_object_mut()
+                        && !props.contains_key(&key)
+                    {
+                        props.insert(key, serde_json::Value::String(value));
                     }
                 }
             }
@@ -455,13 +454,12 @@ impl EntityResolver {
 
                 if extracted.text != existing_name
                     && extracted.confidence > existing_confidence as f32
+                    && let Some(props) = merged.properties.as_object_mut()
                 {
-                    if let Some(props) = merged.properties.as_object_mut() {
-                        props.insert(
-                            "name".to_string(),
-                            serde_json::Value::String(extracted.text),
-                        );
-                    }
+                    props.insert(
+                        "name".to_string(),
+                        serde_json::Value::String(extracted.text),
+                    );
                 }
             }
         }
@@ -493,10 +491,10 @@ impl EntityDisambiguator {
         let mut confidence_scores = Vec::new();
 
         // 1. Check unique identifiers
-        if self.config.check_unique_identifiers {
-            if let Some(score) = self.check_unique_identifiers(extracted, existing) {
-                confidence_scores.push(("identifiers", score));
-            }
+        if self.config.check_unique_identifiers
+            && let Some(score) = self.check_unique_identifiers(extracted, existing)
+        {
+            confidence_scores.push(("identifiers", score));
         }
 
         // 2. Analyze context overlap
@@ -537,14 +535,12 @@ impl EntityDisambiguator {
         existing: &Entity,
     ) -> Option<f32> {
         for (key, value) in &extracted.metadata {
-            if self.is_unique_identifier_key(key) {
-                if let Some(existing_props) = existing.properties.as_object() {
-                    if let Some(existing_value) = existing_props.get(key).and_then(|v| v.as_str()) {
-                        if value == existing_value {
-                            return Some(1.0); // Perfect match for unique identifier
-                        }
-                    }
-                }
+            if self.is_unique_identifier_key(key)
+                && let Some(existing_props) = existing.properties.as_object()
+                && let Some(existing_value) = existing_props.get(key).and_then(|v| v.as_str())
+                && value == existing_value
+            {
+                return Some(1.0); // Perfect match for unique identifier
             }
         }
         None
@@ -1032,14 +1028,12 @@ impl EntityResolver {
         existing: &Entity,
     ) -> bool {
         for (key, value) in &extracted.metadata {
-            if self.is_unique_identifier(key) {
-                if let Some(existing_props) = existing.properties.as_object() {
-                    if let Some(existing_value) = existing_props.get(key).and_then(|v| v.as_str()) {
-                        if value == existing_value {
-                            return true;
-                        }
-                    }
-                }
+            if self.is_unique_identifier(key)
+                && let Some(existing_props) = existing.properties.as_object()
+                && let Some(existing_value) = existing_props.get(key).and_then(|v| v.as_str())
+                && value == existing_value
+            {
+                return true;
             }
         }
         false

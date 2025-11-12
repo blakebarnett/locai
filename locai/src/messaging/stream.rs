@@ -79,27 +79,26 @@ pub mod utils {
     /// Check if a message matches a filter
     pub fn matches_filter(message: &Message, filter: &MessageFilter) -> bool {
         // Check exact topic matches
-        if let Some(topics) = &filter.topics {
-            if !topics.contains(&message.topic) {
-                return false;
-            }
+        if let Some(topics) = &filter.topics
+            && !topics.contains(&message.topic)
+        {
+            return false;
         }
 
         // Check topic patterns
-        if let Some(patterns) = &filter.topic_patterns {
-            if !patterns
+        if let Some(patterns) = &filter.topic_patterns
+            && !patterns
                 .iter()
                 .any(|pattern| matches_pattern(pattern, &message.topic))
-            {
-                return false;
-            }
+        {
+            return false;
         }
 
         // Check senders
-        if let Some(senders) = &filter.senders {
-            if !senders.contains(&message.sender) {
-                return false;
-            }
+        if let Some(senders) = &filter.senders
+            && !senders.contains(&message.sender)
+        {
+            return false;
         }
 
         // Check recipients
@@ -112,10 +111,10 @@ pub mod utils {
         }
 
         // Check time range
-        if let Some((start, end)) = &filter.time_range {
-            if message.timestamp < *start || message.timestamp > *end {
-                return false;
-            }
+        if let Some((start, end)) = &filter.time_range
+            && (message.timestamp < *start || message.timestamp > *end)
+        {
+            return false;
         }
 
         // Check importance range
@@ -131,17 +130,17 @@ pub mod utils {
         }
 
         // Check tags (must have all)
-        if let Some(tags) = &filter.tags {
-            if !tags.iter().all(|tag| message.has_tag(tag)) {
-                return false;
-            }
+        if let Some(tags) = &filter.tags
+            && !tags.iter().all(|tag| message.has_tag(tag))
+        {
+            return false;
         }
 
         // Check tags (must have any)
-        if let Some(tags_any) = &filter.tags_any {
-            if !tags_any.iter().any(|tag| message.has_tag(tag)) {
-                return false;
-            }
+        if let Some(tags_any) = &filter.tags_any
+            && !tags_any.iter().any(|tag| message.has_tag(tag))
+        {
+            return false;
         }
 
         // Check headers

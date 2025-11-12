@@ -64,14 +64,14 @@ impl EmbeddingManager {
             return Err(MLError::embedding("Embedding cannot be empty".to_string()));
         }
 
-        if let Some(expected_dim) = self.expected_dimensions {
-            if embedding.len() != expected_dim {
-                return Err(MLError::embedding(format!(
-                    "Expected embedding dimension {}, got {}",
-                    expected_dim,
-                    embedding.len()
-                )));
-            }
+        if let Some(expected_dim) = self.expected_dimensions
+            && embedding.len() != expected_dim
+        {
+            return Err(MLError::embedding(format!(
+                "Expected embedding dimension {}, got {}",
+                expected_dim,
+                embedding.len()
+            )));
         }
 
         // Check for invalid values

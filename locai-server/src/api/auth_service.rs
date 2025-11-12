@@ -234,10 +234,10 @@ impl AuthService {
             .map_err(|e| ServerError::Database(format!("Failed to query users: {}", e)))?;
 
         for entity in entities {
-            if let Ok(user) = User::from_entity(entity) {
-                if user.username == username {
-                    return Ok(Some(user));
-                }
+            if let Ok(user) = User::from_entity(entity)
+                && user.username == username
+            {
+                return Ok(Some(user));
             }
         }
 

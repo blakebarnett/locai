@@ -354,14 +354,14 @@ where
                 conditions.push(format!("content CONTAINS '{}'", content));
             }
 
-            if let Some(tags) = &f.tags {
-                if !tags.is_empty() {
-                    let tag_conditions: Vec<String> = tags
-                        .iter()
-                        .map(|tag| format!("'{}' IN metadata.tags", tag))
-                        .collect();
-                    conditions.push(format!("({})", tag_conditions.join(" OR ")));
-                }
+            if let Some(tags) = &f.tags
+                && !tags.is_empty()
+            {
+                let tag_conditions: Vec<String> = tags
+                    .iter()
+                    .map(|tag| format!("'{}' IN metadata.tags", tag))
+                    .collect();
+                conditions.push(format!("({})", tag_conditions.join(" OR ")));
             }
 
             if let Some(source) = &f.source {
@@ -1168,38 +1168,38 @@ where
         let mut memory = memories.into_iter().next().map(Memory::from);
 
         // Track lifecycle if enabled (but don't trigger hooks)
-        if let Some(ref mut mem) = memory {
-            if self.config.lifecycle_tracking.enabled
-                && self.config.lifecycle_tracking.update_on_get
-            {
-                if self.config.lifecycle_tracking.batched {
-                    // For batched mode: queue the update BEFORE modifying in-memory
-                    // The delta represents this access
-                    let update = crate::storage::lifecycle::LifecycleUpdate::new(mem.id.clone());
-                    if let Err(e) = self.lifecycle_queue.queue_update(update).await {
-                        tracing::warn!("Failed to queue lifecycle update: {}", e);
-                    }
-                    // Update in-memory for the return value
-                    mem.record_access();
-                } else if self.config.lifecycle_tracking.blocking {
-                    // Update in-memory counts first
-                    mem.record_access();
-                    // Immediate blocking update with absolute values
-                    if let Err(e) = self.update_lifecycle_metadata(mem).await {
-                        tracing::warn!("Failed to update lifecycle metadata: {}", e);
-                    }
-                } else {
-                    // Update in-memory counts first
-                    mem.record_access();
-                    // Spawn async update (fire-and-forget) - Fixed to use MERGE
-                    let memory_id = mem.id.clone();
-                    let access_count = mem.access_count;
-                    let last_accessed = mem.last_accessed;
-                    let self_clone = self.client.clone();
-                    tokio::spawn(async move {
-                        let record_id = RecordId::from(("memory", memory_id.as_str()));
-                        // Use MERGE to avoid overwriting concurrent updates
-                        let update_query = r#"
+        if let Some(ref mut mem) = memory
+            && self.config.lifecycle_tracking.enabled
+            && self.config.lifecycle_tracking.update_on_get
+        {
+            if self.config.lifecycle_tracking.batched {
+                // For batched mode: queue the update BEFORE modifying in-memory
+                // The delta represents this access
+                let update = crate::storage::lifecycle::LifecycleUpdate::new(mem.id.clone());
+                if let Err(e) = self.lifecycle_queue.queue_update(update).await {
+                    tracing::warn!("Failed to queue lifecycle update: {}", e);
+                }
+                // Update in-memory for the return value
+                mem.record_access();
+            } else if self.config.lifecycle_tracking.blocking {
+                // Update in-memory counts first
+                mem.record_access();
+                // Immediate blocking update with absolute values
+                if let Err(e) = self.update_lifecycle_metadata(mem).await {
+                    tracing::warn!("Failed to update lifecycle metadata: {}", e);
+                }
+            } else {
+                // Update in-memory counts first
+                mem.record_access();
+                // Spawn async update (fire-and-forget) - Fixed to use MERGE
+                let memory_id = mem.id.clone();
+                let access_count = mem.access_count;
+                let last_accessed = mem.last_accessed;
+                let self_clone = self.client.clone();
+                tokio::spawn(async move {
+                    let record_id = RecordId::from(("memory", memory_id.as_str()));
+                    // Use MERGE to avoid overwriting concurrent updates
+                    let update_query = r#"
                             UPDATE $id MERGE {
                                 metadata: {
                                     access_count: $access_count,
@@ -1208,17 +1208,16 @@ where
                                 updated_at: time::now()
                             }
                         "#;
-                        if let Err(e) = self_clone
-                            .query(update_query)
-                            .bind(("id", record_id))
-                            .bind(("access_count", access_count))
-                            .bind(("last_accessed", last_accessed.map(|dt| dt.to_rfc3339())))
-                            .await
-                        {
-                            tracing::warn!("Failed to update lifecycle in background: {}", e);
-                        }
-                    });
-                }
+                    if let Err(e) = self_clone
+                        .query(update_query)
+                        .bind(("id", record_id))
+                        .bind(("access_count", access_count))
+                        .bind(("last_accessed", last_accessed.map(|dt| dt.to_rfc3339())))
+                        .await
+                    {
+                        tracing::warn!("Failed to update lifecycle in background: {}", e);
+                    }
+                });
             }
         }
 

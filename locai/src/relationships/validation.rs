@@ -54,117 +54,109 @@ impl SchemaValidator {
         }
 
         // Check required fields (for objects)
-        if let Some(required) = schema_obj.get("required") {
-            if let Some(required_array) = required.as_array() {
-                if let Some(data_obj) = data.as_object() {
-                    for field in required_array {
-                        if let Some(field_name) = field.as_str() {
-                            if !data_obj.contains_key(field_name) {
-                                return Err(ValidationError::MissingRequiredField(
-                                    field_name.to_string(),
-                                ));
-                            }
-                        }
+        if let Some(required) = schema_obj.get("required")
+            && let Some(required_array) = required.as_array()
+        {
+            if let Some(data_obj) = data.as_object() {
+                for field in required_array {
+                    if let Some(field_name) = field.as_str()
+                        && !data_obj.contains_key(field_name)
+                    {
+                        return Err(ValidationError::MissingRequiredField(
+                            field_name.to_string(),
+                        ));
                     }
-                } else {
-                    return Err(ValidationError::ValidationFailed(
-                        "Required fields specified but data is not an object".to_string(),
-                    ));
                 }
+            } else {
+                return Err(ValidationError::ValidationFailed(
+                    "Required fields specified but data is not an object".to_string(),
+                ));
             }
         }
 
         // Check properties (for objects)
-        if let Some(properties) = schema_obj.get("properties") {
-            if let Some(properties_obj) = properties.as_object() {
-                if let Some(data_obj) = data.as_object() {
-                    for (prop_name, prop_schema) in properties_obj {
-                        if let Some(prop_data) = data_obj.get(prop_name) {
-                            Self::validate_against_schema(prop_schema, prop_data)?;
-                        }
-                    }
+        if let Some(properties) = schema_obj.get("properties")
+            && let Some(properties_obj) = properties.as_object()
+            && let Some(data_obj) = data.as_object()
+        {
+            for (prop_name, prop_schema) in properties_obj {
+                if let Some(prop_data) = data_obj.get(prop_name) {
+                    Self::validate_against_schema(prop_schema, prop_data)?;
                 }
             }
         }
 
         // Check items (for arrays)
-        if let Some(items) = schema_obj.get("items") {
-            if let Some(data_array) = data.as_array() {
-                for item in data_array {
-                    Self::validate_against_schema(items, item)?;
-                }
+        if let Some(items) = schema_obj.get("items")
+            && let Some(data_array) = data.as_array()
+        {
+            for item in data_array {
+                Self::validate_against_schema(items, item)?;
             }
         }
 
         // Check enum constraint
-        if let Some(enum_values) = schema_obj.get("enum") {
-            if let Some(enum_array) = enum_values.as_array() {
-                if !enum_array.iter().any(|v| v == data) {
-                    let valid_values: Vec<String> = enum_array
-                        .iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                        .collect();
-                    return Err(ValidationError::ValidationFailed(format!(
-                        "Value must be one of: {}",
-                        valid_values.join(", ")
-                    )));
-                }
-            }
+        if let Some(enum_values) = schema_obj.get("enum")
+            && let Some(enum_array) = enum_values.as_array()
+            && !enum_array.iter().any(|v| v == data)
+        {
+            let valid_values: Vec<String> = enum_array
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect();
+            return Err(ValidationError::ValidationFailed(format!(
+                "Value must be one of: {}",
+                valid_values.join(", ")
+            )));
         }
 
         // Check minimum/maximum for numbers
         if data.is_number() {
-            if let Some(minimum) = schema_obj.get("minimum") {
-                if let Some(min_val) = minimum.as_f64() {
-                    if let Some(data_val) = data.as_f64() {
-                        if data_val < min_val {
-                            return Err(ValidationError::ValidationFailed(format!(
-                                "Value {} is less than minimum {}",
-                                data_val, min_val
-                            )));
-                        }
-                    }
-                }
+            if let Some(minimum) = schema_obj.get("minimum")
+                && let Some(min_val) = minimum.as_f64()
+                && let Some(data_val) = data.as_f64()
+                && data_val < min_val
+            {
+                return Err(ValidationError::ValidationFailed(format!(
+                    "Value {} is less than minimum {}",
+                    data_val, min_val
+                )));
             }
 
-            if let Some(maximum) = schema_obj.get("maximum") {
-                if let Some(max_val) = maximum.as_f64() {
-                    if let Some(data_val) = data.as_f64() {
-                        if data_val > max_val {
-                            return Err(ValidationError::ValidationFailed(format!(
-                                "Value {} is greater than maximum {}",
-                                data_val, max_val
-                            )));
-                        }
-                    }
-                }
+            if let Some(maximum) = schema_obj.get("maximum")
+                && let Some(max_val) = maximum.as_f64()
+                && let Some(data_val) = data.as_f64()
+                && data_val > max_val
+            {
+                return Err(ValidationError::ValidationFailed(format!(
+                    "Value {} is greater than maximum {}",
+                    data_val, max_val
+                )));
             }
         }
 
         // Check minLength/maxLength for strings
         if let Some(s) = data.as_str() {
-            if let Some(min_length) = schema_obj.get("minLength") {
-                if let Some(min_val) = min_length.as_u64() {
-                    if (s.len() as u64) < min_val {
-                        return Err(ValidationError::ValidationFailed(format!(
-                            "String length {} is less than minimum {}",
-                            s.len(),
-                            min_val
-                        )));
-                    }
-                }
+            if let Some(min_length) = schema_obj.get("minLength")
+                && let Some(min_val) = min_length.as_u64()
+                && (s.len() as u64) < min_val
+            {
+                return Err(ValidationError::ValidationFailed(format!(
+                    "String length {} is less than minimum {}",
+                    s.len(),
+                    min_val
+                )));
             }
 
-            if let Some(max_length) = schema_obj.get("maxLength") {
-                if let Some(max_val) = max_length.as_u64() {
-                    if (s.len() as u64) > max_val {
-                        return Err(ValidationError::ValidationFailed(format!(
-                            "String length {} exceeds maximum {}",
-                            s.len(),
-                            max_val
-                        )));
-                    }
-                }
+            if let Some(max_length) = schema_obj.get("maxLength")
+                && let Some(max_val) = max_length.as_u64()
+                && (s.len() as u64) > max_val
+            {
+                return Err(ValidationError::ValidationFailed(format!(
+                    "String length {} exceeds maximum {}",
+                    s.len(),
+                    max_val
+                )));
             }
         }
 
@@ -190,10 +182,10 @@ impl SchemaValidator {
             Ok(())
         } else if expected_type == "integer" && data.is_number() {
             // Special case: integer type
-            if let Some(num) = data.as_f64() {
-                if num.fract() == 0.0 {
-                    return Ok(());
-                }
+            if let Some(num) = data.as_f64()
+                && num.fract() == 0.0
+            {
+                return Ok(());
             }
             Err(ValidationError::TypeMismatch {
                 field: "value".to_string(),
@@ -219,21 +211,19 @@ impl SchemaValidator {
         }
 
         // Ensure schema has valid type if specified
-        if let Some(schema_obj) = schema_value.as_object() {
-            if let Some(type_field) = schema_obj.get("type") {
-                if let Some(type_str) = type_field.as_str() {
-                    match type_str {
-                        "null" | "boolean" | "object" | "array" | "number" | "string"
-                        | "integer" => {
-                            // Valid types
-                        }
-                        _ => {
-                            return Err(ValidationError::InvalidSchema(format!(
-                                "Invalid type: {}",
-                                type_str
-                            )));
-                        }
-                    }
+        if let Some(schema_obj) = schema_value.as_object()
+            && let Some(type_field) = schema_obj.get("type")
+            && let Some(type_str) = type_field.as_str()
+        {
+            match type_str {
+                "null" | "boolean" | "object" | "array" | "number" | "string" | "integer" => {
+                    // Valid types
+                }
+                _ => {
+                    return Err(ValidationError::InvalidSchema(format!(
+                        "Invalid type: {}",
+                        type_str
+                    )));
                 }
             }
         }

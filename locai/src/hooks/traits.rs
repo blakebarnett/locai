@@ -27,19 +27,14 @@ use crate::models::Memory;
 use async_trait::async_trait;
 
 /// Result type for hook execution
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum HookResult {
     /// Continue with the memory operation
+    #[default]
     Continue,
     /// Veto the operation (only valid for `before_memory_deleted`)
     /// Contains a reason for the veto
     Veto(String),
-}
-
-impl Default for HookResult {
-    fn default() -> Self {
-        HookResult::Continue
-    }
 }
 
 /// Trait for memory operation hooks

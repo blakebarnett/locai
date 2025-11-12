@@ -75,10 +75,9 @@ impl GroupDynamicsAnalyzer {
             if relationship.involves_entity(entity)
                 && relationship.intensity > 0.5
                 && relationship.trust_level > 0.6
+                && let Some(other) = relationship.get_other_entity(entity)
             {
-                if let Some(other) = relationship.get_other_entity(entity) {
-                    allies.push(other.to_string());
-                }
+                allies.push(other.to_string());
             }
         }
 
@@ -205,16 +204,16 @@ impl GroupDynamicsAnalyzer {
     /// Determine the type of conflict
     fn determine_conflict_type(relationship: &Relationship) -> Result<ConflictType> {
         // Check metadata for conflict type hints
-        if let Some(conflict_type) = relationship.metadata.get("conflict_type") {
-            if let Some(type_str) = conflict_type.as_str() {
-                return match type_str.to_lowercase().as_str() {
-                    "romantic" => Ok(ConflictType::Romantic),
-                    "resource" => Ok(ConflictType::Resource),
-                    "ideological" => Ok(ConflictType::Ideological),
-                    "professional" => Ok(ConflictType::Professional),
-                    _ => Ok(ConflictType::Personal),
-                };
-            }
+        if let Some(conflict_type) = relationship.metadata.get("conflict_type")
+            && let Some(type_str) = conflict_type.as_str()
+        {
+            return match type_str.to_lowercase().as_str() {
+                "romantic" => Ok(ConflictType::Romantic),
+                "resource" => Ok(ConflictType::Resource),
+                "ideological" => Ok(ConflictType::Ideological),
+                "professional" => Ok(ConflictType::Professional),
+                _ => Ok(ConflictType::Personal),
+            };
         }
 
         // Infer from relationship type and history

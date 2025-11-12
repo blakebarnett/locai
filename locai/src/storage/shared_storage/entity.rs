@@ -181,15 +181,15 @@ where
 
         // Add filter conditions
         if let Some(f) = &filter {
-            if let Some(ids) = &f.ids {
-                if !ids.is_empty() {
-                    let id_list = ids
-                        .iter()
-                        .map(|id| format!("entity:{}", id))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    conditions.push(format!("id IN [{}]", id_list));
-                }
+            if let Some(ids) = &f.ids
+                && !ids.is_empty()
+            {
+                let id_list = ids
+                    .iter()
+                    .map(|id| format!("entity:{}", id))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                conditions.push(format!("id IN [{}]", id_list));
             }
 
             if let Some(entity_type) = &f.entity_type {

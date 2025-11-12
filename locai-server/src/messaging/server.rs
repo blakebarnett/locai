@@ -117,15 +117,15 @@ impl MessagingServer {
     pub async fn authenticate_connection(&self, connection_id: &str, app_id: &str) -> Result<bool> {
         let mut connections = self.connections.write().await;
 
-        if let Some(app_info) = connections.get_mut(connection_id) {
-            if app_info.app_id == app_id {
-                app_info.authenticated = true;
-                info!(
-                    "Authenticated connection {} for app {}",
-                    connection_id, app_id
-                );
-                return Ok(true);
-            }
+        if let Some(app_info) = connections.get_mut(connection_id)
+            && app_info.app_id == app_id
+        {
+            app_info.authenticated = true;
+            info!(
+                "Authenticated connection {} for app {}",
+                connection_id, app_id
+            );
+            return Ok(true);
         }
 
         warn!(
@@ -201,11 +201,11 @@ impl MessagingServer {
         tokio::spawn(async move {
             let mut global_rx = global_receiver;
             while let Ok(message) = global_rx.recv().await {
-                if Self::message_matches_filter(&message, &filter_clone) {
-                    if let Err(e) = sender_clone.send(message) {
-                        debug!("Failed to forward message to subscription: {}", e);
-                        break;
-                    }
+                if Self::message_matches_filter(&message, &filter_clone)
+                    && let Err(e) = sender_clone.send(message)
+                {
+                    debug!("Failed to forward message to subscription: {}", e);
+                    break;
                 }
             }
         });
@@ -238,34 +238,33 @@ impl MessagingServer {
     /// Check if a message matches a filter
     fn message_matches_filter(message: &Message, filter: &MessageFilter) -> bool {
         // Check topic patterns
-        if let Some(patterns) = &filter.topic_patterns {
-            if !patterns
+        if let Some(patterns) = &filter.topic_patterns
+            && !patterns
                 .iter()
                 .any(|pattern| Self::topic_matches_pattern(&message.topic, pattern))
-            {
-                return false;
-            }
+        {
+            return false;
         }
 
         // Check exact topics
-        if let Some(topics) = &filter.topics {
-            if !topics.contains(&message.topic) {
-                return false;
-            }
+        if let Some(topics) = &filter.topics
+            && !topics.contains(&message.topic)
+        {
+            return false;
         }
 
         // Check senders
-        if let Some(senders) = &filter.senders {
-            if !senders.contains(&message.sender) {
-                return false;
-            }
+        if let Some(senders) = &filter.senders
+            && !senders.contains(&message.sender)
+        {
+            return false;
         }
 
         // Check source app (for cross-app messaging)
-        if let Some(source_app) = &filter.source_app {
-            if &message.sender != source_app {
-                return false;
-            }
+        if let Some(source_app) = &filter.source_app
+            && &message.sender != source_app
+        {
+            return false;
         }
 
         // Check recipients
@@ -278,35 +277,35 @@ impl MessagingServer {
         }
 
         // Check time range
-        if let Some((start, end)) = &filter.time_range {
-            if message.timestamp < *start || message.timestamp > *end {
-                return false;
-            }
+        if let Some((start, end)) = &filter.time_range
+            && (message.timestamp < *start || message.timestamp > *end)
+        {
+            return false;
         }
 
         // Check importance range
         if let Some((min, max)) = &filter.importance_range {
-            if let Some(importance) = message.importance {
-                if importance < *min || importance > *max {
-                    return false;
-                }
-            } else {
+            if let Some(importance) = message.importance
+                && (importance < *min || importance > *max)
+            {
+                return false;
+            } else if message.importance.is_none() {
                 return false;
             }
         }
 
         // Check tags (must have all)
-        if let Some(tags) = &filter.tags {
-            if !tags.iter().all(|tag| message.has_tag(tag)) {
-                return false;
-            }
+        if let Some(tags) = &filter.tags
+            && !tags.iter().all(|tag| message.has_tag(tag))
+        {
+            return false;
         }
 
         // Check tags (must have any)
-        if let Some(tags_any) = &filter.tags_any {
-            if !tags_any.iter().any(|tag| message.has_tag(tag)) {
-                return false;
-            }
+        if let Some(tags_any) = &filter.tags_any
+            && !tags_any.iter().any(|tag| message.has_tag(tag))
+        {
+            return false;
         }
 
         // Check headers

@@ -144,14 +144,14 @@ impl RelationshipManager {
             relationship.relationship_type = new_type.clone();
         } else {
             // Let the analyzer determine if type should change
-            if let Ok(suggested_type) = self.analyzer.determine_relationship_type(&relationship) {
-                if suggested_type != relationship.relationship_type {
-                    debug!(
-                        "Relationship type evolved from {:?} to {:?} for {} and {}",
-                        relationship.relationship_type, suggested_type, entity_a, entity_b
-                    );
-                    relationship.relationship_type = suggested_type;
-                }
+            if let Ok(suggested_type) = self.analyzer.determine_relationship_type(&relationship)
+                && suggested_type != relationship.relationship_type
+            {
+                debug!(
+                    "Relationship type evolved from {:?} to {:?} for {} and {}",
+                    relationship.relationship_type, suggested_type, entity_a, entity_b
+                );
+                relationship.relationship_type = suggested_type;
             }
         }
 
@@ -208,14 +208,12 @@ impl RelationshipManager {
 
         let mut relationships = Vec::new();
         for memory in memories {
-            if let Some(relationship_data) = memory.properties.get("relationship_data") {
-                if let Ok(relationship) =
+            if let Some(relationship_data) = memory.properties.get("relationship_data")
+                && let Ok(relationship) =
                     serde_json::from_value::<Relationship>(relationship_data.clone())
-                {
-                    if relationship.involves_entity(entity) {
-                        relationships.push(relationship);
-                    }
-                }
+                && relationship.involves_entity(entity)
+            {
+                relationships.push(relationship);
             }
         }
 
@@ -287,16 +285,13 @@ impl RelationshipManager {
             .await?;
 
         for memory in memories {
-            if let Some(relationship_data) = memory.properties.get("relationship_data") {
-                if let Ok(relationship) =
+            if let Some(relationship_data) = memory.properties.get("relationship_data")
+                && let Ok(relationship) =
                     serde_json::from_value::<Relationship>(relationship_data.clone())
-                {
-                    if (relationship.entity_a == entity_a && relationship.entity_b == entity_b)
-                        || (relationship.entity_a == entity_b && relationship.entity_b == entity_a)
-                    {
-                        return Ok(relationship);
-                    }
-                }
+                && ((relationship.entity_a == entity_a && relationship.entity_b == entity_b)
+                    || (relationship.entity_a == entity_b && relationship.entity_b == entity_a))
+            {
+                return Ok(relationship);
             }
         }
 
@@ -319,32 +314,31 @@ impl RelationshipManager {
             .await?;
 
         for memory in memories {
-            if let Some(stored_id) = memory.properties.get("relationship_id") {
-                if let Some(id_str) = stored_id.as_str() {
-                    if id_str == relationship.id {
-                        // Update the memory with new relationship data
-                        let mut updated_memory = memory.clone();
-                        if let serde_json::Value::Object(ref mut map) = updated_memory.properties {
-                            map.insert(
-                                "relationship_data".to_string(),
-                                serde_json::to_value(relationship).unwrap_or_default(),
-                            );
-                        }
-
-                        // Update memory content
-                        updated_memory.content = format!(
-                            "Relationship between {} and {}: {} (intensity: {:.2}, trust: {:.2})",
-                            relationship.entity_a,
-                            relationship.entity_b,
-                            relationship.relationship_type,
-                            relationship.intensity,
-                            relationship.trust_level
-                        );
-
-                        self.memory_manager.update_memory(updated_memory).await?;
-                        return Ok(());
-                    }
+            if let Some(stored_id) = memory.properties.get("relationship_id")
+                && let Some(id_str) = stored_id.as_str()
+                && id_str == relationship.id
+            {
+                // Update the memory with new relationship data
+                let mut updated_memory = memory.clone();
+                if let serde_json::Value::Object(ref mut map) = updated_memory.properties {
+                    map.insert(
+                        "relationship_data".to_string(),
+                        serde_json::to_value(relationship).unwrap_or_default(),
+                    );
                 }
+
+                // Update memory content
+                updated_memory.content = format!(
+                    "Relationship between {} and {}: {} (intensity: {:.2}, trust: {:.2})",
+                    relationship.entity_a,
+                    relationship.entity_b,
+                    relationship.relationship_type,
+                    relationship.intensity,
+                    relationship.trust_level
+                );
+
+                self.memory_manager.update_memory(updated_memory).await?;
+                return Ok(());
             }
         }
 

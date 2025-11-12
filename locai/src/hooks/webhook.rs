@@ -182,7 +182,7 @@ impl Webhook {
     ) -> Result<(), String> {
         let request_builder = match self.method.to_uppercase().as_str() {
             "PUT" => client.put(&self.url),
-            "POST" | _ => client.post(&self.url),
+            _ => client.post(&self.url),
         };
 
         let mut request_builder = request_builder.json(payload);

@@ -51,7 +51,7 @@ where
         let counter = self
             .counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        counter % self.rate == 0
+        counter.is_multiple_of(self.rate)
     }
 }
 

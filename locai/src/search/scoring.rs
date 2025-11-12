@@ -119,7 +119,7 @@ pub struct ScoringConfig {
     /// - Linear: hours until boost reaches 0
     /// - Exponential: decay constant (higher = faster decay)
     /// - Logarithmic: decay constant (higher = faster decay)
-    /// Default: 0.1 (slow decay, favors long-term relevance)
+    ///   Default: 0.1 (slow decay, favors long-term relevance)
     pub decay_rate: f32,
 }
 

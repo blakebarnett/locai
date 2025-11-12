@@ -118,25 +118,25 @@ async fn main() -> Result<()> {
     }
 
     // Initialize authentication if enabled
-    if server_config.enable_auth {
-        if let Err(e) = initialize_auth(&mut app_state, server_config.clone()).await {
-            warn!(
-                "Failed to initialize authentication: {}. Auth may not work properly.",
-                e
-            );
-        }
+    if server_config.enable_auth
+        && let Err(e) = initialize_auth(&mut app_state, server_config.clone()).await
+    {
+        warn!(
+            "Failed to initialize authentication: {}. Auth may not work properly.",
+            e
+        );
     }
 
     let app_state = Arc::new(app_state);
 
     // Initialize live queries if enabled and using SurrealDB
-    if server_config.enable_live_queries {
-        if let Err(e) = setup_live_queries(app_state.clone()).await {
-            warn!(
-                "Failed to setup live queries: {}. Continuing without live query support.",
-                e
-            );
-        }
+    if server_config.enable_live_queries
+        && let Err(e) = setup_live_queries(app_state.clone()).await
+    {
+        warn!(
+            "Failed to setup live queries: {}. Continuing without live query support.",
+            e
+        );
     }
 
     // Create the router with all API endpoints

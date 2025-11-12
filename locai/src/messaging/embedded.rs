@@ -121,16 +121,12 @@ impl EmbeddedMessaging {
             let stream = async_stream::stream! {
                 while let Ok(event) = receiver.recv().await {
                     // Only process memory table events
-                    if event.table == "memory" {
-                        if let Some(message) = convert_db_event_to_message(&event).await {
-                            // Apply memory-level filtering first
-                            if matches_memory_filter(&message, &memory_filter) {
-                                // Apply message-level filtering
-                                if crate::messaging::stream::utils::matches_filter(&message, &filter_clone) {
-                                    yield Ok(message);
-                                }
-                            }
-                        }
+                    if event.table == "memory"
+                        && let Some(message) = convert_db_event_to_message(&event).await
+                        && matches_memory_filter(&message, &memory_filter)
+                        && crate::messaging::stream::utils::matches_filter(&message, &filter_clone)
+                    {
+                        yield Ok(message);
                     }
                 }
             };
@@ -427,23 +423,23 @@ fn matches_memory_filter(
     }
 
     // Check source filter (maps to sender)
-    if let Some(source) = &filter.source {
-        if source != &message.sender {
-            return false;
-        }
+    if let Some(source) = &filter.source
+        && source != &message.sender
+    {
+        return false;
     }
 
     // Check time range
-    if let Some(created_after) = &filter.created_after {
-        if message.timestamp < *created_after {
-            return false;
-        }
+    if let Some(created_after) = &filter.created_after
+        && message.timestamp < *created_after
+    {
+        return false;
     }
 
-    if let Some(created_before) = &filter.created_before {
-        if message.timestamp > *created_before {
-            return false;
-        }
+    if let Some(created_before) = &filter.created_before
+        && message.timestamp > *created_before
+    {
+        return false;
     }
 
     // Check content filter

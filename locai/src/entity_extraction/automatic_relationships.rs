@@ -89,10 +89,10 @@ impl AutomaticRelationshipCreator {
         let mut relationship_count = 0;
 
         for method in &self.config.methods {
-            if let Some(max_rels) = self.config.max_relationships_per_memory {
-                if relationship_count >= max_rels {
-                    break;
-                }
+            if let Some(max_rels) = self.config.max_relationships_per_memory
+                && relationship_count >= max_rels
+            {
+                break;
             }
 
             let relationships = match method {
@@ -122,10 +122,10 @@ impl AutomaticRelationshipCreator {
 
             for rel in relationships {
                 if rel.confidence >= self.config.min_confidence {
-                    if let Some(max_rels) = self.config.max_relationships_per_memory {
-                        if relationship_count >= max_rels {
-                            break;
-                        }
+                    if let Some(max_rels) = self.config.max_relationships_per_memory
+                        && relationship_count >= max_rels
+                    {
+                        break;
                     }
 
                     let relationship = self.create_relationship_record(rel)?;

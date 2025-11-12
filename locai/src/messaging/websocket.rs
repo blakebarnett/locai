@@ -430,13 +430,13 @@ impl WebSocketClient {
                 subscription_id,
             } => {
                 let subs = subscriptions.read().await;
-                if let Some(sub_info) = subs.get(subscription_id) {
-                    if let Err(e) = sub_info.sender.send(message.clone()) {
-                        debug!(
-                            "Failed to broadcast message to subscription {}: {}",
-                            subscription_id, e
-                        );
-                    }
+                if let Some(sub_info) = subs.get(subscription_id)
+                    && let Err(e) = sub_info.sender.send(message.clone())
+                {
+                    debug!(
+                        "Failed to broadcast message to subscription {}: {}",
+                        subscription_id, e
+                    );
                 }
             }
 
@@ -456,10 +456,10 @@ impl WebSocketClient {
 
                 if let Some(corr_id) = correlation_id {
                     let mut handlers = response_handlers.write().await;
-                    if let Some(sender) = handlers.remove(corr_id) {
-                        if let Err(e) = sender.send(msg).await {
-                            debug!("Failed to send response to handler: {}", e);
-                        }
+                    if let Some(sender) = handlers.remove(corr_id)
+                        && let Err(e) = sender.send(msg).await
+                    {
+                        debug!("Failed to send response to handler: {}", e);
                     }
                 }
             }

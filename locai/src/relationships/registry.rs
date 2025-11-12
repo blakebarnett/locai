@@ -199,12 +199,12 @@ impl RelationshipTypeRegistry {
         }
 
         // If this type has an inverse, verify the inverse type name is valid
-        if let Some(ref inverse_name) = def.inverse {
-            if inverse_name.trim().is_empty() {
-                return Err(RegistryError::InvalidTypeName(
-                    "Inverse type name cannot be empty".to_string(),
-                ));
-            }
+        if let Some(ref inverse_name) = def.inverse
+            && inverse_name.trim().is_empty()
+        {
+            return Err(RegistryError::InvalidTypeName(
+                "Inverse type name cannot be empty".to_string(),
+            ));
         }
 
         types.insert(def.name.clone(), def.clone());

@@ -294,15 +294,12 @@ impl GraphOperations {
                         {
                             for related_memory_id in related_memory_ids {
                                 // Don't include the original memory
-                                if related_memory_id != memory_id {
-                                    if let Ok(Some(memory)) =
+                                if related_memory_id != memory_id
+                                    && let Ok(Some(memory)) =
                                         self.storage.get_memory(&related_memory_id).await
-                                    {
-                                        // Check if we already have this memory to avoid duplicates
-                                        if !results.iter().any(|m| m.id == memory.id) {
-                                            results.push(memory);
-                                        }
-                                    }
+                                    && !results.iter().any(|m| m.id == memory.id)
+                                {
+                                    results.push(memory);
                                 }
                             }
                         }
@@ -319,14 +316,12 @@ impl GraphOperations {
                     // Limit to avoid too many results
                     if let Ok(related_memory_ids) = self.get_memories_for_entity(&entity.id).await {
                         for related_memory_id in related_memory_ids.into_iter().take(10) {
-                            if related_memory_id != memory_id {
-                                if let Ok(Some(memory)) =
+                            if related_memory_id != memory_id
+                                && let Ok(Some(memory)) =
                                     self.storage.get_memory(&related_memory_id).await
-                                {
-                                    if !results.iter().any(|m| m.id == memory.id) {
-                                        results.push(memory);
-                                    }
-                                }
+                                && !results.iter().any(|m| m.id == memory.id)
+                            {
+                                results.push(memory);
                             }
                         }
                     }

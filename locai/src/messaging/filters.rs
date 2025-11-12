@@ -140,10 +140,10 @@ pub fn convert_message_filter_to_memory_filter(
     }
 
     // Convert sender filter to source filter
-    if let Some(senders) = &filter.senders {
-        if !senders.is_empty() {
-            memory_filter.source = Some(senders[0].clone());
-        }
+    if let Some(senders) = &filter.senders
+        && !senders.is_empty()
+    {
+        memory_filter.source = Some(senders[0].clone());
     }
 
     // Convert time range

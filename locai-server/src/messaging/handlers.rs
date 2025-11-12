@@ -31,11 +31,11 @@ pub async fn handle_messaging_websocket(socket: WebSocket, messaging_server: Arc
         connection_id: connection_id.clone(),
     };
 
-    if let Ok(msg_text) = serde_json::to_string(&connect_msg) {
-        if sender.send(WsMessage::Text(msg_text.into())).await.is_err() {
-            warn!("Failed to send connection message to {}", connection_id);
-            return;
-        }
+    if let Ok(msg_text) = serde_json::to_string(&connect_msg)
+        && sender.send(WsMessage::Text(msg_text.into())).await.is_err()
+    {
+        warn!("Failed to send connection message to {}", connection_id);
+        return;
     }
 
     // Message handling loop
@@ -58,13 +58,12 @@ pub async fn handle_messaging_websocket(socket: WebSocket, messaging_server: Arc
                                     &mut subscriptions,
                                 ).await;
 
-                                if let Some(response_msg) = response {
-                                    if let Ok(response_text) = serde_json::to_string(&response_msg) {
-                                        if sender.send(WsMessage::Text(response_text.into())).await.is_err() {
-                                            error!("Failed to send response to {}", connection_id);
-                                            break;
-                                        }
-                                    }
+                                if let Some(response_msg) = response
+                                    && let Ok(response_text) = serde_json::to_string(&response_msg)
+                                    && sender.send(WsMessage::Text(response_text.into())).await.is_err()
+                                {
+                                    error!("Failed to send response to {}", connection_id);
+                                    break;
                                 }
                             }
                             Err(e) => {
@@ -113,11 +112,11 @@ pub async fn handle_messaging_websocket(socket: WebSocket, messaging_server: Arc
                             subscription_id,
                         };
 
-                        if let Ok(msg_text) = serde_json::to_string(&incoming_msg) {
-                            if sender.send(WsMessage::Text(msg_text.into())).await.is_err() {
-                                error!("Failed to forward subscription message to {}", connection_id);
-                                break;
-                            }
+                        if let Ok(msg_text) = serde_json::to_string(&incoming_msg)
+                            && sender.send(WsMessage::Text(msg_text.into())).await.is_err()
+                        {
+                            error!("Failed to forward subscription message to {}", connection_id);
+                            break;
                         }
                     }
                     None => {
@@ -132,10 +131,10 @@ pub async fn handle_messaging_websocket(socket: WebSocket, messaging_server: Arc
     // Cleanup
     debug!("Cleaning up connection {}", connection_id);
 
-    if let Some(_app_id) = app_id {
-        if let Err(e) = messaging_server.remove_connection(&connection_id).await {
-            error!("Failed to remove connection {}: {}", connection_id, e);
-        }
+    if let Some(_app_id) = app_id
+        && let Err(e) = messaging_server.remove_connection(&connection_id).await
+    {
+        error!("Failed to remove connection {}: {}", connection_id, e);
     }
 
     info!("WebSocket connection {} cleanup complete", connection_id);

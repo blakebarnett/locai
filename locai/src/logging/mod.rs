@@ -64,10 +64,10 @@ pub fn init(config: &LoggingConfig) -> Result<()> {
     };
 
     // If the error is "already set", ignore it
-    if let Err(LogError::SubscriberError(ref e)) = result {
-        if e.to_string().contains("SetGlobalDefaultError") {
-            return Ok(());
-        }
+    if let Err(LogError::SubscriberError(ref e)) = result
+        && e.to_string().contains("SetGlobalDefaultError")
+    {
+        return Ok(());
     }
 
     result
@@ -161,10 +161,10 @@ fn create_non_blocking_file(
     let path = path.as_ref();
 
     // Ensure the directory exists
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.exists()
+    {
+        std::fs::create_dir_all(parent)?;
     }
 
     // Create a rolling file appender

@@ -175,12 +175,12 @@ async fn handle_websocket(socket: WebSocket, state: Arc<AppState>) {
         connection_id: connection_id.to_string(),
     };
 
-    if let Ok(msg_text) = serde_json::to_string(&connect_msg) {
-        if sender.send(Message::Text(msg_text.into())).await.is_err() {
-            warn!("Failed to send connection message to {}", connection_id);
-            state.remove_websocket_connection(&connection_id);
-            return;
-        }
+    if let Ok(msg_text) = serde_json::to_string(&connect_msg)
+        && sender.send(Message::Text(msg_text.into())).await.is_err()
+    {
+        warn!("Failed to send connection message to {}", connection_id);
+        state.remove_websocket_connection(&connection_id);
+        return;
     }
 
     // Spawn task to handle incoming messages from client
@@ -263,11 +263,11 @@ async fn handle_websocket(socket: WebSocket, state: Arc<AppState>) {
                 msg = global_rx.recv() => {
                     match msg {
                         Ok(ws_msg) => {
-                            if let Ok(msg_text) = serde_json::to_string(&ws_msg) {
-                                if sender.send(Message::Text(msg_text.into())).await.is_err() {
-                                    error!("Failed to send message to WebSocket {}", connection_id);
-                                    break;
-                                }
+                            if let Ok(msg_text) = serde_json::to_string(&ws_msg)
+                                && sender.send(Message::Text(msg_text.into())).await.is_err()
+                            {
+                                error!("Failed to send message to WebSocket {}", connection_id);
+                                break;
                             }
                         }
                         Err(broadcast::error::RecvError::Closed) => {
@@ -285,11 +285,11 @@ async fn handle_websocket(socket: WebSocket, state: Arc<AppState>) {
                 msg = rx.recv() => {
                     match msg {
                         Ok(ws_msg) => {
-                            if let Ok(msg_text) = serde_json::to_string(&ws_msg) {
-                                if sender.send(Message::Text(msg_text.into())).await.is_err() {
-                                    error!("Failed to send message to WebSocket {}", connection_id);
-                                    break;
-                                }
+                            if let Ok(msg_text) = serde_json::to_string(&ws_msg)
+                                && sender.send(Message::Text(msg_text.into())).await.is_err()
+                            {
+                                error!("Failed to send message to WebSocket {}", connection_id);
+                                break;
                             }
                         }
                         Err(broadcast::error::RecvError::Closed) => {

@@ -830,7 +830,7 @@ pub struct ScoringConfigDto {
     /// - Linear: hours until boost reaches 0
     /// - Exponential: decay constant (higher = faster decay)
     /// - Logarithmic: decay constant (higher = faster decay)
-    /// Default: 0.1 (slow decay, favors long-term relevance)
+    ///   Default: 0.1 (slow decay, favors long-term relevance)
     #[serde(default = "default_decay_rate")]
     #[schema(example = 0.1)]
     pub decay_rate: f32,
@@ -876,6 +876,7 @@ fn default_decay_rate() -> f32 {
 /// Webhook event type
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
+#[allow(clippy::enum_variant_names)]
 pub enum WebhookEvent {
     /// Memory created event
     #[serde(rename = "memory.created")]

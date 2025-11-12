@@ -127,31 +127,31 @@ impl AppState {
                 } => {
                     if let Some(ref filter) = filters.memory_filter {
                         // Check memory type filter
-                        if let Some(ref filter_type) = filter.memory_type {
-                            if memory_type != filter_type {
-                                return false;
-                            }
+                        if let Some(ref filter_type) = filter.memory_type
+                            && memory_type != filter_type
+                        {
+                            return false;
                         }
 
                         // Check importance range filter
                         if let Some(imp) = importance {
-                            if let Some(min) = filter.importance_min {
-                                if *imp < min {
-                                    return false;
-                                }
+                            if let Some(min) = filter.importance_min
+                                && *imp < min
+                            {
+                                return false;
                             }
-                            if let Some(max) = filter.importance_max {
-                                if *imp > max {
-                                    return false;
-                                }
+                            if let Some(max) = filter.importance_max
+                                && *imp > max
+                            {
+                                return false;
                             }
                         }
 
                         // Check content contains filter
-                        if let Some(ref contains) = filter.content_contains {
-                            if !content.contains(contains) {
-                                return false;
-                            }
+                        if let Some(ref contains) = filter.content_contains
+                            && !content.contains(contains)
+                        {
+                            return false;
                         }
                     }
                 }
@@ -164,23 +164,23 @@ impl AppState {
                         // For updates, we can't filter by memory_type since it's not in the message
                         // Check importance range filter
                         if let Some(imp) = importance {
-                            if let Some(min) = filter.importance_min {
-                                if *imp < min {
-                                    return false;
-                                }
+                            if let Some(min) = filter.importance_min
+                                && *imp < min
+                            {
+                                return false;
                             }
-                            if let Some(max) = filter.importance_max {
-                                if *imp > max {
-                                    return false;
-                                }
+                            if let Some(max) = filter.importance_max
+                                && *imp > max
+                            {
+                                return false;
                             }
                         }
 
                         // Check content contains filter
-                        if let Some(ref contains) = filter.content_contains {
-                            if !content.contains(contains) {
-                                return false;
-                            }
+                        if let Some(ref contains) = filter.content_contains
+                            && !content.contains(contains)
+                        {
+                            return false;
                         }
                     }
                 }
@@ -196,10 +196,10 @@ impl AppState {
                 } => {
                     if let Some(ref filter) = filters.entity_filter {
                         // Check entity type filter
-                        if let Some(ref filter_type) = filter.entity_type {
-                            if entity_type != filter_type {
-                                return false;
-                            }
+                        if let Some(ref filter_type) = filter.entity_type
+                            && entity_type != filter_type
+                        {
+                            return false;
                         }
 
                         // Check properties contains filter
@@ -219,24 +219,24 @@ impl AppState {
                 } => {
                     if let Some(ref filter) = filters.relationship_filter {
                         // Check relationship type filter
-                        if let Some(ref filter_type) = filter.relationship_type {
-                            if relationship_type != filter_type {
-                                return false;
-                            }
+                        if let Some(ref filter_type) = filter.relationship_type
+                            && relationship_type != filter_type
+                        {
+                            return false;
                         }
 
                         // Check source ID filter
-                        if let Some(ref filter_source) = filter.source_id {
-                            if source_id != filter_source {
-                                return false;
-                            }
+                        if let Some(ref filter_source) = filter.source_id
+                            && source_id != filter_source
+                        {
+                            return false;
                         }
 
                         // Check target ID filter
-                        if let Some(ref filter_target) = filter.target_id {
-                            if target_id != filter_target {
-                                return false;
-                            }
+                        if let Some(ref filter_target) = filter.target_id
+                            && target_id != filter_target
+                        {
+                            return false;
                         }
                     }
                 }

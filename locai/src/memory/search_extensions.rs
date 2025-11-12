@@ -855,11 +855,10 @@ impl SearchExtensions {
                 .get("description")
                 .or_else(|| entity.properties.get("desc"))
                 .and_then(|v| v.as_str())
+                && description.to_lowercase().contains(&query_lower)
             {
-                if description.to_lowercase().contains(&query_lower) {
-                    score += 0.8;
-                    match_reasons.push("description match".to_string());
-                }
+                score += 0.8;
+                match_reasons.push("description match".to_string());
             }
 
             // Check entity type match
@@ -876,14 +875,12 @@ impl SearchExtensions {
                         && key != "desc"
                         && key != "text"
                         && key != "value"
+                        && let Some(str_value) = value.as_str()
+                        && str_value.to_lowercase().contains(&query_lower)
                     {
-                        if let Some(str_value) = value.as_str() {
-                            if str_value.to_lowercase().contains(&query_lower) {
-                                score += 0.3;
-                                match_reasons.push(format!("property {} match", key));
-                                break;
-                            }
-                        }
+                        score += 0.3;
+                        match_reasons.push(format!("property {} match", key));
+                        break;
                     }
                 }
             }
@@ -950,40 +947,40 @@ impl SearchExtensions {
         for entity_result in entity_results {
             if let UniversalSearchResult::Entity { entity, score, .. } = entity_result {
                 // Get memories that contain this entity
-                if let Ok(related_memory_ids) = self.get_memories_for_entity(&entity.id).await {
-                    if !related_memory_ids.is_empty() {
-                        // Create a graph centered on this entity
-                        let mut graph = MemoryGraph::new(entity.id.clone());
+                if let Ok(related_memory_ids) = self.get_memories_for_entity(&entity.id).await
+                    && !related_memory_ids.is_empty()
+                {
+                    // Create a graph centered on this entity
+                    let mut graph = MemoryGraph::new(entity.id.clone());
 
-                        // Add related memories to the graph
-                        for memory_id in related_memory_ids.iter().take(10) {
-                            if let Ok(Some(memory)) = self.storage.get_memory(memory_id).await {
-                                graph.add_memory(memory);
-                            }
+                    // Add related memories to the graph
+                    for memory_id in related_memory_ids.iter().take(10) {
+                        if let Ok(Some(memory)) = self.storage.get_memory(memory_id).await {
+                            graph.add_memory(memory);
                         }
+                    }
 
-                        // Get relationships involving this entity
-                        if let Ok(relationships) =
-                            self.storage.get_entity_relationships(&entity.id).await
-                        {
-                            for relationship in relationships.into_iter().take(20) {
-                                graph.add_relationship(relationship);
-                            }
+                    // Get relationships involving this entity
+                    if let Ok(relationships) =
+                        self.storage.get_entity_relationships(&entity.id).await
+                    {
+                        for relationship in relationships.into_iter().take(20) {
+                            graph.add_relationship(relationship);
                         }
+                    }
 
-                        // Only include graphs with meaningful content
-                        if graph.memories.len() > 1 || !graph.relationships.is_empty() {
-                            universal_results.push(UniversalSearchResult::Graph {
-                                center_id: entity.id.clone(),
-                                center_type: "entity".to_string(),
-                                graph,
-                                score: score.map(|s| (s * 0.8).min(1.0)), // Slightly lower score for graph results, capped at 1.0
-                                match_reason: format!(
-                                    "graph centered on entity '{}' matching query",
-                                    entity.id
-                                ),
-                            });
-                        }
+                    // Only include graphs with meaningful content
+                    if graph.memories.len() > 1 || !graph.relationships.is_empty() {
+                        universal_results.push(UniversalSearchResult::Graph {
+                            center_id: entity.id.clone(),
+                            center_type: "entity".to_string(),
+                            graph,
+                            score: score.map(|s| (s * 0.8).min(1.0)), // Slightly lower score for graph results, capped at 1.0
+                            match_reason: format!(
+                                "graph centered on entity '{}' matching query",
+                                entity.id
+                            ),
+                        });
                     }
                 }
             }

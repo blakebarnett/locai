@@ -47,13 +47,11 @@ impl MessagingIntegration {
                         let stream = async_stream::stream! {
                             while let Ok(event) = receiver.recv().await {
                                 // Only process memory table events
-                                if event.table == "memory" && (event.action == "CREATE" || event.action == "UPDATE") {
-                                    if let Some(memory) = convert_db_event_to_memory(&event) {
-                                        // Apply filtering
-                                        if matches_memory_filter_detailed(&memory, &filter_clone) {
-                                            yield Ok(memory);
-                                        }
-                                    }
+                                if event.table == "memory" && (event.action == "CREATE" || event.action == "UPDATE")
+                                    && let Some(memory) = convert_db_event_to_memory(&event)
+                                    && matches_memory_filter_detailed(&memory, &filter_clone)
+                                {
+                                    yield Ok(memory);
                                 }
                             }
                         };
@@ -446,30 +444,30 @@ fn matches_memory_filter_detailed(memory: &Memory, filter: &MemoryFilter) -> boo
     }
 
     // Check source
-    if let Some(filter_source) = &filter.source {
-        if &memory.source != filter_source {
-            return false;
-        }
+    if let Some(filter_source) = &filter.source
+        && &memory.source != filter_source
+    {
+        return false;
     }
 
     // Check tags
-    if let Some(filter_tags) = &filter.tags {
-        if !filter_tags.iter().all(|tag| memory.tags.contains(tag)) {
-            return false;
-        }
+    if let Some(filter_tags) = &filter.tags
+        && !filter_tags.iter().all(|tag| memory.tags.contains(tag))
+    {
+        return false;
     }
 
     // Check time range
-    if let Some(created_after) = &filter.created_after {
-        if memory.created_at < *created_after {
-            return false;
-        }
+    if let Some(created_after) = &filter.created_after
+        && memory.created_at < *created_after
+    {
+        return false;
     }
 
-    if let Some(created_before) = &filter.created_before {
-        if memory.created_at > *created_before {
-            return false;
-        }
+    if let Some(created_before) = &filter.created_before
+        && memory.created_at > *created_before
+    {
+        return false;
     }
 
     true
