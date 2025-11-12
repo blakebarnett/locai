@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test Suite
+  prepare-deps:
+    name: Prepare Dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -27,6 +27,34 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
+
+      - name: Build dependencies
+        env:
+          RUSTC_WRAPPER: ""
+        run: cargo build --workspace --all-features
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: prepare-deps
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld build-essential pkg-config libssl-dev
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Run cargo test
         env:
@@ -51,6 +79,7 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    needs: prepare-deps
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -67,6 +96,8 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Run cargo clippy
         env:
@@ -76,6 +107,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
+    needs: prepare-deps
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -90,6 +122,8 @@ jobs:
 
       - name: Cache dependencies  
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Run cargo check
         env:
@@ -99,6 +133,7 @@ jobs:
   examples:
     name: Examples
     runs-on: ubuntu-latest
+    needs: prepare-deps
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -113,6 +148,8 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Check examples compile
         env:
