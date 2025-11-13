@@ -200,6 +200,21 @@ impl MemoryOperations {
         // BYOE approach: Users provide their own embeddings via Memory.with_embedding()
         // No automatic embedding generation - embeddings are provided by the user when needed
 
+        // Validate embedding dimensions before storage (fail fast, don't silently skip in search)
+        // SurrealDB M-Tree index requires 1024 dimensions - reject mismatched dimensions early
+        if let Some(embedding) = &memory.embedding {
+            const EXPECTED_DIMENSIONS: usize = 1024;
+            if embedding.len() != EXPECTED_DIMENSIONS {
+                return Err(LocaiError::Memory(format!(
+                    "Embedding dimension mismatch: expected {} dimensions (required for SurrealDB M-Tree index), but got {}. \
+                     Vector search will fail with this dimension. Please provide a {}-dimensional embedding or omit the embedding field.",
+                    EXPECTED_DIMENSIONS,
+                    embedding.len(),
+                    EXPECTED_DIMENSIONS
+                )));
+            }
+        }
+
         // Store the memory first
         let created = self
             .storage
@@ -207,39 +222,8 @@ impl MemoryOperations {
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to store memory: {}", e)))?;
 
-        // Create Vector record if memory has an embedding
-        if let Some(embedding) = &created.embedding {
-            let vector = crate::storage::models::Vector {
-                id: format!("mem_{}", created.id),
-                vector: embedding.clone(),
-                dimension: embedding.len(),
-                metadata: serde_json::json!({
-                    "type": "memory",
-                    "memory_id": created.id,
-                    "memory_type": created.memory_type.to_string(),
-                    "content_preview": created.content.chars().take(100).collect::<String>(),
-                    "source": created.source,
-                    "tags": created.tags
-                }),
-                source_id: Some(created.id.clone()),
-                created_at: created.created_at,
-            };
-
-            // Add vector to storage, but don't fail memory storage if this fails
-            match self.storage.add_vector(vector).await {
-                Ok(_) => {
-                    tracing::debug!("Created vector record for memory {}", created.id);
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to create vector record for memory {}: {}",
-                        created.id,
-                        e
-                    );
-                    // Continue - memory storage should not fail because of vector creation failure
-                }
-            }
-        }
+        // Vector table removed - embeddings are stored directly in memory.embedding
+        // with M-Tree index for vector search. No separate vector records needed.
 
         // Extract entities if entity extraction is enabled
         if self.config.entity_extraction.enabled && !self.entity_extractors.is_empty() {
@@ -590,112 +574,28 @@ impl MemoryOperations {
     /// # Returns
     /// Whether the update was successful
     pub async fn update_memory(&self, memory: Memory) -> Result<bool> {
-        let updated = self
-            .storage
+        // Validate embedding dimensions before storage (fail fast, don't silently skip in search)
+        // SurrealDB M-Tree index requires 1024 dimensions - reject mismatched dimensions early
+        if let Some(embedding) = &memory.embedding {
+            const EXPECTED_DIMENSIONS: usize = 1024;
+            if embedding.len() != EXPECTED_DIMENSIONS {
+                return Err(LocaiError::Memory(format!(
+                    "Embedding dimension mismatch: expected {} dimensions (required for SurrealDB M-Tree index), but got {}. \
+                     Vector search will fail with this dimension. Please provide a {}-dimensional embedding or omit the embedding field.",
+                    EXPECTED_DIMENSIONS,
+                    embedding.len(),
+                    EXPECTED_DIMENSIONS
+                )));
+            }
+        }
+
+        self.storage
             .update_memory(memory)
             .await
             .map_err(|e| LocaiError::Storage(format!("Failed to update memory: {}", e)))?;
 
-        // Update or create vector record if memory has an embedding
-        if let Some(embedding) = &updated.embedding {
-            let vector_id = format!("mem_{}", updated.id);
-
-            // Check if vector already exists
-            match self.storage.get_vector(&vector_id).await {
-                Ok(Some(existing_vector)) => {
-                    // Update existing vector - preserve original creation time
-                    let new_vector = crate::storage::models::Vector {
-                        id: vector_id.clone(),
-                        vector: embedding.clone(),
-                        dimension: embedding.len(),
-                        metadata: serde_json::json!({
-                            "type": "memory",
-                            "memory_id": updated.id,
-                            "memory_type": updated.memory_type.to_string(),
-                            "content_preview": updated.content.chars().take(100).collect::<String>(),
-                            "source": updated.source,
-                            "tags": updated.tags
-                        }),
-                        source_id: Some(updated.id.clone()),
-                        created_at: existing_vector.created_at, // Preserve original vector creation time
-                    };
-
-                    match self.storage.upsert_vector(new_vector).await {
-                        Ok(_) => {
-                            tracing::debug!("Updated vector record for memory {}", updated.id);
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to update vector record for memory {}: {}",
-                                updated.id,
-                                e
-                            );
-                        }
-                    }
-                }
-                Ok(None) => {
-                    // Create new vector
-                    let vector = crate::storage::models::Vector {
-                        id: vector_id,
-                        vector: embedding.clone(),
-                        dimension: embedding.len(),
-                        metadata: serde_json::json!({
-                            "type": "memory",
-                            "memory_id": updated.id,
-                            "memory_type": updated.memory_type.to_string(),
-                            "content_preview": updated.content.chars().take(100).collect::<String>(),
-                            "source": updated.source,
-                            "tags": updated.tags
-                        }),
-                        source_id: Some(updated.id.clone()),
-                        created_at: updated.created_at,
-                    };
-
-                    match self.storage.add_vector(vector).await {
-                        Ok(_) => {
-                            tracing::debug!(
-                                "Created vector record for updated memory {}",
-                                updated.id
-                            );
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to create vector record for updated memory {}: {}",
-                                updated.id,
-                                e
-                            );
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to check for existing vector for memory {}: {}",
-                        updated.id,
-                        e
-                    );
-                }
-            }
-        } else {
-            // Memory no longer has an embedding, delete the vector if it exists
-            let vector_id = format!("mem_{}", updated.id);
-            match self.storage.delete_vector(&vector_id).await {
-                Ok(deleted) => {
-                    if deleted {
-                        tracing::debug!(
-                            "Deleted vector record for memory {} (no longer has embedding)",
-                            updated.id
-                        );
-                    }
-                }
-                Err(e) => {
-                    tracing::debug!(
-                        "No vector to delete for memory {} (or deletion failed): {}",
-                        updated.id,
-                        e
-                    );
-                }
-            }
-        }
+        // Vector table removed - embeddings are stored directly in memory.embedding
+        // with M-Tree index for vector search. No separate vector records needed.
 
         Ok(true) // If we got here, the update was successful
     }

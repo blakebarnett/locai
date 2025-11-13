@@ -93,35 +93,9 @@ where
             COMMENT "M-Tree vector index for 1024-dimensional embeddings (exact nearest neighbor, BGE-M3 compatible)";
     "#;
 
-    // Create the vector table for embeddings storage
-    let vector_table_query = r#"
-        DEFINE TABLE vector SCHEMALESS
-        COMMENT "Stores vector embeddings for semantic search";
-        
-        DEFINE FIELD id ON vector TYPE record<vector>;
-        DEFINE FIELD vector ON vector TYPE array<float>;
-        DEFINE FIELD dimension ON vector TYPE int;
-        DEFINE FIELD metadata ON vector TYPE object DEFAULT {};
-        DEFINE FIELD source_id ON vector TYPE option<string>;
-        DEFINE FIELD created_at ON vector TYPE datetime DEFAULT time::now();
-        
-        DEFINE INDEX vector_source_idx ON vector FIELDS source_id;
-        DEFINE INDEX vector_created_at_idx ON vector FIELDS created_at;
-        DEFINE INDEX vector_dimension_idx ON vector FIELDS dimension;
-        
-        -- Full-text search on vector metadata for hybrid search
-        DEFINE INDEX vector_metadata_ft ON vector
-            FIELDS metadata
-            SEARCH ANALYZER memory_analyzer
-            COMMENT "Full-text search on vector metadata";
-    "#;
-
-    // Create vector indexes for efficient similarity search
-    // We'll create only a 1024-dimensional index for BGE-M3 model compatibility
-    let vector_index_queries = [
-        // HNSW index for 1024-dimensional vectors (BGE-M3 model)
-        r#"DEFINE INDEX vector_hnsw_1024_idx ON vector FIELDS vector HNSW DIMENSION 1024 DIST COSINE EFC 150 M 12;"#,
-    ];
+    // Vector table removed - standardizing on M-Tree index in memory table
+    // Embeddings are stored directly in memory.embedding field with M-Tree index
+    // This eliminates data duplication and ensures consistency
 
     // Create the entity table with owner field and full-text search
     let entity_table_query = r#"
@@ -262,15 +236,7 @@ where
     execute_schema_query(client, analyzers_query, "search analyzers").await?;
     execute_schema_query(client, user_table_query, "user table").await?;
     execute_schema_query(client, memory_table_query, "memory table").await?;
-    execute_schema_query(client, vector_table_query, "vector table").await?;
-
-    // Create vector indexes (ignore errors for now since dimension might not match)
-    for (i, index_query) in vector_index_queries.iter().enumerate() {
-        match execute_schema_query(client, index_query, &format!("vector index {}", i)).await {
-            Ok(_) => tracing::debug!("Created vector index {} successfully", i),
-            Err(e) => tracing::warn!("Failed to create vector index {}: {:?}", i, e),
-        }
-    }
+    // Vector table removed - using M-Tree index on memory.embedding instead
 
     execute_schema_query(client, entity_table_query, "entity table").await?;
     execute_schema_query(client, relationship_table_query, "relationship table").await?;
