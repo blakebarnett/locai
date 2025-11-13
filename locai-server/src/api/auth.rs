@@ -125,7 +125,7 @@ fn is_public_endpoint(path: &str) -> bool {
 }
 
 /// Validate a JWT token and return the authentication context
-fn validate_jwt_token(token: &str, secret: &str) -> Result<AuthContext, ServerError> {
+pub(crate) fn validate_jwt_token(token: &str, secret: &str) -> Result<AuthContext, ServerError> {
     let decoding_key = DecodingKey::from_secret(secret.as_ref());
     let validation = Validation::default();
 
