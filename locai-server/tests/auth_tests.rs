@@ -34,14 +34,14 @@ async fn create_test_server_with_auth() -> (TestServer, Arc<AppState>, tempfile:
 
     // Create AppState
     let mut app_state = AppState::new(memory_manager, server_config.clone());
-    
+
     // Initialize auth service if auth is enabled
     if server_config.enable_auth {
         use locai_server::api::auth_service::AuthService;
         let auth_service = AuthService::new(server_config.jwt_secret.clone());
         app_state.set_auth_service(auth_service);
     }
-    
+
     let state = Arc::new(app_state);
     let app = locai_server::create_router(state.clone());
     let server = TestServer::new(app).unwrap();
@@ -86,13 +86,14 @@ async fn test_jwt_token_validation() {
     let secret = "test-secret-key";
     let expiration_hours = 24;
 
-    let (token, _) = generate_jwt_token(&user_id, username, role, secret, expiration_hours).unwrap();
+    let (token, _) =
+        generate_jwt_token(&user_id, username, role, secret, expiration_hours).unwrap();
 
     // Valid token should decode successfully using jsonwebtoken directly
     let decoding_key = DecodingKey::from_secret(secret.as_ref());
     let validation = Validation::default();
     let token_data = decode::<Claims>(&token, &decoding_key, &validation).unwrap();
-    
+
     assert_eq!(token_data.claims.sub, user_id.to_string());
     assert_eq!(token_data.claims.username, username);
     assert_eq!(token_data.claims.role, role);
@@ -107,7 +108,8 @@ async fn test_jwt_token_validation_wrong_secret() {
     let wrong_secret = "wrong-secret-key";
     let expiration_hours = 24;
 
-    let (token, _) = generate_jwt_token(&user_id, username, role, secret, expiration_hours).unwrap();
+    let (token, _) =
+        generate_jwt_token(&user_id, username, role, secret, expiration_hours).unwrap();
 
     // Token with wrong secret should fail validation
     let decoding_key = DecodingKey::from_secret(wrong_secret.as_ref());
@@ -122,11 +124,11 @@ async fn test_jwt_token_expiration() {
     let username = "testuser";
     let role = "viewer";
     let secret = "test-secret-key";
-    
+
     // Create a token that expires in the past
     let now = chrono::Utc::now().timestamp() as usize;
     let exp = now - 3600; // Expired 1 hour ago
-    
+
     let claims = Claims {
         sub: user_id.to_string(),
         username: username.to_string(),
@@ -134,9 +136,10 @@ async fn test_jwt_token_expiration() {
         iat: now - 7200, // Issued 2 hours ago
         exp,
     };
-    
+
     let encoding_key = jsonwebtoken::EncodingKey::from_secret(secret.as_ref());
-    let token = jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &encoding_key).unwrap();
+    let token =
+        jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &encoding_key).unwrap();
 
     // Expired token should fail validation
     let decoding_key = DecodingKey::from_secret(secret.as_ref());
@@ -155,10 +158,7 @@ async fn test_signup_endpoint() {
         "email": "newuser@example.com"
     });
 
-    let response = server
-        .post("/api/auth/signup")
-        .json(&signup_request)
-        .await;
+    let response = server.post("/api/auth/signup").json(&signup_request).await;
 
     response.assert_status(StatusCode::CREATED);
 
@@ -180,17 +180,11 @@ async fn test_signup_duplicate_username() {
     });
 
     // First signup should succeed
-    let response1 = server
-        .post("/api/auth/signup")
-        .json(&signup_request)
-        .await;
+    let response1 = server.post("/api/auth/signup").json(&signup_request).await;
     response1.assert_status(StatusCode::CREATED);
 
     // Second signup with same username should fail (returns 400 Bad Request for validation error)
-    let response2 = server
-        .post("/api/auth/signup")
-        .json(&signup_request)
-        .await;
+    let response2 = server.post("/api/auth/signup").json(&signup_request).await;
     response2.assert_status(StatusCode::BAD_REQUEST);
 }
 
@@ -224,10 +218,7 @@ async fn test_login_endpoint() {
         "username": "loginuser",
         "password": "password123"
     });
-    let signup_response = server
-        .post("/api/auth/signup")
-        .json(&signup_request)
-        .await;
+    let signup_response = server.post("/api/auth/signup").json(&signup_request).await;
     signup_response.assert_status(StatusCode::CREATED);
 
     // Then login with correct credentials
@@ -235,10 +226,7 @@ async fn test_login_endpoint() {
         "username": "loginuser",
         "password": "password123"
     });
-    let login_response = server
-        .post("/api/auth/login")
-        .json(&login_request)
-        .await;
+    let login_response = server.post("/api/auth/login").json(&login_request).await;
 
     login_response.assert_status(StatusCode::OK);
 
@@ -257,20 +245,14 @@ async fn test_login_invalid_credentials() {
         "username": "testuser",
         "password": "password123"
     });
-    server
-        .post("/api/auth/signup")
-        .json(&signup_request)
-        .await;
+    server.post("/api/auth/signup").json(&signup_request).await;
 
     // Try login with wrong password
     let login_request = serde_json::json!({
         "username": "testuser",
         "password": "wrongpassword"
     });
-    let response = server
-        .post("/api/auth/login")
-        .json(&login_request)
-        .await;
+    let response = server.post("/api/auth/login").json(&login_request).await;
 
     response.assert_status(StatusCode::UNAUTHORIZED);
 }
@@ -284,10 +266,7 @@ async fn test_auth_middleware_with_valid_token() {
         "username": "authtest",
         "password": "password123"
     });
-    let signup_response = server
-        .post("/api/auth/signup")
-        .json(&signup_request)
-        .await;
+    let signup_response = server.post("/api/auth/signup").json(&signup_request).await;
     signup_response.assert_status(StatusCode::CREATED);
 
     let auth_response: serde_json::Value = signup_response.json();
@@ -326,10 +305,7 @@ async fn test_auth_middleware_public_endpoints() {
         "password": "password123"
     });
     // This will fail because user doesn't exist, but endpoint is accessible
-    let response = server
-        .post("/api/auth/login")
-        .json(&login_request)
-        .await;
+    let response = server.post("/api/auth/login").json(&login_request).await;
     // Should get 401, not 403 (endpoint is accessible, just wrong credentials)
     assert!(response.status_code() == StatusCode::UNAUTHORIZED);
 }
@@ -357,4 +333,3 @@ async fn test_jwt_token_claims_structure() {
     assert!(token_data.claims.exp > token_data.claims.iat);
     assert_eq!(token_data.claims.exp as i64, expires_at);
 }
-
