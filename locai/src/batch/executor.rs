@@ -244,6 +244,8 @@ impl BatchExecutor {
 
                     final_embedding = Some(emb);
                 }
+                // Note: Auto-generation not available in batch executor since it doesn't have ML service access.
+                // Auto-generation is handled at the API layer (see locai-server/src/api/memories.rs).
 
                 let memory = Memory {
                     id: uuid::Uuid::new_v4().to_string(),

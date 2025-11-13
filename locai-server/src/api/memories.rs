@@ -99,9 +99,20 @@ pub async fn create_memory(
         }
 
         memory_builder = memory_builder.embedding(embedding);
+    } else if state.memory_manager.has_ml_service() {
+        // Auto-generate embedding if ML service is configured and user didn't provide one
+        // Note: Current EmbeddingManager only supports validation/normalization, not generation.
+        // Actual embedding generation requires an EmbeddingModel implementation (e.g., CandleEmbeddingModel).
+        // When EmbeddingModel is available, this should call:
+        //   let embedding = ml_service.generate_embedding(&request.content).await?;
+        //   memory_builder = memory_builder.embedding(embedding);
+        tracing::debug!(
+            "ML service available but auto-generation not yet implemented. \
+             Memory will be stored without embedding. \
+             To enable auto-generation, configure an EmbeddingModel implementation."
+        );
+        // Continue without embedding - memory will be stored but won't be searchable via vector search
     }
-    // TODO: Auto-generate embedding if ML service is configured and user didn't provide one
-    // This requires EmbeddingModel implementation which may not be available yet
 
     let memory = memory_builder.build();
 
