@@ -17,23 +17,23 @@ fn main() {
     // Platform-specific server optimizations
     match (&target_os[..], &target_arch[..]) {
         ("linux", "x86_64") => {
-            // Try to use LLD linker for faster linking
-            if which::which("ld.lld").is_ok() {
+            // Try to use LLD linker for faster linking (unless disabled)
+            if env::var("DISABLE_LLD").is_err() && which::which("ld.lld").is_ok() {
                 println!("cargo:rustc-link-arg=-fuse-ld=lld");
                 println!("cargo:warning=Using LLD linker for server builds");
             } else {
-                println!("cargo:warning=LLD not available, using default linker");
+                println!("cargo:warning=LLD not available or disabled, using default linker");
             }
         }
 
         ("linux", "aarch64") => {
             println!("cargo:warning=ARM64 Linux server build");
-            // Try to use LLD if available for ARM64 server builds
-            if which::which("ld.lld").is_ok() {
+            // Try to use LLD if available for ARM64 server builds (unless disabled)
+            if env::var("DISABLE_LLD").is_err() && which::which("ld.lld").is_ok() {
                 println!("cargo:rustc-link-arg=-fuse-ld=lld");
                 println!("cargo:warning=Using LLD linker for ARM64 server builds");
             } else {
-                println!("cargo:warning=LLD not available, using default linker");
+                println!("cargo:warning=LLD not available or disabled, using default linker");
             }
         }
 
