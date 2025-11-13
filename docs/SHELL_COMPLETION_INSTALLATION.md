@@ -291,3 +291,4 @@ Save as `install-completions.sh`, make executable (`chmod +x install-completions
 
 The `completions` command generates completion scripts but does not install them automatically. This gives you control over where and how completions are installed.
 
+

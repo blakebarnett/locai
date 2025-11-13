@@ -46,17 +46,27 @@ RUN apt-get update && apt-get install -y \
 COPY --from=planner /app/recipe.json recipe.json
 COPY .cargo/config.toml .cargo/config.toml
 
-# Configure sccache
+# Configure sccache to use local disk cache (not server mode)
 ENV RUSTC_WRAPPER=sccache
 ENV SCCACHE_DIR=/sccache
 ENV SCCACHE_CACHE_SIZE="10G"
+# Ensure sccache uses local disk cache, not server mode
+ENV SCCACHE_GCS_BUCKET=""
+ENV SCCACHE_REDIS=""
+ENV SCCACHE_MEMCACHED=""
 
 # Build dependencies with sccache
 # Using BuildKit cache mount to persist sccache across builds
+# Disable sccache if it fails (e.g., cross-platform ARM64 builds)
 RUN --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/usr/local/cargo/registry \
+    mkdir -p /sccache && \
+    if ! sccache --show-stats >/dev/null 2>&1; then \
+      unset RUSTC_WRAPPER; \
+      echo "sccache unavailable, building without cache"; \
+    fi && \
     cargo chef cook --release --recipe-path recipe.json && \
-    sccache --show-stats
+    (sccache --show-stats 2>/dev/null || echo "sccache stats unavailable (non-fatal)")
 
 # ============================================================================
 # Stage 4: Build the application with sccache
@@ -80,18 +90,28 @@ COPY --from=dependencies /usr/local/cargo /usr/local/cargo
 # Copy source code and cargo config
 COPY . .
 
-# Configure sccache
+# Configure sccache to use local disk cache (not server mode)
 ENV RUSTC_WRAPPER=sccache
 ENV SCCACHE_DIR=/sccache
 ENV SCCACHE_CACHE_SIZE="10G"
+# Ensure sccache uses local disk cache, not server mode
+ENV SCCACHE_GCS_BUCKET=""
+ENV SCCACHE_REDIS=""
+ENV SCCACHE_MEMCACHED=""
 
 # Build the application with sccache
 # Using BuildKit cache mount to share cache with host
+# Disable sccache if it fails (e.g., cross-platform ARM64 builds)
 RUN --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/usr/local/cargo/registry \
+    mkdir -p /sccache && \
+    if ! sccache --show-stats >/dev/null 2>&1; then \
+      unset RUSTC_WRAPPER; \
+      echo "sccache unavailable, building without cache"; \
+    fi && \
     cargo build --release --bin locai-server && \
     echo "=== sccache statistics ===" && \
-    sccache --show-stats
+    (sccache --show-stats 2>/dev/null || echo "sccache stats unavailable (non-fatal)")
 
 # Verify the binary exists and is executable
 RUN ls -lh /app/target/release/locai-server && \
