@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
 
     // Find all memories connected to the sky memory via "explains" relationship
     let explained_by = memory_manager
-        .find_connected_memories(&sky_id, "explains", 2)
+        .find_connected_memories(&sky_id, Some("explains"), 2)
         .await?;
 
     info!(

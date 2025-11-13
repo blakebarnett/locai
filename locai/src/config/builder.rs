@@ -41,7 +41,7 @@ impl ConfigBuilder {
     /// Use default storage configuration (SurrealDB for both graph and vector)
     pub fn with_default_storage(mut self) -> Self {
         // Set data directory to a default location if not already set
-        if self.config.storage.data_dir == PathBuf::from("./data") {
+        if self.config.storage.data_dir.as_path() == Path::new("./data") {
             let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
             self.config.storage.data_dir = home_dir.join(".locai").join("data");
         }
@@ -110,7 +110,7 @@ impl ConfigBuilder {
     /// Use default ML configuration (local embeddings with a standard model)
     pub fn with_default_ml(mut self) -> Self {
         // Set cache directory to a default location if not set
-        if self.config.ml.model_cache_dir == PathBuf::from("./model_cache") {
+        if self.config.ml.model_cache_dir.as_path() == Path::new("./model_cache") {
             let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
             self.config.ml.model_cache_dir = home_dir.join(".locai").join("models");
         }
