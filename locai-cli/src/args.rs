@@ -39,7 +39,8 @@ pub struct SearchArgs {
     pub limit: usize,
 
     /// Search mode (text, vector, hybrid, keyword, bm25)
-    #[arg(long, short, default_value = "text")]
+    /// Default: hybrid (automatically combines text and semantic search when available)
+    #[arg(long, short, default_value = "hybrid")]
     pub mode: String,
 
     /// Similarity threshold (0.0 to 1.0)

@@ -164,12 +164,13 @@ pub async fn handle_memory_command(
         },
 
         MemoryCommands::Search(args) => {
-            let search_mode = match args.mode.as_str() {
+            // Parse requested mode
+            let requested_mode = match args.mode.as_str() {
                 "vector" => SearchMode::Vector,
                 "hybrid" => SearchMode::Hybrid,
                 "semantic" => SearchMode::Vector,
                 "text" | "keyword" | "bm25" => SearchMode::Text,
-                _ => SearchMode::Text,
+                _ => SearchMode::Hybrid, // Default to hybrid
             };
 
             // Handle temporal filters
@@ -210,112 +211,271 @@ pub async fn handle_memory_command(
                 None
             };
 
-            // For vector/semantic/hybrid search, generate query embedding
-            // Try Ollama if OLLAMA_URL and OLLAMA_MODEL are set, otherwise use mock embedding
-            let results = if matches!(search_mode, SearchMode::Vector | SearchMode::Hybrid) {
-                // Generate query embedding (Ollama if available, otherwise mock)
+            // Check if embeddings are available (Ollama configured)
+            let has_ollama = std::env::var("OLLAMA_URL").is_ok() && std::env::var("OLLAMA_MODEL").is_ok();
+            
+            // Determine actual search mode with graceful fallback
+            let (search_mode, use_hybrid_tagging) = if requested_mode == SearchMode::Hybrid {
+                if has_ollama {
+                    // Hybrid mode with embeddings available - run both searches separately for tagging
+                    (SearchMode::Hybrid, true)
+                } else {
+                    // Hybrid requested but no embeddings - fallback to text-only
+                    (SearchMode::Text, false)
+                }
+            } else {
+                // Explicit mode requested (text or semantic)
+                (requested_mode, false)
+            };
+
+            // Tagged result structure
+            #[derive(Clone)]
+            struct TaggedResult {
+                memory: locai::prelude::Memory,
+                score: Option<f32>,
+                tags: Vec<String>, // ["text"], ["semantic"], or ["text", "semantic"]
+            }
+
+            // Perform search with tagging if hybrid mode
+            let tagged_results: Vec<TaggedResult> = if use_hybrid_tagging {
+                // Run both text and semantic searches separately for tagging
+                let text_results = match ctx.memory_manager
+                    .search(&args.query, Some(args.limit * 2), filter.clone(), SearchMode::Text)
+                    .await
+                {
+                    Ok(results) => results,
+                    Err(e) => {
+                        tracing::warn!("Text search failed in hybrid mode: {}", e);
+                        Vec::new()
+                    }
+                };
+                
                 let query_embedding = generate_query_embedding(&args.query, 1024).await;
-                ctx.memory_manager
+                let semantic_results = match ctx.memory_manager
                     .search_with_embedding(
                         &args.query,
                         Some(&query_embedding),
-                        Some(args.limit),
+                        Some(args.limit * 2),
                         filter,
-                        search_mode,
+                        SearchMode::Vector,
                     )
                     .await
-            } else {
-                ctx.memory_manager
-                    .search(&args.query, Some(args.limit), filter, search_mode)
-                    .await
-            };
-            
-            match results {
-                Ok(results) => {
-                    if output_format == "json" {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&results)
-                                .unwrap_or_else(|_| "{}".to_string())
-                        );
-                    } else if results.is_empty() {
-                        println!(
-                            "{}",
-                            format_info(&format!(
-                                "No memories found matching '{}'",
-                                args.query.color(CliColors::accent())
-                            ))
-                        );
-                        
-                        // Provide helpful suggestions based on search mode
-                        if matches!(search_mode, SearchMode::Vector | SearchMode::Hybrid) {
-                            println!();
-                            println!("{}", "💡 Tips for semantic search:".bold());
-                            println!("  • Semantic search only finds memories with embeddings");
-                            let has_ollama = std::env::var("OLLAMA_URL").is_ok() && std::env::var("OLLAMA_MODEL").is_ok();
-                            if has_ollama {
-                                println!("  • Using Ollama for query embeddings (set via OLLAMA_URL and OLLAMA_MODEL)");
-                            } else {
-                                println!("  • {} Using mock query embeddings - these don't capture semantic meaning!", "⚠️".color(CliColors::warning()));
-                                println!("  • Mock embeddings won't match real embeddings (e.g., 'battle' won't match 'warrior')");
-                                println!("  • Set OLLAMA_URL and OLLAMA_MODEL for real semantic search");
-                                println!("  • Example: {} OLLAMA_URL=http://localhost:11434 OLLAMA_MODEL=nomic-embed-text locai-cli memory search \"battle\" --mode semantic", "export".color(CliColors::muted()));
+                {
+                    Ok(results) => results,
+                    Err(e) => {
+                        tracing::warn!("Semantic search failed in hybrid mode: {}", e);
+                        Vec::new()
+                    }
+                };
+
+                // Combine and tag results
+                use std::collections::HashMap;
+                let mut result_map: HashMap<String, TaggedResult> = HashMap::new();
+
+                // Add text results
+                for result in text_results {
+                    let memory_id = result.memory.id.clone();
+                    result_map.entry(memory_id).or_insert_with(|| TaggedResult {
+                        memory: result.memory,
+                        score: result.score,
+                        tags: vec!["text".to_string()],
+                    });
+                }
+
+                // Add semantic results (merge if already exists)
+                for result in semantic_results {
+                    let memory_id = result.memory.id.clone();
+                    if let Some(existing) = result_map.get_mut(&memory_id) {
+                        // Already exists from text search - add semantic tag
+                        existing.tags.push("semantic".to_string());
+                        // Use higher score if semantic score is better
+                        if let Some(sem_score) = result.score {
+                            if existing.score.map_or(true, |text_score| sem_score > text_score) {
+                                existing.score = Some(sem_score);
                             }
-                            println!("  • Quickstart creates embeddings for the first 3 memories");
-                            println!("  • Try searching for words related to: {}", "warrior, John, Alice, mage, kingdom".color(CliColors::accent()));
-                            println!("  • Or use text search: {}", format!("locai-cli memory search \"{}\" --mode text", args.query).color(CliColors::accent()));
-                        } else if search_mode == SearchMode::Text {
-                            println!();
-                            println!("{}", "💡 Tips:".bold());
-                            println!("  • BM25 search looks for exact words - try searching for words that appear in your memories");
-                            println!("  • Example: search for '{}' or '{}' instead", "warrior".color(CliColors::accent()), "John".color(CliColors::accent()));
-                            println!("  • Use {} for semantic search (if embeddings are configured)", "--mode semantic".color(CliColors::accent()));
-                            println!("  • Try: {}", "locai-cli memory search \"warrior\" --mode text".color(CliColors::accent()));
                         }
                     } else {
-                        println!(
-                            "{} (query: {})",
-                            format_info(&format!("Found {} memories:", results.len())),
-                            args.query.color(CliColors::accent()).italic()
-                        );
-                        let has_ollama = std::env::var("OLLAMA_URL").is_ok() && std::env::var("OLLAMA_MODEL").is_ok();
-                        let using_mock = !has_ollama && matches!(search_mode, SearchMode::Vector | SearchMode::Hybrid);
-                        
-                        if using_mock && !results.is_empty() {
-                            // Check if scores are suspiciously low (likely mock vs real embedding mismatch)
-                            let avg_score: f32 = results.iter()
-                                .map(|r| r.score.unwrap_or(0.0))
-                                .sum::<f32>() / results.len() as f32;
-                            
-                            if avg_score < 0.1 {
-                                println!();
-                                println!("{}", format!("⚠️  Warning: Very low similarity scores detected ({:.2} average)", avg_score).color(CliColors::warning()));
-                                println!("  This likely means you're using mock query embeddings with real stored embeddings.");
-                                println!("  Mock embeddings don't capture semantic meaning - set OLLAMA_URL and OLLAMA_MODEL for real semantic search.");
-                                println!();
-                            }
-                        }
-                        
-                        for (i, result) in results.iter().enumerate() {
-                            let score = result.score.unwrap_or(0.0);
-                            let (score_label, score_color) = match score {
-                                s if s > 0.8 => ("Excellent", CliColors::success()),
-                                s if s > 0.6 => ("Good", CliColors::info()),
-                                s if s > 0.4 => ("Fair", CliColors::warning()),
-                                s if s > 0.0 => ("Weak", CliColors::muted()),
-                                _ => ("Very Weak", CliColors::muted()),
-                            };
-                            println!(
-                                "{}. {} {}",
-                                format!("{}", i + 1).color(CliColors::muted()),
-                                format!("[{} match: {:.2}]", score_label, score).color(score_color),
-                                result.memory.content
-                            );
-                        }
+                        // New result from semantic search only
+                        result_map.insert(memory_id, TaggedResult {
+                            memory: result.memory,
+                            score: result.score,
+                            tags: vec!["semantic".to_string()],
+                        });
                     }
                 }
-                Err(e) => {
-                    output_error(&format!("Search failed: {}", e), output_format);
+
+                // Convert to sorted vector (by score descending)
+                let mut results: Vec<TaggedResult> = result_map.into_values().collect();
+                results.sort_by(|a, b| {
+                    let score_a = a.score.unwrap_or(0.0);
+                    let score_b = b.score.unwrap_or(0.0);
+                    score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                results.truncate(args.limit);
+                results
+            } else {
+                // Single mode search (text or semantic)
+                let results = if matches!(search_mode, SearchMode::Vector) {
+                    let query_embedding = generate_query_embedding(&args.query, 1024).await;
+                    ctx.memory_manager
+                        .search_with_embedding(
+                            &args.query,
+                            Some(&query_embedding),
+                            Some(args.limit),
+                            filter,
+                            search_mode,
+                        )
+                        .await?
+                } else {
+                    ctx.memory_manager
+                        .search(&args.query, Some(args.limit), filter, search_mode)
+                        .await?
+                };
+
+                results.into_iter().map(|r| TaggedResult {
+                    memory: r.memory,
+                    score: r.score,
+                    tags: vec![if search_mode == SearchMode::Vector { "semantic" } else { "text" }.to_string()],
+                }).collect()
+            };
+
+            // Convert tagged results to regular results for JSON output
+            let results: Vec<locai::storage::models::SearchResult> = tagged_results.iter().map(|tr| {
+                locai::storage::models::SearchResult {
+                    memory: tr.memory.clone(),
+                    score: tr.score,
+                }
+            }).collect();
+            
+            if output_format == "json" {
+                // Add tags to JSON output
+                let json_results: Vec<serde_json::Value> = tagged_results.iter().map(|tr| {
+                    let match_method = if tr.tags.len() > 1 {
+                        "both"
+                    } else {
+                        tr.tags.first().map(|s| s.as_str()).unwrap_or("text")
+                    };
+                    json!({
+                        "memory": tr.memory,
+                        "score": tr.score,
+                        "tags": tr.tags,
+                        "match_method": match_method
+                    })
+                }).collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json_results)
+                        .unwrap_or_else(|_| "[]".to_string())
+                );
+            } else if results.is_empty() {
+                println!(
+                    "{}",
+                    format_info(&format!(
+                        "No memories found matching '{}'",
+                        args.query.color(CliColors::accent())
+                    ))
+                );
+                
+                // Provide helpful suggestions
+                if use_hybrid_tagging {
+                    println!();
+                    println!("{}", "💡 Tips:".bold());
+                    println!("  • Hybrid search combines text and semantic search automatically");
+                    println!("  • Text search finds exact keyword matches");
+                    println!("  • Semantic search finds related concepts (requires embeddings)");
+                    if !has_ollama {
+                        println!("  • {} Semantic search unavailable - set OLLAMA_URL and OLLAMA_MODEL to enable", "⚠️".color(CliColors::warning()));
+                    }
+                    println!("  • Try searching for different keywords or related concepts");
+                } else if search_mode == SearchMode::Vector {
+                    println!();
+                    println!("{}", "💡 Tips for semantic search:".bold());
+                    println!("  • Semantic search only finds memories with embeddings");
+                    if has_ollama {
+                        println!("  • Using Ollama for query embeddings");
+                    } else {
+                        println!("  • {} Using mock query embeddings - these don't capture semantic meaning!", "⚠️".color(CliColors::warning()));
+                        println!("  • Set OLLAMA_URL and OLLAMA_MODEL for real semantic search");
+                    }
+                } else {
+                    println!();
+                    println!("{}", "💡 Tips:".bold());
+                    println!("  • BM25 search looks for exact words - try searching for words that appear in your memories");
+                    if has_ollama {
+                        println!("  • Use {} for semantic search or {} for hybrid (default)", "--mode semantic".color(CliColors::accent()), "--mode hybrid".color(CliColors::accent()));
+                    }
+                }
+            } else {
+                // Show search mode info
+                let mode_info = if use_hybrid_tagging {
+                    format!("[hybrid: text + semantic]")
+                } else if search_mode == SearchMode::Vector {
+                    format!("[semantic]")
+                } else {
+                    format!("[text]")
+                };
+
+                println!(
+                    "{} {} (query: {})",
+                    format_info(&format!("Found {} memories:", results.len())),
+                    mode_info.color(CliColors::muted()),
+                    args.query.color(CliColors::accent()).italic()
+                );
+
+                // Warn if using mock embeddings with semantic search
+                if !has_ollama && (use_hybrid_tagging || search_mode == SearchMode::Vector) {
+                    let avg_score: f32 = tagged_results.iter()
+                        .filter_map(|tr| tr.score)
+                        .sum::<f32>() / tagged_results.len().max(1) as f32;
+                    
+                    if avg_score < 0.1 && !tagged_results.is_empty() {
+                        println!();
+                        println!("{}", format!("⚠️  Warning: Very low similarity scores detected ({:.2} average)", avg_score).color(CliColors::warning()));
+                        println!("  This likely means you're using mock query embeddings with real stored embeddings.");
+                        println!("  Set OLLAMA_URL and OLLAMA_MODEL for real semantic search.");
+                        println!();
+                    }
+                }
+
+                // Show note if hybrid fell back to text-only
+                if requested_mode == SearchMode::Hybrid && !has_ollama {
+                    println!();
+                    println!("{}", format_info("ℹ️  Hybrid search requested but semantic search unavailable (no embeddings). Using text search only."));
+                    println!("  Set OLLAMA_URL and OLLAMA_MODEL to enable semantic search.");
+                    println!();
+                }
+                
+                // Display results with tags
+                for (i, tagged_result) in tagged_results.iter().enumerate() {
+                    let score = tagged_result.score.unwrap_or(0.0);
+                    let (score_label, score_color) = match score {
+                        s if s > 0.8 => ("Excellent", CliColors::success()),
+                        s if s > 0.6 => ("Good", CliColors::info()),
+                        s if s > 0.4 => ("Fair", CliColors::warning()),
+                        s if s > 0.0 => ("Weak", CliColors::muted()),
+                        _ => ("Very Weak", CliColors::muted()),
+                    };
+                    
+                    // Build tag string
+                    let tag_str = if tagged_result.tags.len() > 1 {
+                        format!("[{}]", tagged_result.tags.join("+"))
+                    } else if let Some(tag) = tagged_result.tags.first() {
+                        format!("[{}]", tag)
+                    } else {
+                        "[text]".to_string()
+                    };
+                    
+                    println!(
+                        "{}. {} {} {}",
+                        format!("{}", i + 1).color(CliColors::muted()),
+                        tag_str.color(if tagged_result.tags.contains(&"semantic".to_string()) {
+                            CliColors::info()
+                        } else {
+                            CliColors::muted()
+                        }),
+                        format!("[{} match: {:.2}]", score_label, score).color(score_color),
+                        tagged_result.memory.content
+                    );
                 }
             }
         }
