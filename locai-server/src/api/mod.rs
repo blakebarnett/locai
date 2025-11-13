@@ -140,7 +140,7 @@ use auth::auth_middleware;
     info(
                     title = "Locai Memory Service API",
             version = "1.0.0",
-            description = "RESTful API for the Locai memory management service with graph-centric design. Provides text search by default, with vector/hybrid search available when ML service is configured.",
+            description = "RESTful API for the Locai memory management service with graph-centric design. Provides text search by default (for backward compatibility), with hybrid search recommended when ML service is configured. Hybrid mode automatically combines text and semantic search for best results.",
             contact(
                 name = "Locai Team",
             url = "https://locai.dev"
@@ -325,7 +325,12 @@ async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Va
             } else {
                 vec!["text"]
             },
-            "default": "text"
+            "default": "text",
+            "recommended": if state.memory_manager.has_ml_service() {
+                "hybrid"
+            } else {
+                "text"
+            }
         }
     });
 

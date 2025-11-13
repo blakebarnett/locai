@@ -448,7 +448,11 @@ pub struct SearchRequest {
     #[serde(default = "default_limit")]
     pub limit: usize,
 
-    /// Search mode (semantic or keyword)
+    /// Search mode: text (default), vector (semantic), or hybrid (recommended when ML service available)
+    /// 
+    /// - `text`: BM25 keyword search - always available
+    /// - `vector`: Vector similarity search - requires ML service
+    /// - `hybrid`: Combines text and semantic search - recommended when ML service available
     #[serde(default)]
     pub mode: SearchMode,
 
@@ -504,6 +508,14 @@ pub struct SearchResultDto {
     /// - >1.0: Boosted scores from exact matches or other factors
     #[schema(example = 0.87, minimum = 0.0)]
     pub score: Option<f32>,
+
+    /// Method that found this result (when using hybrid mode)
+    /// 
+    /// Values: "text", "semantic", or "both"
+    /// Only present when using hybrid search mode
+    #[schema(example = "both")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_method: Option<String>,
 }
 
 impl From<SearchResult> for SearchResultDto {
@@ -511,6 +523,7 @@ impl From<SearchResult> for SearchResultDto {
         Self {
             memory: MemoryDto::from(result.memory),
             score: result.score,
+            match_method: None, // TODO: Add match method tagging when hybrid search is implemented
         }
     }
 }

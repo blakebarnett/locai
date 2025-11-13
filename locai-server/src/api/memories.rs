@@ -356,7 +356,15 @@ pub async fn delete_memory(
 
 /// Search memories using semantic or keyword search with optional lifecycle-aware scoring
 ///
-/// Supports basic BM25 text search by default. When a scoring configuration is provided,
+/// **Search Modes:**
+/// - `text` (default): BM25 keyword search - always available, fast, works without embeddings
+/// - `vector`: Vector similarity search - finds related concepts, requires ML service
+/// - `hybrid` (recommended): Combines text and semantic search - best results when ML service available
+///
+/// **Recommendation:** Use `hybrid` mode when ML service is configured. It automatically combines
+/// text and semantic search for comprehensive results. Falls back to text-only if ML service unavailable.
+///
+/// Supports basic BM25 text search by default (for backward compatibility). When a scoring configuration is provided,
 /// results are ranked using a combination of:
 /// - BM25 keyword relevance
 /// - Vector similarity (if ML service configured)
@@ -371,6 +379,21 @@ pub async fn delete_memory(
 /// query parameter. For complex scoring configs, consider POST endpoint (if implemented).
 ///
 /// # Examples
+///
+/// Hybrid search (recommended when ML service available):
+/// ```text
+/// GET /api/memories/search?q=warrior&mode=hybrid&limit=10
+/// ```
+///
+/// Text search (default, always available):
+/// ```text
+/// GET /api/memories/search?q=warrior&mode=text&limit=10
+/// ```
+///
+/// Semantic search only:
+/// ```text
+/// GET /api/memories/search?q=battle&mode=vector&limit=10
+/// ```
 ///
 /// Scoring:
 /// ```text
@@ -685,7 +708,14 @@ pub struct SearchParams {
     /// Maximum number of results
     pub limit: Option<usize>,
 
-    /// Search mode
+    /// Search mode: text (default), vector (semantic), or hybrid (recommended when ML service available)
+    /// 
+    /// - `text`: BM25 keyword search - always available, fast
+    /// - `vector`: Vector similarity search - finds related concepts, requires ML service
+    /// - `hybrid`: Combines text and semantic search - recommended when ML service available
+    /// 
+    /// Default: `text` (for backward compatibility)
+    /// Recommended: `hybrid` (when ML service configured)
     pub mode: Option<SearchMode>,
 
     /// Similarity threshold for semantic search
