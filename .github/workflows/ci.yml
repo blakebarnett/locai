@@ -98,14 +98,6 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
-
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
@@ -114,6 +106,19 @@ jobs:
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
+
+      - name: Build dependencies to populate cache
+        env:
+          RUSTC_WRAPPER: ""
+        run: cargo check --all-features --workspace
 
   # Format check - runs independently and fast
   fmt:
