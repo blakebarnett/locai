@@ -128,6 +128,7 @@ mod tests {
             let result = SearchResultDto {
                 memory: MemoryDto::from(memory.clone()),
                 score: Some(score),
+                match_method: None,
             };
 
             // Verify serialization works with any non-negative score
