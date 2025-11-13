@@ -195,6 +195,7 @@ impl BatchExecutor {
                 tags,
                 source,
                 properties,
+                embedding,
             } => {
                 let priority_enum = match priority {
                     Some(0) => MemoryPriority::Low,
@@ -203,6 +204,46 @@ impl BatchExecutor {
                     Some(3) => MemoryPriority::Critical,
                     _ => MemoryPriority::Normal,
                 };
+
+                // Validate and normalize embedding if provided
+                let mut final_embedding = None;
+                if let Some(mut emb) = embedding {
+                    const EXPECTED_DIMENSIONS: usize = 1024;
+                    if emb.len() != EXPECTED_DIMENSIONS {
+                        return Err(BatchError::ValidationError {
+                            message: format!(
+                                "Embedding dimension mismatch: expected {} dimensions, but got {}",
+                                EXPECTED_DIMENSIONS,
+                                emb.len()
+                            ),
+                        });
+                    }
+
+                    // Validate values
+                    for (i, &value) in emb.iter().enumerate() {
+                        if !value.is_finite() {
+                            return Err(BatchError::ValidationError {
+                                message: format!(
+                                    "Invalid embedding value at index {}: {}",
+                                    i, value
+                                ),
+                            });
+                        }
+                    }
+
+                    // Normalize
+                    let norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if norm == 0.0 {
+                        return Err(BatchError::ValidationError {
+                            message: "Cannot normalize zero vector".to_string(),
+                        });
+                    }
+                    for value in emb.iter_mut() {
+                        *value /= norm;
+                    }
+
+                    final_embedding = Some(emb);
+                }
 
                 let memory = Memory {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -217,7 +258,7 @@ impl BatchExecutor {
                     expires_at: None,
                     properties: properties.unwrap_or(serde_json::json!({})),
                     related_memories: Vec::new(),
-                    embedding: None,
+                    embedding: final_embedding,
                 };
 
                 let created = self.storage.create_memory(memory).await.map_err(|e| {
@@ -235,6 +276,7 @@ impl BatchExecutor {
                 priority,
                 tags,
                 properties,
+                embedding,
             } => {
                 // Get existing memory
                 let mut memory = self
@@ -266,6 +308,54 @@ impl BatchExecutor {
                 }
                 if let Some(new_properties) = properties {
                     memory.properties = new_properties;
+                }
+
+                // Handle embedding update
+                if let Some(embedding_option) = embedding {
+                    match embedding_option {
+                        Some(mut emb) => {
+                            // Validate dimensions
+                            const EXPECTED_DIMENSIONS: usize = 1024;
+                            if emb.len() != EXPECTED_DIMENSIONS {
+                                return Err(BatchError::ValidationError {
+                                    message: format!(
+                                        "Embedding dimension mismatch: expected {} dimensions, but got {}",
+                                        EXPECTED_DIMENSIONS,
+                                        emb.len()
+                                    ),
+                                });
+                            }
+
+                            // Validate values
+                            for (i, &value) in emb.iter().enumerate() {
+                                if !value.is_finite() {
+                                    return Err(BatchError::ValidationError {
+                                        message: format!(
+                                            "Invalid embedding value at index {}: {}",
+                                            i, value
+                                        ),
+                                    });
+                                }
+                            }
+
+                            // Normalize
+                            let norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            if norm == 0.0 {
+                                return Err(BatchError::ValidationError {
+                                    message: "Cannot normalize zero vector".to_string(),
+                                });
+                            }
+                            for value in emb.iter_mut() {
+                                *value /= norm;
+                            }
+
+                            memory.embedding = Some(emb);
+                        }
+                        None => {
+                            // Remove embedding
+                            memory.embedding = None;
+                        }
+                    }
                 }
 
                 let updated = self.storage.update_memory(memory).await.map_err(|e| {

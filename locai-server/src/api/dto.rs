@@ -117,6 +117,14 @@ pub struct CreateMemoryRequest {
     /// Additional properties
     #[serde(default)]
     pub properties: serde_json::Value,
+
+    /// Optional embedding vector (1024 dimensions required for vector search)
+    ///
+    /// If provided, this embedding will be used for vector search. If omitted and ML service
+    /// is configured, an embedding will be auto-generated. Embeddings must be 1024 dimensions
+    /// to work with the SurrealDB M-Tree index.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Vec<f32>>,
 }
 
 fn default_source() -> String {
@@ -157,6 +165,14 @@ pub struct UpdateMemoryRequest {
 
     /// Updated properties (optional)
     pub properties: Option<serde_json::Value>,
+
+    /// Updated embedding vector (optional, 1024 dimensions required for vector search)
+    ///
+    /// If provided, replaces the existing embedding. If set to null, removes the embedding.
+    /// Embeddings must be 1024 dimensions to work with the SurrealDB M-Tree index.
+    /// Use `Some(None)` to remove embedding, `Some(Some(vec))` to set embedding, `None` to leave unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Option<Vec<f32>>>,
 }
 
 /// Entity DTO for API responses

@@ -55,13 +55,55 @@ pub async fn create_memory(
     };
 
     // Build the memory
-    let memory = MemoryBuilder::new_with_content(request.content)
+    let mut memory_builder = MemoryBuilder::new_with_content(request.content)
         .memory_type(memory_type)
         .priority(priority)
         .tags(request.tags.iter().map(|s| s.as_str()).collect())
         .source(request.source)
-        .properties_json(request.properties)
-        .build();
+        .properties_json(request.properties);
+
+    // Handle user-provided embedding with validation and normalization
+    if let Some(mut embedding) = request.embedding {
+        // Validate dimensions (1024 required for SurrealDB M-Tree index)
+        const EXPECTED_DIMENSIONS: usize = 1024;
+        if embedding.len() != EXPECTED_DIMENSIONS {
+            return Err(ServerError::BadRequest(format!(
+                "Embedding dimension mismatch: expected {} dimensions (required for SurrealDB M-Tree index), but got {}. \
+                 Vector search will fail with this dimension. Please provide a {}-dimensional embedding or omit the embedding field.",
+                EXPECTED_DIMENSIONS,
+                embedding.len(),
+                EXPECTED_DIMENSIONS
+            )));
+        }
+
+        // Validate embedding values (no NaN/infinity)
+        for (i, &value) in embedding.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ServerError::BadRequest(format!(
+                    "Invalid embedding value at index {}: {}. Embeddings must contain only finite values.",
+                    i, value
+                )));
+            }
+        }
+
+        // Normalize embedding for cosine similarity (required for consistent search results)
+        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm == 0.0 {
+            return Err(ServerError::BadRequest(
+                "Cannot normalize zero vector. Embedding must contain at least one non-zero value."
+                    .to_string(),
+            ));
+        }
+        for value in embedding.iter_mut() {
+            *value /= norm;
+        }
+
+        memory_builder = memory_builder.embedding(embedding);
+    }
+    // TODO: Auto-generate embedding if ML service is configured and user didn't provide one
+    // This requires EmbeddingModel implementation which may not be available yet
+
+    let memory = memory_builder.build();
 
     // Store the memory
     let memory_id = state.memory_manager.store_memory(memory.clone()).await?;
@@ -287,6 +329,52 @@ pub async fn update_memory(
 
     if let Some(properties) = request.properties {
         memory.properties = properties;
+    }
+
+    // Handle embedding update
+    if let Some(embedding_option) = request.embedding {
+        match embedding_option {
+            Some(mut embedding) => {
+                // Validate dimensions (1024 required for SurrealDB M-Tree index)
+                const EXPECTED_DIMENSIONS: usize = 1024;
+                if embedding.len() != EXPECTED_DIMENSIONS {
+                    return Err(ServerError::BadRequest(format!(
+                        "Embedding dimension mismatch: expected {} dimensions (required for SurrealDB M-Tree index), but got {}. \
+                         Vector search will fail with this dimension. Please provide a {}-dimensional embedding.",
+                        EXPECTED_DIMENSIONS,
+                        embedding.len(),
+                        EXPECTED_DIMENSIONS
+                    )));
+                }
+
+                // Validate embedding values (no NaN/infinity)
+                for (i, &value) in embedding.iter().enumerate() {
+                    if !value.is_finite() {
+                        return Err(ServerError::BadRequest(format!(
+                            "Invalid embedding value at index {}: {}. Embeddings must contain only finite values.",
+                            i, value
+                        )));
+                    }
+                }
+
+                // Normalize embedding for cosine similarity
+                let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm == 0.0 {
+                    return Err(ServerError::BadRequest(
+                        "Cannot normalize zero vector. Embedding must contain at least one non-zero value.".to_string()
+                    ));
+                }
+                for value in embedding.iter_mut() {
+                    *value /= norm;
+                }
+
+                memory.embedding = Some(embedding);
+            }
+            None => {
+                // Remove embedding (set to None)
+                memory.embedding = None;
+            }
+        }
     }
 
     // Update the memory

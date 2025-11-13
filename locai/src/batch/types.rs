@@ -24,6 +24,8 @@ pub enum BatchOperation {
         source: Option<String>,
         /// Optional custom properties
         properties: Option<Value>,
+        /// Optional embedding vector (1024 dimensions required for vector search)
+        embedding: Option<Vec<f32>>,
     },
 
     /// Update an existing memory
@@ -38,6 +40,8 @@ pub enum BatchOperation {
         tags: Option<Vec<String>>,
         /// Optional new properties (merged)
         properties: Option<Value>,
+        /// Optional embedding vector (1024 dimensions required, set to null to remove)
+        embedding: Option<Option<Vec<f32>>>,
     },
 
     /// Delete a memory
@@ -314,6 +318,7 @@ mod tests {
             tags: Some(vec!["important".to_string()]),
             source: None,
             properties: None,
+            embedding: None,
         };
 
         let json = serde_json::to_string(&op).expect("Should serialize");
