@@ -31,7 +31,7 @@ docker run --rm locai-cli:latest --help
 
 # Create a memory
 docker run --rm -v locai-data:/data locai-cli:latest \
-  memory create "Docker CLI is working!" --priority high
+  memory add "Docker CLI is working!" --priority high
 
 # List memories
 docker run --rm -v locai-data:/data locai-cli:latest \
@@ -52,7 +52,7 @@ docker-compose up -d locai-server
 
 # Run CLI commands against shared data
 docker-compose run --rm locai-cli memory list
-docker-compose run --rm locai-cli memory create "Hello from CLI"
+docker-compose run --rm locai-cli memory add "Hello from CLI"
 docker-compose run --rm locai-cli entity list
 ```
 
@@ -75,13 +75,13 @@ locai-cli memory search "query"
 ```bash
 # Create a memory
 docker run --rm -v $(pwd)/data:/data locai-cli:latest \
-  memory create "Important note" \
+  memory add "Important note" \
   --priority high \
   --tags important,note
 
 # Export memories to JSON
 docker run --rm -v $(pwd)/data:/data -v $(pwd):/output locai-cli:latest \
-  memory list --format json > /output/memories.json
+  memory list --output json > /output/memories.json
 ```
 
 ### 2. CI/CD Integration
@@ -103,7 +103,7 @@ jobs:
             -v ${{ secrets.DATA_PATH }}:/data \
             -v ./backup:/output \
             ghcr.io/blakebarnett/locai-cli:latest \
-            memory list --format json > backup/memories-$(date +%Y%m%d).json
+            memory list --output json > backup/memories-$(date +%Y%m%d).json
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -150,7 +150,7 @@ spec:
 # Import memories from file
 cat memories.txt | while read line; do
   docker run --rm -v locai-data:/data locai-cli:latest \
-    memory create "$line"
+    memory add "$line"
 done
 
 # Or use a script
@@ -325,7 +325,7 @@ docker run --rm --entrypoint /usr/local/bin/locai-cli locai-cli:latest --version
 4. **Logging**
    - Set `RUST_LOG` for appropriate verbosity
    - Redirect output to files for records
-   - Use `--format json` for machine-readable output
+   - Use `--output json` or `--machine` for machine-readable output
 
 ## Future Enhancements
 

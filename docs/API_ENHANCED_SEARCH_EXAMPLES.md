@@ -16,13 +16,29 @@ The search endpoint supports optional lifecycle-aware scoring that combines mult
 
 ---
 
-## Basic Search (No Scoring)
+## Basic Search
 
-Default behavior uses BM25 text search only:
+### Text Search (Default)
+
+Default behavior uses BM25 text search only (for backward compatibility):
 
 ```bash
-curl "http://localhost:3000/api/memories/search?q=magic+spell&limit=10"
+curl "http://localhost:3000/api/memories/search?q=magic+spell&limit=10&mode=text"
 ```
+
+### Hybrid Search (Recommended)
+
+**Recommended when ML service is configured.** Automatically combines text and semantic search:
+
+```bash
+curl "http://localhost:3000/api/memories/search?q=magic+spell&limit=10&mode=hybrid"
+```
+
+Hybrid search provides the best results by combining:
+- **Text search**: Finds exact keyword matches
+- **Semantic search**: Finds related concepts (e.g., "spell" matches "magic", "incantation")
+
+**Note**: Falls back to text-only if ML service is not configured.
 
 ---
 
@@ -88,9 +104,9 @@ curl -G "http://localhost:3000/api/memories/search" \
 
 ---
 
-### Example 5: Semantic + Lifecycle Scoring
+### Example 5: Hybrid Search + Lifecycle Scoring (Recommended)
 
-Combine vector similarity with lifecycle metadata:
+Combine hybrid search (text + semantic) with lifecycle metadata:
 
 ```bash
 curl -G "http://localhost:3000/api/memories/search" \
