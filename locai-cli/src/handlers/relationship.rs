@@ -1,7 +1,7 @@
 //! Relationship command handlers
 
-use crate::context::LocaiCliContext;
 use crate::commands::RelationshipCommands;
+use crate::context::LocaiCliContext;
 use crate::output::*;
 use colored::Colorize;
 use locai::LocaiError;
@@ -107,7 +107,9 @@ pub async fn handle_relationship_command(
                 .memory_manager
                 .get_relationship(&args.id)
                 .await?
-                .ok_or_else(|| LocaiError::Other(format!("Relationship '{}' not found", args.id)))?;
+                .ok_or_else(|| {
+                    LocaiError::Other(format!("Relationship '{}' not found", args.id))
+                })?;
 
             if let Some(relationship_type) = args.relationship_type {
                 relationship.relationship_type = relationship_type;

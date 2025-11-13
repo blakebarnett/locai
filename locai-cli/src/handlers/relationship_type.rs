@@ -1,7 +1,7 @@
 //! Relationship type command handlers
 
-use crate::context::LocaiCliContext;
 use crate::commands::RelationshipTypeCommands;
+use crate::context::LocaiCliContext;
 use crate::output::*;
 use colored::Colorize;
 use locai::LocaiError;
@@ -163,7 +163,11 @@ pub async fn handle_relationship_type_command(
                 type_def = type_def.with_metadata_schema(schema);
             }
 
-            match ctx.relationship_type_registry.register(type_def.clone()).await {
+            match ctx
+                .relationship_type_registry
+                .register(type_def.clone())
+                .await
+            {
                 Ok(()) => {
                     if output_format == "json" {
                         println!(
@@ -182,7 +186,10 @@ pub async fn handle_relationship_type_command(
                     }
                 }
                 Err(e) => {
-                    output_error(&format!("Failed to register relationship type: {}", e), output_format);
+                    output_error(
+                        &format!("Failed to register relationship type: {}", e),
+                        output_format,
+                    );
                 }
             }
         }
@@ -192,7 +199,9 @@ pub async fn handle_relationship_type_command(
                 .relationship_type_registry
                 .get(&args.name)
                 .await
-                .ok_or_else(|| LocaiError::Other(format!("Relationship type '{}' not found", args.name)))?;
+                .ok_or_else(|| {
+                    LocaiError::Other(format!("Relationship type '{}' not found", args.name))
+                })?;
 
             if let Some(inverse) = args.inverse {
                 type_def = type_def.with_inverse(inverse);
@@ -244,7 +253,11 @@ pub async fn handle_relationship_type_command(
                 type_def = type_def.with_metadata_schema(schema);
             }
 
-            match ctx.relationship_type_registry.update(type_def.clone()).await {
+            match ctx
+                .relationship_type_registry
+                .update(type_def.clone())
+                .await
+            {
                 Ok(()) => {
                     if output_format == "json" {
                         println!(
@@ -263,7 +276,10 @@ pub async fn handle_relationship_type_command(
                     }
                 }
                 Err(e) => {
-                    output_error(&format!("Failed to update relationship type: {}", e), output_format);
+                    output_error(
+                        &format!("Failed to update relationship type: {}", e),
+                        output_format,
+                    );
                 }
             }
         }
@@ -278,7 +294,8 @@ pub async fn handle_relationship_type_command(
                         });
                         println!(
                             "{}",
-                            serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                            serde_json::to_string_pretty(&result)
+                                .unwrap_or_else(|_| "{}".to_string())
                         );
                     } else {
                         println!(
@@ -291,7 +308,10 @@ pub async fn handle_relationship_type_command(
                     }
                 }
                 Err(e) => {
-                    output_error(&format!("Failed to delete relationship type: {}", e), output_format);
+                    output_error(
+                        &format!("Failed to delete relationship type: {}", e),
+                        output_format,
+                    );
                 }
             }
         }
@@ -317,7 +337,9 @@ pub async fn handle_relationship_type_command(
             } else {
                 println!(
                     "{}",
-                    "━━━ Relationship Type Metrics ━━━".color(CliColors::accent()).bold()
+                    "━━━ Relationship Type Metrics ━━━"
+                        .color(CliColors::accent())
+                        .bold()
                 );
                 println!(
                     "{}: {}",
@@ -368,7 +390,8 @@ pub async fn handle_relationship_type_command(
                         });
                         println!(
                             "{}",
-                            serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                            serde_json::to_string_pretty(&result)
+                                .unwrap_or_else(|_| "{}".to_string())
                         );
                     } else {
                         println!(
@@ -381,7 +404,10 @@ pub async fn handle_relationship_type_command(
                     }
                 }
                 Err(e) => {
-                    output_error(&format!("Failed to seed relationship types: {}", e), output_format);
+                    output_error(
+                        &format!("Failed to seed relationship types: {}", e),
+                        output_format,
+                    );
                 }
             }
         }

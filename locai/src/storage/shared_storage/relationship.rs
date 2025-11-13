@@ -139,7 +139,7 @@ where
         // Create appropriate edge table entries based on relationship type and node types
         // Check if both source and target are memories (for direct memory-to-memory relationships)
         let target_is_memory = self.get_memory(&relationship.target_id).await?.is_some();
-        
+
         if source_is_memory && target_is_memory {
             // Memory-to-memory relationships are stored in the relationship table only
             // No edge table entry needed - graph traversal will query the relationship table directly

@@ -312,7 +312,7 @@ where
             tracing::debug!("{} already exists, skipping", description);
             return Ok(());
         }
-        
+
         // For other errors, log and fail
         let error_msg = format!("Schema creation failed for {}: {}", description, e);
         tracing::error!("{}", error_msg);

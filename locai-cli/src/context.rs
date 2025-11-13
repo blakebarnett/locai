@@ -20,13 +20,12 @@ impl LocaiCliContext {
         } else {
             locai::init_with_defaults().await?
         };
-        
+
         let registry = RelationshipTypeRegistry::new();
-        
-        Ok(Self { 
+
+        Ok(Self {
             memory_manager: mm,
             relationship_type_registry: registry,
         })
     }
 }
-

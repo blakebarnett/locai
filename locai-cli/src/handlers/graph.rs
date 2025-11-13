@@ -1,7 +1,7 @@
 //! Graph command handlers
 
-use crate::context::LocaiCliContext;
 use crate::commands::GraphCommands;
+use crate::context::LocaiCliContext;
 use crate::output::*;
 use crate::utils::*;
 use colored::Colorize;
@@ -32,7 +32,8 @@ pub async fn handle_graph_command(
                     let duration_seconds = (end - start).num_seconds();
 
                     if output_format == "json" {
-                        let mut graph_json: Value = serde_json::to_value(&graph).unwrap_or_default();
+                        let mut graph_json: Value =
+                            serde_json::to_value(&graph).unwrap_or_default();
                         graph_json["temporal_span"] = json!({
                             "start": start.to_rfc3339(),
                             "end": end.to_rfc3339(),
@@ -40,15 +41,44 @@ pub async fn handle_graph_command(
                             "duration_seconds": duration_seconds,
                             "memory_count": memories.len()
                         });
-                        println!("{}", serde_json::to_string_pretty(&graph_json).unwrap_or_else(|_| "{}".to_string()));
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&graph_json)
+                                .unwrap_or_else(|_| "{}".to_string())
+                        );
                     } else {
                         print_memory_graph(&graph);
                         println!();
-                        println!("{}", "━━━ Temporal Span ━━━".color(CliColors::accent()).bold());
-                        println!("{}: {}", "Start".color(CliColors::muted()), start.format("%Y-%m-%d %H:%M:%S UTC").to_string().color(CliColors::primary()));
-                        println!("{}: {}", "End".color(CliColors::muted()), end.format("%Y-%m-%d %H:%M:%S UTC").to_string().color(CliColors::primary()));
-                        println!("{}: {} days ({} seconds)", "Duration".color(CliColors::muted()), duration_days.to_string().color(CliColors::accent()), duration_seconds.to_string().color(CliColors::muted()));
-                        println!("{}: {}", "Memory Count".color(CliColors::muted()), memories.len().to_string().color(CliColors::accent()));
+                        println!(
+                            "{}",
+                            "━━━ Temporal Span ━━━".color(CliColors::accent()).bold()
+                        );
+                        println!(
+                            "{}: {}",
+                            "Start".color(CliColors::muted()),
+                            start
+                                .format("%Y-%m-%d %H:%M:%S UTC")
+                                .to_string()
+                                .color(CliColors::primary())
+                        );
+                        println!(
+                            "{}: {}",
+                            "End".color(CliColors::muted()),
+                            end.format("%Y-%m-%d %H:%M:%S UTC")
+                                .to_string()
+                                .color(CliColors::primary())
+                        );
+                        println!(
+                            "{}: {} days ({} seconds)",
+                            "Duration".color(CliColors::muted()),
+                            duration_days.to_string().color(CliColors::accent()),
+                            duration_seconds.to_string().color(CliColors::muted())
+                        );
+                        println!(
+                            "{}: {}",
+                            "Memory Count".color(CliColors::muted()),
+                            memories.len().to_string().color(CliColors::accent())
+                        );
                     }
                     return Ok(());
                 }
@@ -84,13 +114,13 @@ pub async fn handle_graph_command(
 
         GraphCommands::Connected(args) => {
             let memory_id = resolve_memory_id(ctx, &args.id).await?;
-            
+
             let relationship_type = if args.relationship_type == "all" {
                 None
             } else {
                 Some(args.relationship_type.as_str())
             };
-            
+
             let mut graph = ctx
                 .memory_manager
                 .get_memory_graph(&memory_id, args.depth)
@@ -140,8 +170,16 @@ pub async fn handle_graph_command(
                         &rel.source_id
                     };
 
-                    let source_is_memory = ctx.memory_manager.get_memory(&rel.source_id).await?.is_some();
-                    let target_is_memory = ctx.memory_manager.get_memory(&rel.target_id).await?.is_some();
+                    let source_is_memory = ctx
+                        .memory_manager
+                        .get_memory(&rel.source_id)
+                        .await?
+                        .is_some();
+                    let target_is_memory = ctx
+                        .memory_manager
+                        .get_memory(&rel.target_id)
+                        .await?
+                        .is_some();
 
                     if source_is_memory && target_is_memory {
                         if !graph.relationships.iter().any(|r| r.id == rel.id) {
@@ -163,11 +201,15 @@ pub async fn handle_graph_command(
             }
 
             if let Some(rel_type) = relationship_type {
-                graph.relationships.retain(|r| r.relationship_type == rel_type);
+                graph
+                    .relationships
+                    .retain(|r| r.relationship_type == rel_type);
             }
 
             if args.no_temporal {
-                graph.relationships.retain(|r| r.relationship_type != "temporal_sequence");
+                graph
+                    .relationships
+                    .retain(|r| r.relationship_type != "temporal_sequence");
             }
 
             if output_format == "json" {
@@ -223,23 +265,23 @@ pub async fn handle_graph_command(
             // Calculate connected components using BFS
             let mut connected_components = 0u64;
             let mut visited = std::collections::HashSet::new();
-            
+
             // Get all memories for traversal
             let all_memories = ctx
                 .memory_manager
                 .filter_memories(MemoryFilter::default(), None, None, None)
                 .await?;
-            
+
             for memory in &all_memories {
                 if visited.contains(&memory.id) {
                     continue;
                 }
-                
+
                 // BFS to find all connected memories
                 let mut queue = std::collections::VecDeque::new();
                 queue.push_back(memory.id.clone());
                 visited.insert(memory.id.clone());
-                
+
                 while let Some(current_id) = queue.pop_front() {
                     // Get relationships where this memory is source or target
                     let source_filter = RelationshipFilter {
@@ -252,7 +294,7 @@ pub async fn handle_graph_command(
                         target_id: Some(current_id.clone()),
                         ..Default::default()
                     };
-                    
+
                     let source_rels = ctx
                         .memory_manager
                         .list_relationships(Some(source_filter), None, None)
@@ -263,20 +305,30 @@ pub async fn handle_graph_command(
                         .list_relationships(Some(target_filter), None, None)
                         .await
                         .unwrap_or_default();
-                    
+
                     for rel in source_rels.iter().chain(target_rels.iter()) {
                         // Check if both source and target are memories
                         // Use unwrap_or_default to handle errors gracefully
-                        let source_is_memory = ctx.memory_manager.get_memory(&rel.source_id).await.unwrap_or(None).is_some();
-                        let target_is_memory = ctx.memory_manager.get_memory(&rel.target_id).await.unwrap_or(None).is_some();
-                        
+                        let source_is_memory = ctx
+                            .memory_manager
+                            .get_memory(&rel.source_id)
+                            .await
+                            .unwrap_or(None)
+                            .is_some();
+                        let target_is_memory = ctx
+                            .memory_manager
+                            .get_memory(&rel.target_id)
+                            .await
+                            .unwrap_or(None)
+                            .is_some();
+
                         if source_is_memory && target_is_memory {
                             let other_id = if rel.source_id == current_id {
                                 &rel.target_id
                             } else {
                                 &rel.source_id
                             };
-                            
+
                             if !visited.contains(other_id) {
                                 visited.insert(other_id.clone());
                                 queue.push_back(other_id.clone());
@@ -284,7 +336,7 @@ pub async fn handle_graph_command(
                         }
                     }
                 }
-                
+
                 connected_components += 1;
             }
 
@@ -302,22 +354,59 @@ pub async fn handle_graph_command(
                         "content_preview": content
                     })).collect::<Vec<_>>()
                 });
-                println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                );
             } else {
-                println!("{}", "━━━ Graph Metrics ━━━".color(CliColors::accent()).bold());
+                println!(
+                    "{}",
+                    "━━━ Graph Metrics ━━━".color(CliColors::accent()).bold()
+                );
                 println!();
-                println!("{}: {}", "Memories".color(CliColors::muted()), memory_count.to_string().color(CliColors::accent()).bold());
-                println!("{}: {}", "Relationships".color(CliColors::muted()), relationship_count.to_string().color(CliColors::accent()).bold());
-                println!("{}: {}", "Entities".color(CliColors::muted()), entity_count.to_string().color(CliColors::accent()).bold());
-                println!("{}: {:.2}", "Average Degree".color(CliColors::muted()), average_degree.to_string().color(CliColors::accent()));
-                println!("{}: {:.4}", "Graph Density".color(CliColors::muted()), density.to_string().color(CliColors::accent()));
-                println!("{}: {}", "Connected Components".color(CliColors::muted()), connected_components.to_string().color(CliColors::accent()));
+                println!(
+                    "{}: {}",
+                    "Memories".color(CliColors::muted()),
+                    memory_count.to_string().color(CliColors::accent()).bold()
+                );
+                println!(
+                    "{}: {}",
+                    "Relationships".color(CliColors::muted()),
+                    relationship_count
+                        .to_string()
+                        .color(CliColors::accent())
+                        .bold()
+                );
+                println!(
+                    "{}: {}",
+                    "Entities".color(CliColors::muted()),
+                    entity_count.to_string().color(CliColors::accent()).bold()
+                );
+                println!(
+                    "{}: {:.2}",
+                    "Average Degree".color(CliColors::muted()),
+                    average_degree.to_string().color(CliColors::accent())
+                );
+                println!(
+                    "{}: {:.4}",
+                    "Graph Density".color(CliColors::muted()),
+                    density.to_string().color(CliColors::accent())
+                );
+                println!(
+                    "{}: {}",
+                    "Connected Components".color(CliColors::muted()),
+                    connected_components.to_string().color(CliColors::accent())
+                );
 
                 if !central_memories.is_empty() {
                     println!();
-                    println!("{}", "Central Memories (Top 5):".color(CliColors::muted()).bold());
+                    println!(
+                        "{}",
+                        "Central Memories (Top 5):".color(CliColors::muted()).bold()
+                    );
                     for (i, (memory_id, score, content)) in central_memories.iter().enumerate() {
-                        println!("  {}. {} (score: {:.1}) - {}", 
+                        println!(
+                            "  {}. {} (score: {:.1}) - {}",
                             (i + 1).to_string().color(CliColors::muted()),
                             memory_id[..8].color(CliColors::accent()),
                             score,
@@ -346,12 +435,16 @@ pub async fn handle_graph_command(
 
                 if all_memories.is_empty() {
                     if output_format == "json" {
-                        println!("{}", serde_json::to_string_pretty(&json!({
-                            "query": args.pattern,
-                            "results": [],
-                            "total_results": 0,
-                            "message": "No memories found in storage"
-                        })).unwrap_or_else(|_| "{}".to_string()));
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json!({
+                                "query": args.pattern,
+                                "results": [],
+                                "total_results": 0,
+                                "message": "No memories found in storage"
+                            }))
+                            .unwrap_or_else(|_| "{}".to_string())
+                        );
                     } else {
                         println!("{}", format_info("No memories found in storage."));
                     }
@@ -378,12 +471,16 @@ pub async fn handle_graph_command(
 
                 if all_memories.is_empty() {
                     if output_format == "json" {
-                        println!("{}", serde_json::to_string_pretty(&json!({
-                            "query": args.pattern,
-                            "results": [],
-                            "total_results": 0,
-                            "message": "No memories found in storage"
-                        })).unwrap_or_else(|_| "{}".to_string()));
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json!({
+                                "query": args.pattern,
+                                "results": [],
+                                "total_results": 0,
+                                "message": "No memories found in storage"
+                            }))
+                            .unwrap_or_else(|_| "{}".to_string())
+                        );
                     } else {
                         println!("{}", format_info("No memories found in storage."));
                     }
@@ -423,7 +520,11 @@ pub async fn handle_graph_command(
                             results.push((search_result.memory.id.clone(), graph));
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to get graph for memory {}: {}", search_result.memory.id, e);
+                            tracing::warn!(
+                                "Failed to get graph for memory {}: {}",
+                                search_result.memory.id,
+                                e
+                            );
                         }
                     }
                 }
@@ -443,9 +544,18 @@ pub async fn handle_graph_command(
                     })).collect::<Vec<_>>(),
                     "total_results": results.len()
                 });
-                println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                );
             } else {
-                println!("{}", format_info(&format!("Graph Query: \"{}\"", args.pattern.color(CliColors::accent()))));
+                println!(
+                    "{}",
+                    format_info(&format!(
+                        "Graph Query: \"{}\"",
+                        args.pattern.color(CliColors::accent())
+                    ))
+                );
                 if results.is_empty() {
                     println!("{}", format_info("No matching graph structures found."));
                 } else {
@@ -453,12 +563,23 @@ pub async fn handle_graph_command(
                     println!("Found {} matching graph structures:", results.len());
                     println!();
                     for (i, (center_id, graph)) in results.iter().enumerate() {
-                        println!("Graph {} (Center: {}):", 
+                        println!(
+                            "Graph {} (Center: {}):",
                             (i + 1).to_string().color(CliColors::muted()),
                             center_id[..8].color(CliColors::accent())
                         );
-                        println!("  Nodes: {} memories", graph.memories.len().to_string().color(CliColors::accent()));
-                        println!("  Edges: {} relationships", graph.relationships.len().to_string().color(CliColors::accent()));
+                        println!(
+                            "  Nodes: {} memories",
+                            graph.memories.len().to_string().color(CliColors::accent())
+                        );
+                        println!(
+                            "  Edges: {} relationships",
+                            graph
+                                .relationships
+                                .len()
+                                .to_string()
+                                .color(CliColors::accent())
+                        );
                         if !graph.memories.is_empty() {
                             println!("  Memories:");
                             for memory in graph.memories.values().take(3) {
@@ -467,14 +588,20 @@ pub async fn handle_graph_command(
                                 } else {
                                     memory.content.clone()
                                 };
-                                println!("    {} [{}] {}", 
+                                println!(
+                                    "    {} [{}] {}",
                                     "●".color(CliColors::accent()),
                                     format_memory_type(&memory.memory_type),
                                     content.color(CliColors::primary())
                                 );
                             }
                             if graph.memories.len() > 3 {
-                                println!("    ... and {} more", (graph.memories.len() - 3).to_string().color(CliColors::muted()));
+                                println!(
+                                    "    ... and {} more",
+                                    (graph.memories.len() - 3)
+                                        .to_string()
+                                        .color(CliColors::muted())
+                                );
                             }
                         }
                         if i < results.len() - 1 {
@@ -487,8 +614,16 @@ pub async fn handle_graph_command(
 
         GraphCommands::Similar(args) => {
             // Validate pattern_id exists
-            if ctx.memory_manager.get_memory(&args.pattern_id).await?.is_none() {
-                output_error(&format!("Pattern memory '{}' not found", args.pattern_id), output_format);
+            if ctx
+                .memory_manager
+                .get_memory(&args.pattern_id)
+                .await?
+                .is_none()
+            {
+                output_error(
+                    &format!("Pattern memory '{}' not found", args.pattern_id),
+                    output_format,
+                );
                 return Ok(());
             }
 
@@ -506,7 +641,13 @@ pub async fn handle_graph_command(
                 .collect();
 
             if pattern_graph.memories.is_empty() {
-                output_error(&format!("Pattern memory '{}' has no graph structure", args.pattern_id), output_format);
+                output_error(
+                    &format!(
+                        "Pattern memory '{}' has no graph structure",
+                        args.pattern_id
+                    ),
+                    output_format,
+                );
                 return Ok(());
             }
 
@@ -518,14 +659,21 @@ pub async fn handle_graph_command(
 
             if candidate_memories.is_empty() {
                 if output_format == "json" {
-                    println!("{}", serde_json::to_string_pretty(&json!({
-                        "pattern_id": args.pattern_id,
-                        "results": [],
-                        "total_results": 0,
-                        "message": "No candidate memories found for comparison"
-                    })).unwrap_or_else(|_| "{}".to_string()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "pattern_id": args.pattern_id,
+                            "results": [],
+                            "total_results": 0,
+                            "message": "No candidate memories found for comparison"
+                        }))
+                        .unwrap_or_else(|_| "{}".to_string())
+                    );
                 } else {
-                    println!("{}", format_info("No candidate memories found for comparison."));
+                    println!(
+                        "{}",
+                        format_info("No candidate memories found for comparison.")
+                    );
                 }
                 return Ok(());
             }
@@ -545,18 +693,30 @@ pub async fn handle_graph_command(
                             .map(|r| r.relationship_type.clone())
                             .collect();
 
-                        let structure_similarity = if pattern_memory_count > 0 && candidate_memory_count > 0 {
-                            let memory_ratio = (pattern_memory_count.min(candidate_memory_count) as f64) 
+                        let structure_similarity = if pattern_memory_count > 0
+                            && candidate_memory_count > 0
+                        {
+                            let memory_ratio = (pattern_memory_count.min(candidate_memory_count)
+                                as f64)
                                 / (pattern_memory_count.max(candidate_memory_count) as f64);
-                            let relationship_ratio = if pattern_relationship_count > 0 && candidate_relationship_count > 0 {
-                                (pattern_relationship_count.min(candidate_relationship_count) as f64)
-                                    / (pattern_relationship_count.max(candidate_relationship_count) as f64)
+                            let relationship_ratio = if pattern_relationship_count > 0
+                                && candidate_relationship_count > 0
+                            {
+                                (pattern_relationship_count.min(candidate_relationship_count)
+                                    as f64)
+                                    / (pattern_relationship_count.max(candidate_relationship_count)
+                                        as f64)
                             } else {
                                 0.0
                             };
-                            let type_overlap = pattern_relationship_types.intersection(&candidate_relationship_types).count() as f64
-                                / pattern_relationship_types.union(&candidate_relationship_types).count().max(1) as f64;
-                            
+                            let type_overlap = pattern_relationship_types
+                                .intersection(&candidate_relationship_types)
+                                .count() as f64
+                                / pattern_relationship_types
+                                    .union(&candidate_relationship_types)
+                                    .count()
+                                    .max(1) as f64;
+
                             memory_ratio * 0.3 + relationship_ratio * 0.3 + type_overlap * 0.4
                         } else {
                             0.0
@@ -568,7 +728,10 @@ pub async fn handle_graph_command(
                                 structure_similarity,
                                 candidate_memory_count,
                                 candidate_relationship_count,
-                                candidate_relationship_types.intersection(&pattern_relationship_types).cloned().collect::<Vec<_>>(),
+                                candidate_relationship_types
+                                    .intersection(&pattern_relationship_types)
+                                    .cloned()
+                                    .collect::<Vec<_>>(),
                             ));
                         }
                     }
@@ -578,7 +741,8 @@ pub async fn handle_graph_command(
                 }
             }
 
-            similar_structures.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            similar_structures
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             similar_structures.truncate(args.limit);
 
             if output_format == "json" {
@@ -592,15 +756,27 @@ pub async fn handle_graph_command(
                         "common_types": types
                     })).collect::<Vec<_>>()
                 });
-                println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                );
             } else {
-                println!("{}", format_info(&format!("Similar Structures to: {}", args.pattern_id.color(CliColors::accent()))));
+                println!(
+                    "{}",
+                    format_info(&format!(
+                        "Similar Structures to: {}",
+                        args.pattern_id.color(CliColors::accent())
+                    ))
+                );
                 if similar_structures.is_empty() {
                     println!("{}", format_info("No similar structures found."));
                 } else {
                     println!();
-                    for (i, (memory_id, similarity, nodes, edges, types)) in similar_structures.iter().enumerate() {
-                        println!("{}. {} (Similarity: {:.2})", 
+                    for (i, (memory_id, similarity, nodes, edges, types)) in
+                        similar_structures.iter().enumerate()
+                    {
+                        println!(
+                            "{}. {} (Similarity: {:.2})",
                             (i + 1).to_string().color(CliColors::muted()),
                             memory_id[..8].color(CliColors::accent()),
                             similarity
@@ -621,13 +797,19 @@ pub async fn handle_graph_command(
             let is_entity = ctx.memory_manager.get_entity(&args.id).await?.is_some();
 
             if !is_memory && !is_entity {
-                output_error(&format!("ID '{}' not found (not a memory or entity)", args.id), output_format);
+                output_error(
+                    &format!("ID '{}' not found (not a memory or entity)", args.id),
+                    output_format,
+                );
                 return Ok(());
             }
 
             if is_memory {
-                let graph = ctx.memory_manager.get_memory_graph(&args.id, args.depth).await?;
-                
+                let graph = ctx
+                    .memory_manager
+                    .get_memory_graph(&args.id, args.depth)
+                    .await?;
+
                 if args.include_temporal_span && !graph.memories.is_empty() {
                     let memories: Vec<_> = graph.memories.values().collect();
                     let mut timestamps: Vec<_> = memories.iter().map(|m| m.created_at).collect();
@@ -638,7 +820,8 @@ pub async fn handle_graph_command(
                         let duration_seconds = (end - start).num_seconds();
 
                         if output_format == "json" {
-                            let mut graph_json: Value = serde_json::to_value(&graph).unwrap_or_default();
+                            let mut graph_json: Value =
+                                serde_json::to_value(&graph).unwrap_or_default();
                             graph_json["temporal_span"] = json!({
                                 "start": start.to_rfc3339(),
                                 "end": end.to_rfc3339(),
@@ -646,22 +829,54 @@ pub async fn handle_graph_command(
                                 "duration_seconds": duration_seconds,
                                 "memory_count": memories.len()
                             });
-                            println!("{}", serde_json::to_string_pretty(&graph_json).unwrap_or_else(|_| "{}".to_string()));
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&graph_json)
+                                    .unwrap_or_else(|_| "{}".to_string())
+                            );
                         } else {
                             print_memory_graph(&graph);
                             println!();
-                            println!("{}", "━━━ Temporal Span ━━━".color(CliColors::accent()).bold());
-                            println!("{}: {}", "Start".color(CliColors::muted()), start.format("%Y-%m-%d %H:%M:%S UTC").to_string().color(CliColors::primary()));
-                            println!("{}: {}", "End".color(CliColors::muted()), end.format("%Y-%m-%d %H:%M:%S UTC").to_string().color(CliColors::primary()));
-                            println!("{}: {} days ({} seconds)", "Duration".color(CliColors::muted()), duration_days.to_string().color(CliColors::accent()), duration_seconds.to_string().color(CliColors::muted()));
-                            println!("{}: {}", "Memory Count".color(CliColors::muted()), memories.len().to_string().color(CliColors::accent()));
+                            println!(
+                                "{}",
+                                "━━━ Temporal Span ━━━".color(CliColors::accent()).bold()
+                            );
+                            println!(
+                                "{}: {}",
+                                "Start".color(CliColors::muted()),
+                                start
+                                    .format("%Y-%m-%d %H:%M:%S UTC")
+                                    .to_string()
+                                    .color(CliColors::primary())
+                            );
+                            println!(
+                                "{}: {}",
+                                "End".color(CliColors::muted()),
+                                end.format("%Y-%m-%d %H:%M:%S UTC")
+                                    .to_string()
+                                    .color(CliColors::primary())
+                            );
+                            println!(
+                                "{}: {} days ({} seconds)",
+                                "Duration".color(CliColors::muted()),
+                                duration_days.to_string().color(CliColors::accent()),
+                                duration_seconds.to_string().color(CliColors::muted())
+                            );
+                            println!(
+                                "{}: {}",
+                                "Memory Count".color(CliColors::muted()),
+                                memories.len().to_string().color(CliColors::accent())
+                            );
                         }
                         return Ok(());
                     }
                 }
 
                 if output_format == "json" {
-                    println!("{}", serde_json::to_string_pretty(&graph).unwrap_or_else(|_| "{}".to_string()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&graph).unwrap_or_else(|_| "{}".to_string())
+                    );
                 } else {
                     print_memory_graph(&graph);
                 }
@@ -721,14 +936,38 @@ pub async fn handle_graph_command(
                         "relationships": relationships,
                         "memories": memories
                     });
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                    );
                 } else {
-                    println!("{}", format_info(&format!("Entity Graph: {}", args.id.color(CliColors::accent()))));
+                    println!(
+                        "{}",
+                        format_info(&format!(
+                            "Entity Graph: {}",
+                            args.id.color(CliColors::accent())
+                        ))
+                    );
                     println!();
-                    println!("{}: {}", "Memories".color(CliColors::muted()), memories.len().to_string().color(CliColors::accent()));
-                    println!("{}: {}", "Entities".color(CliColors::muted()), related_entities.len().to_string().color(CliColors::accent()));
-                    println!("{}: {}", "Relationships".color(CliColors::muted()), relationships.len().to_string().color(CliColors::accent()));
-                    
+                    println!(
+                        "{}: {}",
+                        "Memories".color(CliColors::muted()),
+                        memories.len().to_string().color(CliColors::accent())
+                    );
+                    println!(
+                        "{}: {}",
+                        "Entities".color(CliColors::muted()),
+                        related_entities
+                            .len()
+                            .to_string()
+                            .color(CliColors::accent())
+                    );
+                    println!(
+                        "{}: {}",
+                        "Relationships".color(CliColors::muted()),
+                        relationships.len().to_string().color(CliColors::accent())
+                    );
+
                     if !memories.is_empty() {
                         println!();
                         println!("{}", "Memories:".color(CliColors::primary()).bold());
@@ -738,7 +977,8 @@ pub async fn handle_graph_command(
                             } else {
                                 memory.content.clone()
                             };
-                            println!("  {} [{}] {}", 
+                            println!(
+                                "  {} [{}] {}",
                                 "●".color(CliColors::accent()),
                                 format_memory_type(&memory.memory_type),
                                 content.color(CliColors::primary())
@@ -750,7 +990,8 @@ pub async fn handle_graph_command(
                         println!();
                         println!("{}", "Related Entities:".color(CliColors::primary()).bold());
                         for entity in related_entities.iter().take(10) {
-                            println!("  {} {} ({})", 
+                            println!(
+                                "  {} {} ({})",
                                 "◇".color(CliColors::entity()),
                                 entity.entity_type.color(CliColors::entity()),
                                 entity.id.color(CliColors::accent())

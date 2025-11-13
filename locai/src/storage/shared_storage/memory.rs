@@ -601,11 +601,11 @@ where
         );
 
         let query_vector_owned: Vec<f32> = query_vector.to_vec();
-        
+
         // Log query for debugging
         tracing::debug!("Vector search query: {}", vector_query);
         tracing::debug!("Query vector dimensions: {}", query_vector_owned.len());
-        
+
         // Debug: Check how many memories have embeddings
         let count_query = "SELECT VALUE count() FROM memory WHERE embedding IS NOT NULL";
         if let Ok(mut count_result) = self.client.query(count_query).await
@@ -614,7 +614,7 @@ where
         {
             tracing::debug!("Memories with embeddings: {}", count);
         }
-        
+
         let mut result = self
             .client
             .query(&vector_query)
@@ -655,11 +655,13 @@ where
                 return self.brute_force_vector_search(query_vector, limit).await;
             }
         };
-        
+
         tracing::debug!("Vector search returned {} results", results.len());
 
         if results.is_empty() {
-            tracing::debug!("M-Tree index search returned 0 results, falling back to brute-force search");
+            tracing::debug!(
+                "M-Tree index search returned 0 results, falling back to brute-force search"
+            );
             return self.brute_force_vector_search(query_vector, limit).await;
         }
 
@@ -980,11 +982,11 @@ where
         );
 
         let query_vector_owned: Vec<f32> = query_vector.to_vec();
-        
+
         // Log query for debugging
         tracing::debug!("Vector search query: {}", vector_query);
         tracing::debug!("Query vector dimensions: {}", query_vector_owned.len());
-        
+
         // Debug: Check how many memories have embeddings
         let count_query = "SELECT VALUE count() FROM memory WHERE embedding IS NOT NULL";
         if let Ok(mut count_result) = self.client.query(count_query).await
@@ -993,7 +995,7 @@ where
         {
             tracing::debug!("Memories with embeddings: {}", count);
         }
-        
+
         let mut result = self
             .client
             .query(&vector_query)
@@ -1034,11 +1036,13 @@ where
                 return self.brute_force_vector_search(query_vector, limit).await;
             }
         };
-        
+
         tracing::debug!("Vector search returned {} results", results.len());
 
         if results.is_empty() {
-            tracing::debug!("M-Tree index search returned 0 results, falling back to brute-force search");
+            tracing::debug!(
+                "M-Tree index search returned 0 results, falling back to brute-force search"
+            );
             return self.brute_force_vector_search(query_vector, limit).await;
         }
 
@@ -1057,11 +1061,7 @@ where
                     created_at: r.created_at,
                     updated_at: r.updated_at,
                 };
-                (
-                    Memory::from(memory),
-                    r.similarity_score,
-                    String::new(),
-                )
+                (Memory::from(memory), r.similarity_score, String::new())
             })
             .collect())
     }
@@ -1074,20 +1074,24 @@ where
         limit: usize,
     ) -> Result<Vec<(Memory, f32, String)>, StorageError> {
         tracing::debug!("Performing brute-force vector search");
-        
+
         // Get all memories with embeddings
         let all_memories_query = "SELECT * FROM memory WHERE embedding IS NOT NULL";
-        let mut result = self
-            .client
-            .query(all_memories_query)
-            .await
-            .map_err(|e| StorageError::Query(format!("Failed to fetch memories for brute-force search: {}", e)))?;
-
-        let memories: Vec<SurrealMemory> = result.take(0).map_err(|e| {
-            StorageError::Query(format!("Failed to extract memories: {}", e))
+        let mut result = self.client.query(all_memories_query).await.map_err(|e| {
+            StorageError::Query(format!(
+                "Failed to fetch memories for brute-force search: {}",
+                e
+            ))
         })?;
 
-        tracing::debug!("Found {} memories with embeddings for brute-force search", memories.len());
+        let memories: Vec<SurrealMemory> = result
+            .take(0)
+            .map_err(|e| StorageError::Query(format!("Failed to extract memories: {}", e)))?;
+
+        tracing::debug!(
+            "Found {} memories with embeddings for brute-force search",
+            memories.len()
+        );
 
         // Calculate cosine similarity for each memory
         let mut scored_memories: Vec<(Memory, f32)> = memories

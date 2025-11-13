@@ -303,7 +303,9 @@ pub async fn handle_memory_command(
                         existing.tags.push("semantic".to_string());
                         // Use higher score if semantic score is better
                         if let Some(sem_score) = result.score
-                            && existing.score.is_none_or(|text_score| sem_score > text_score)
+                            && existing
+                                .score
+                                .is_none_or(|text_score| sem_score > text_score)
                         {
                             existing.score = Some(sem_score);
                         }

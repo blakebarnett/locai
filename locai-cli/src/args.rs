@@ -1,5 +1,5 @@
 //! Command argument structures
-//! 
+//!
 //! This module contains all CLI argument structs organized by command category.
 
 use clap::Args;
@@ -541,4 +541,3 @@ pub enum Shell {
     Power,
     Elvish,
 }
-

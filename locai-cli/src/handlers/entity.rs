@@ -1,14 +1,14 @@
 //! Entity command handlers
 
-use crate::context::LocaiCliContext;
-use crate::commands::EntityCommands;
 use crate::args::*;
+use crate::commands::EntityCommands;
+use crate::context::LocaiCliContext;
 use crate::output::*;
+use colored::*;
 use locai::LocaiError;
 use locai::storage::filters::{EntityFilter, RelationshipFilter};
 use locai::storage::models::{Entity, Relationship};
 use serde_json::{Value, json};
-use colored::*;
 
 pub async fn handle_entity_command(
     cmd: EntityCommands,
@@ -148,7 +148,10 @@ pub async fn handle_entity_command(
                             match serde_json::from_str::<Value>(&props) {
                                 Ok(props) => props,
                                 Err(e) => {
-                                    output_error(&format!("Invalid JSON properties: {}", e), output_format);
+                                    output_error(
+                                        &format!("Invalid JSON properties: {}", e),
+                                        output_format,
+                                    );
                                     return Ok(());
                                 }
                             }
@@ -156,8 +159,16 @@ pub async fn handle_entity_command(
                             Value::Null
                         };
 
-                        if ctx.memory_manager.get_entity(&create_args.target).await?.is_none() {
-                            output_error(&format!("Target entity '{}' not found", create_args.target), output_format);
+                        if ctx
+                            .memory_manager
+                            .get_entity(&create_args.target)
+                            .await?
+                            .is_none()
+                        {
+                            output_error(
+                                &format!("Target entity '{}' not found", create_args.target),
+                                output_format,
+                            );
                             return Ok(());
                         }
 
@@ -172,10 +183,17 @@ pub async fn handle_entity_command(
                             updated_at: now,
                         };
 
-                        let created = ctx.memory_manager.create_relationship_entity(relationship).await?;
+                        let created = ctx
+                            .memory_manager
+                            .create_relationship_entity(relationship)
+                            .await?;
 
                         if output_format == "json" {
-                            println!("{}", serde_json::to_string_pretty(&created).unwrap_or_else(|_| "{}".to_string()));
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&created)
+                                    .unwrap_or_else(|_| "{}".to_string())
+                            );
                         } else {
                             println!(
                                 "{}",
@@ -221,17 +239,32 @@ pub async fn handle_entity_command(
                         "incoming": incoming,
                         "total": outgoing.len() + incoming.len()
                     });
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                    );
                 } else {
-                    println!("{}", format_info(&format!("Entity Relationships: {}", args.id.color(CliColors::accent()))));
+                    println!(
+                        "{}",
+                        format_info(&format!(
+                            "Entity Relationships: {}",
+                            args.id.color(CliColors::accent())
+                        ))
+                    );
                     println!();
                     if !outgoing.is_empty() {
-                        println!("{}", format_info(&format!("Outgoing Relationships ({}):", outgoing.len())));
+                        println!(
+                            "{}",
+                            format_info(&format!("Outgoing Relationships ({}):", outgoing.len()))
+                        );
                         print_relationship_list(&outgoing);
                         println!();
                     }
                     if !incoming.is_empty() {
-                        println!("{}", format_info(&format!("Incoming Relationships ({}):", incoming.len())));
+                        println!(
+                            "{}",
+                            format_info(&format!("Incoming Relationships ({}):", incoming.len()))
+                        );
                         print_relationship_list(&incoming);
                     }
                     if outgoing.is_empty() && incoming.is_empty() {
@@ -255,15 +288,26 @@ pub async fn handle_entity_command(
 
             let mut memories = Vec::new();
             for relationship in relationships {
-                if let Ok(Some(memory)) = ctx.memory_manager.get_memory(&relationship.source_id).await {
+                if let Ok(Some(memory)) =
+                    ctx.memory_manager.get_memory(&relationship.source_id).await
+                {
                     memories.push(memory);
                 }
             }
 
             if output_format == "json" {
-                println!("{}", serde_json::to_string_pretty(&memories).unwrap_or_else(|_| "[]".to_string()));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&memories).unwrap_or_else(|_| "[]".to_string())
+                );
             } else {
-                println!("{}", format_info(&format!("Memories for Entity: {}", args.id.color(CliColors::accent()))));
+                println!(
+                    "{}",
+                    format_info(&format!(
+                        "Memories for Entity: {}",
+                        args.id.color(CliColors::accent())
+                    ))
+                );
                 if memories.is_empty() {
                     println!("{}", format_info("No memories found."));
                 } else {
@@ -281,11 +325,15 @@ pub async fn handle_entity_command(
 
             if entities.is_empty() {
                 if output_format == "json" {
-                    println!("{}", serde_json::to_string_pretty(&json!({
-                        "central_entities": [],
-                        "total_results": 0,
-                        "message": "No entities found in storage"
-                    })).unwrap_or_else(|_| "{}".to_string()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "central_entities": [],
+                            "total_results": 0,
+                            "message": "No entities found in storage"
+                        }))
+                        .unwrap_or_else(|_| "{}".to_string())
+                    );
                 } else {
                     println!("{}", format_info("No entities found in storage."));
                 }
@@ -333,7 +381,12 @@ pub async fn handle_entity_command(
                     )
                 };
 
-                entity_centrality.push((entity.id, total_relationships, entity.entity_type, content_preview));
+                entity_centrality.push((
+                    entity.id,
+                    total_relationships,
+                    entity.entity_type,
+                    content_preview,
+                ));
             }
 
             entity_centrality.sort_by(|a, b| b.1.cmp(&a.1));
@@ -348,14 +401,21 @@ pub async fn handle_entity_command(
                         "preview": preview
                     })).collect::<Vec<_>>()
                 });
-                println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                );
             } else {
-                println!("{}", "━━━ Central Entities ━━━".color(CliColors::accent()).bold());
+                println!(
+                    "{}",
+                    "━━━ Central Entities ━━━".color(CliColors::accent()).bold()
+                );
                 if entity_centrality.is_empty() {
                     println!("{}", format_info("No entities found."));
                 } else {
                     println!();
-                    println!("{:<8} {:<36} {:<15} {:<10} {}", 
+                    println!(
+                        "{:<8} {:<36} {:<15} {:<10} {}",
                         "Rank".color(CliColors::muted()).bold(),
                         "Entity ID".color(CliColors::muted()).bold(),
                         "Type".color(CliColors::muted()).bold(),
@@ -363,8 +423,11 @@ pub async fn handle_entity_command(
                         "Preview".color(CliColors::muted()).bold()
                     );
                     println!("{}", "─".repeat(100).color(CliColors::muted()));
-                    for (i, (entity_id, score, entity_type, preview)) in entity_centrality.iter().enumerate() {
-                        println!("{:<8} {:<36} {:<15} {:<10} {}", 
+                    for (i, (entity_id, score, entity_type, preview)) in
+                        entity_centrality.iter().enumerate()
+                    {
+                        println!(
+                            "{:<8} {:<36} {:<15} {:<10} {}",
                             (i + 1).to_string().color(CliColors::muted()),
                             entity_id.color(CliColors::accent()),
                             entity_type.color(CliColors::entity()),

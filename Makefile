@@ -1,4 +1,4 @@
-.PHONY: help docker-build docker-run docker-push docker-clean test lint
+.PHONY: help docker-build docker-run docker-push docker-clean test lint fmt fmt-check format check pre-commit
 
 # Default target
 .DEFAULT_GOAL := help
@@ -128,10 +128,12 @@ test-docker: ## Test Docker build locally
 lint: ## Run linter
 	cargo clippy --all-features --workspace -- -D warnings
 
-fmt: ## Format code
+fmt: ## Format all code with rustfmt
 	cargo fmt --all
 
-fmt-check: ## Check code formatting
+format: fmt ## Alias for fmt (format all code)
+
+fmt-check: ## Check code formatting without modifying files
 	cargo fmt --all -- --check
 
 # Build targets
@@ -156,10 +158,13 @@ docker-buildx: ## Build multi-architecture image (requires buildx)
 		.
 
 # Utility targets
-check: ## Run all checks (lint, test, fmt-check)
+check: ## Run all checks (fmt-check, lint, test)
 	$(MAKE) fmt-check
 	$(MAKE) lint
 	$(MAKE) test
+
+pre-commit: fmt lint fmt-check ## Format code and run checks (useful before committing)
+	@echo "Pre-commit checks complete!"
 
 size: ## Show Docker image size
 	@docker images $(DOCKER_IMAGE) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"

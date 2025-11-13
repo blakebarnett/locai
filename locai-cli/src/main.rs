@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, CommandFactory};
+use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
 use tracing::{Level, error, info};
 
@@ -12,7 +12,7 @@ mod utils;
 
 use context::LocaiCliContext;
 use handlers::*;
-use output::{CliColors, format_success, format_error, format_info};
+use output::{CliColors, format_error, format_info, format_success};
 
 #[derive(Parser)]
 #[command(name = "locai-cli")]
@@ -104,7 +104,7 @@ enum Commands {
 #[tokio::main]
 async fn main() {
     let cli_args = Cli::parse();
-    
+
     let output_format_str = if cli_args.machine {
         "json".to_string()
     } else if atty::isnt(atty::Stream::Stdout) {
@@ -113,9 +113,9 @@ async fn main() {
     } else {
         cli_args.output.clone()
     };
-    
+
     let result = run(cli_args, &output_format_str).await;
-    
+
     if let Err(e) = result {
         crate::output::output_error_json(&e, &output_format_str);
         std::process::exit(1);
@@ -130,8 +130,11 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
     }
 
     // Skip logging and context initialization for commands that don't need them
-    let skip_init = matches!(cli_args.command, Commands::Version | Commands::Completions(_));
-    
+    let skip_init = matches!(
+        cli_args.command,
+        Commands::Version | Commands::Completions(_)
+    );
+
     if !skip_init {
         // Determine log level: explicit > quiet > verbose/debug > default (OFF)
         // Always initialize logging to prevent library from initializing with defaults
@@ -145,7 +148,10 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                 "debug" => Level::DEBUG,
                 "trace" => Level::TRACE,
                 _ => {
-                    eprintln!("Warning: Invalid log level '{}'. Valid levels: off, error, warn, info, debug, trace", level_str);
+                    eprintln!(
+                        "Warning: Invalid log level '{}'. Valid levels: off, error, warn, info, debug, trace",
+                        level_str
+                    );
                     Level::ERROR // Default to ERROR (suppressed) on invalid level
                 }
             }
@@ -270,25 +276,47 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
         Commands::Completions(completions_args) => {
             use clap_complete::generate;
             let mut cmd = Cli::command();
-            
+
             // Generate completion script
             match completions_args.shell {
                 args::Shell::Bash => {
-                    generate(clap_complete::shells::Bash, &mut cmd, "locai-cli", &mut std::io::stdout());
+                    generate(
+                        clap_complete::shells::Bash,
+                        &mut cmd,
+                        "locai-cli",
+                        &mut std::io::stdout(),
+                    );
                     // Show installation instructions on stderr (only if stderr is a TTY)
                     if atty::is(atty::Stream::Stderr) {
-                        eprintln!("\n{}", format_info("Bash completion script generated. Installation options:"));
+                        eprintln!(
+                            "\n{}",
+                            format_info("Bash completion script generated. Installation options:")
+                        );
                         eprintln!("  1. Direct sourcing: source <(locai-cli completions bash)");
-                        eprintln!("  2. Save and source: locai-cli completions bash > ~/.locai-cli.bash && echo 'source ~/.locai-cli.bash' >> ~/.bashrc");
-                        eprintln!("  3. System-wide: sudo sh -c 'locai-cli completions bash > /etc/bash_completion.d/locai-cli'");
-                        eprintln!("\nNote: ~/.bash_completion.d/ is NOT automatically loaded by bash.");
+                        eprintln!(
+                            "  2. Save and source: locai-cli completions bash > ~/.locai-cli.bash && echo 'source ~/.locai-cli.bash' >> ~/.bashrc"
+                        );
+                        eprintln!(
+                            "  3. System-wide: sudo sh -c 'locai-cli completions bash > /etc/bash_completion.d/locai-cli'"
+                        );
+                        eprintln!(
+                            "\nNote: ~/.bash_completion.d/ is NOT automatically loaded by bash."
+                        );
                         eprintln!("See docs/SHELL_COMPLETION_INSTALLATION.md for details.");
                     }
                 }
                 args::Shell::Zsh => {
-                    generate(clap_complete::shells::Zsh, &mut cmd, "locai-cli", &mut std::io::stdout());
+                    generate(
+                        clap_complete::shells::Zsh,
+                        &mut cmd,
+                        "locai-cli",
+                        &mut std::io::stdout(),
+                    );
                     if atty::is(atty::Stream::Stderr) {
-                        eprintln!("\n{}", format_info("Zsh completion script generated. To install:"));
+                        eprintln!(
+                            "\n{}",
+                            format_info("Zsh completion script generated. To install:")
+                        );
                         eprintln!("  mkdir -p ~/.zsh/completions");
                         eprintln!("  locai-cli completions zsh > ~/.zsh/completions/_locai-cli");
                         eprintln!("  echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc");
@@ -296,28 +324,58 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                     }
                 }
                 args::Shell::Fish => {
-                    generate(clap_complete::shells::Fish, &mut cmd, "locai-cli", &mut std::io::stdout());
+                    generate(
+                        clap_complete::shells::Fish,
+                        &mut cmd,
+                        "locai-cli",
+                        &mut std::io::stdout(),
+                    );
                     if atty::is(atty::Stream::Stderr) {
-                        eprintln!("\n{}", format_info("Fish completion script generated. To install:"));
+                        eprintln!(
+                            "\n{}",
+                            format_info("Fish completion script generated. To install:")
+                        );
                         eprintln!("  mkdir -p ~/.config/fish/completions");
-                        eprintln!("  locai-cli completions fish > ~/.config/fish/completions/locai-cli.fish");
+                        eprintln!(
+                            "  locai-cli completions fish > ~/.config/fish/completions/locai-cli.fish"
+                        );
                         eprintln!("  (Fish automatically loads completions from this directory)");
                     }
                 }
                 args::Shell::Power => {
-                    generate(clap_complete::shells::PowerShell, &mut cmd, "locai-cli", &mut std::io::stdout());
+                    generate(
+                        clap_complete::shells::PowerShell,
+                        &mut cmd,
+                        "locai-cli",
+                        &mut std::io::stdout(),
+                    );
                     if atty::is(atty::Stream::Stderr) {
-                        eprintln!("\n{}", format_info("PowerShell completion script generated. To install:"));
+                        eprintln!(
+                            "\n{}",
+                            format_info("PowerShell completion script generated. To install:")
+                        );
                         eprintln!("  locai-cli completions powershell > $PROFILE\\locai-cli.ps1");
-                        eprintln!("  Add 'source $PROFILE\\locai-cli.ps1' to your PowerShell profile");
+                        eprintln!(
+                            "  Add 'source $PROFILE\\locai-cli.ps1' to your PowerShell profile"
+                        );
                     }
                 }
                 args::Shell::Elvish => {
-                    generate(clap_complete::shells::Elvish, &mut cmd, "locai-cli", &mut std::io::stdout());
+                    generate(
+                        clap_complete::shells::Elvish,
+                        &mut cmd,
+                        "locai-cli",
+                        &mut std::io::stdout(),
+                    );
                     if atty::is(atty::Stream::Stderr) {
-                        eprintln!("\n{}", format_info("Elvish completion script generated. To install:"));
+                        eprintln!(
+                            "\n{}",
+                            format_info("Elvish completion script generated. To install:")
+                        );
                         eprintln!("  mkdir -p ~/.config/elvish/lib");
-                        eprintln!("  locai-cli completions elvish > ~/.config/elvish/lib/locai-cli.elv");
+                        eprintln!(
+                            "  locai-cli completions elvish > ~/.config/elvish/lib/locai-cli.elv"
+                        );
                         eprintln!("  (Elvish automatically loads completions from this directory)");
                     }
                 }

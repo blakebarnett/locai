@@ -19,7 +19,10 @@ pub fn show_explanation(concept: &str) -> locai::Result<()> {
 }
 
 fn show_memory_explanation() -> locai::Result<()> {
-    println!("{}", "━━━ Memory Concept ━━━".color(CliColors::accent()).bold());
+    println!(
+        "{}",
+        "━━━ Memory Concept ━━━".color(CliColors::accent()).bold()
+    );
     println!();
     println!("{}", "What is a Memory?".white().bold());
     println!();
@@ -46,7 +49,10 @@ fn show_memory_explanation() -> locai::Result<()> {
 }
 
 fn show_entity_explanation() -> locai::Result<()> {
-    println!("{}", "━━━ Entity Concept ━━━".color(CliColors::entity()).bold());
+    println!(
+        "{}",
+        "━━━ Entity Concept ━━━".color(CliColors::entity()).bold()
+    );
     println!();
     println!("{}", "What is an Entity?".bold());
     println!();
@@ -72,7 +78,12 @@ fn show_entity_explanation() -> locai::Result<()> {
 }
 
 fn show_relationship_explanation() -> locai::Result<()> {
-    println!("{}", "━━━ Relationship Concept ━━━".color(CliColors::info()).bold());
+    println!(
+        "{}",
+        "━━━ Relationship Concept ━━━"
+            .color(CliColors::info())
+            .bold()
+    );
     println!();
     println!("{}", "What is a Relationship?".bold());
     println!();
@@ -104,7 +115,10 @@ fn show_relationship_explanation() -> locai::Result<()> {
 }
 
 fn show_graph_explanation() -> locai::Result<()> {
-    println!("{}", "━━━ Graph Concept ━━━".color(CliColors::accent()).bold());
+    println!(
+        "{}",
+        "━━━ Graph Concept ━━━".color(CliColors::accent()).bold()
+    );
     println!();
     println!("{}", "What is the Graph?".bold());
     println!();
@@ -132,7 +146,10 @@ fn show_graph_explanation() -> locai::Result<()> {
 }
 
 fn show_search_explanation() -> locai::Result<()> {
-    println!("{}", "━━━ Search Concept ━━━".color(CliColors::info()).bold());
+    println!(
+        "{}",
+        "━━━ Search Concept ━━━".color(CliColors::info()).bold()
+    );
     println!();
     println!("{}", "How Does Search Work?".bold());
     println!();
@@ -161,7 +178,12 @@ fn show_search_explanation() -> locai::Result<()> {
 }
 
 fn show_batch_explanation() -> locai::Result<()> {
-    println!("{}", "━━━ Batch Operations Concept ━━━".color(CliColors::accent()).bold());
+    println!(
+        "{}",
+        "━━━ Batch Operations Concept ━━━"
+            .color(CliColors::accent())
+            .bold()
+    );
     println!();
     println!("{}", "What are Batch Operations?".bold());
     println!();
@@ -195,4 +217,3 @@ fn show_batch_explanation() -> locai::Result<()> {
     println!();
     Ok(())
 }
-

@@ -1,8 +1,8 @@
 use colored::*;
-use serde_json::json;
 use locai::models::{MemoryPriority, MemoryType};
-use locai::storage::models::{Entity, MemoryGraph, MemoryPath, Relationship};
 use locai::prelude::Memory;
+use locai::storage::models::{Entity, MemoryGraph, MemoryPath, Relationship};
+use serde_json::json;
 
 pub struct CliColors;
 
@@ -14,7 +14,7 @@ impl CliColors {
             b: 94,
         }
     }
-    
+
     pub fn error() -> Color {
         Color::TrueColor {
             r: 239,
@@ -22,7 +22,7 @@ impl CliColors {
             b: 68,
         }
     }
-    
+
     pub fn warning() -> Color {
         Color::TrueColor {
             r: 245,
@@ -30,7 +30,7 @@ impl CliColors {
             b: 11,
         }
     }
-    
+
     pub fn info() -> Color {
         Color::TrueColor {
             r: 59,
@@ -38,7 +38,7 @@ impl CliColors {
             b: 246,
         }
     }
-    
+
     pub fn memory_fact() -> Color {
         Color::TrueColor {
             r: 59,
@@ -46,7 +46,7 @@ impl CliColors {
             b: 246,
         }
     }
-    
+
     pub fn memory_episodic() -> Color {
         Color::TrueColor {
             r: 34,
@@ -54,7 +54,7 @@ impl CliColors {
             b: 94,
         }
     }
-    
+
     pub fn memory_semantic() -> Color {
         Color::TrueColor {
             r: 168,
@@ -62,7 +62,7 @@ impl CliColors {
             b: 247,
         }
     }
-    
+
     pub fn entity() -> Color {
         Color::TrueColor {
             r: 245,
@@ -70,7 +70,7 @@ impl CliColors {
             b: 11,
         }
     }
-    
+
     pub fn muted() -> Color {
         Color::TrueColor {
             r: 148,
@@ -78,11 +78,11 @@ impl CliColors {
             b: 184,
         }
     }
-    
+
     pub fn primary() -> Color {
         Color::White
     }
-    
+
     pub fn accent() -> Color {
         Color::TrueColor {
             r: 59,
@@ -120,39 +120,55 @@ pub fn output_error_json(error: &locai::LocaiError, output_format: &str) {
             locai::LocaiError::Entity(msg) => ("ENTITY_ERROR", msg.clone(), None),
             locai::LocaiError::Relationship(msg) => ("RELATIONSHIP_ERROR", msg.clone(), None),
             locai::LocaiError::Version(msg) => ("VERSION_ERROR", msg.clone(), None),
-            locai::LocaiError::MLNotConfigured => ("ML_NOT_CONFIGURED", error.to_string(), Some(json!({
-                "hint": "Initialize with Locai::builder().with_defaults().build().await or use ConfigBuilder::new().with_default_ml()"
-            }))),
-            locai::LocaiError::StorageNotAccessible { path } => ("STORAGE_NOT_ACCESSIBLE", error.to_string(), Some(json!({
-                "path": path
-            }))),
-            locai::LocaiError::InvalidEmbeddingModel { model } => ("INVALID_EMBEDDING_MODEL", error.to_string(), Some(json!({
-                "model": model,
-                "hint": "Try using a supported model like 'BAAI/bge-m3'"
-            }))),
+            locai::LocaiError::MLNotConfigured => (
+                "ML_NOT_CONFIGURED",
+                error.to_string(),
+                Some(json!({
+                    "hint": "Initialize with Locai::builder().with_defaults().build().await or use ConfigBuilder::new().with_default_ml()"
+                })),
+            ),
+            locai::LocaiError::StorageNotAccessible { path } => (
+                "STORAGE_NOT_ACCESSIBLE",
+                error.to_string(),
+                Some(json!({
+                    "path": path
+                })),
+            ),
+            locai::LocaiError::InvalidEmbeddingModel { model } => (
+                "INVALID_EMBEDDING_MODEL",
+                error.to_string(),
+                Some(json!({
+                    "model": model,
+                    "hint": "Try using a supported model like 'BAAI/bge-m3'"
+                })),
+            ),
             locai::LocaiError::Connection(msg) => ("CONNECTION_ERROR", msg.clone(), None),
             locai::LocaiError::Authentication(msg) => ("AUTHENTICATION_ERROR", msg.clone(), None),
             locai::LocaiError::Protocol(msg) => ("PROTOCOL_ERROR", msg.clone(), None),
             locai::LocaiError::Timeout(msg) => ("TIMEOUT_ERROR", msg.clone(), None),
             locai::LocaiError::EmptySearchQuery => ("EMPTY_SEARCH_QUERY", error.to_string(), None),
             locai::LocaiError::NoMemoriesFound => ("NO_MEMORIES_FOUND", error.to_string(), None),
-            locai::LocaiError::FeatureNotEnabled { feature } => ("FEATURE_NOT_ENABLED", error.to_string(), Some(json!({
-                "feature": feature
-            }))),
+            locai::LocaiError::FeatureNotEnabled { feature } => (
+                "FEATURE_NOT_ENABLED",
+                error.to_string(),
+                Some(json!({
+                    "feature": feature
+                })),
+            ),
             locai::LocaiError::Other(msg) => ("OTHER_ERROR", msg.clone(), None),
         };
-        
+
         let mut error_response = json!({
             "error": true,
             "code": code,
             "message": message,
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
-        
+
         if let Some(details) = details {
             error_response["details"] = details;
         }
-        
+
         eprintln!(
             "{}",
             serde_json::to_string_pretty(&error_response).unwrap_or_else(|_| "{}".to_string())
@@ -329,14 +345,15 @@ pub async fn print_connected_memories_tree(
     _exclude_temporal: bool,
 ) -> locai::Result<()> {
     use locai::LocaiError;
-    
+
     if graph.memories.is_empty() {
         println!("{}", format_info("No memories found."));
         return Ok(());
     }
 
-    let source_memory = graph.memories.get(source_id)
-        .ok_or_else(|| LocaiError::Other(format!("Source memory {} not found in graph", source_id)))?;
+    let source_memory = graph.memories.get(source_id).ok_or_else(|| {
+        LocaiError::Other(format!("Source memory {} not found in graph", source_id))
+    })?;
 
     let connected_count = graph.memories.len().saturating_sub(1);
     if connected_count > 0 {
@@ -346,29 +363,29 @@ pub async fn print_connected_memories_tree(
         );
         println!();
     } else {
-        println!(
-            "{}",
-            format_info("No connected memories found.")
-        );
+        println!("{}", format_info("No connected memories found."));
         println!();
     }
 
-    let mut adjacency: std::collections::HashMap<String, Vec<(String, String, bool)>> = std::collections::HashMap::new();
-    
+    let mut adjacency: std::collections::HashMap<String, Vec<(String, String, bool)>> =
+        std::collections::HashMap::new();
+
     for rel in &graph.relationships {
         let source_is_memory = graph.memories.contains_key(&rel.source_id);
         let target_is_memory = graph.memories.contains_key(&rel.target_id);
-        
+
         if source_is_memory && target_is_memory {
-            adjacency.entry(rel.source_id.clone())
-                .or_default()
-                .push((rel.target_id.clone(), rel.relationship_type.clone(), true));
+            adjacency.entry(rel.source_id.clone()).or_default().push((
+                rel.target_id.clone(),
+                rel.relationship_type.clone(),
+                true,
+            ));
         }
     }
 
     let mut visited = std::collections::HashSet::new();
     visited.insert(source_id.to_string());
-    
+
     print_tree_node(
         source_id,
         source_memory,
@@ -429,7 +446,7 @@ fn print_tree_node(
 
             let child_memory = &all_memories[child_id];
             let is_last_child = idx == child_count - 1;
-            
+
             let new_prefix = if is_root {
                 "".to_string()
             } else if is_last {
@@ -442,7 +459,7 @@ fn print_tree_node(
                 if rel_type == "temporal_sequence" {
                     let source_mem = all_memories.get(memory_id);
                     let target_mem = all_memories.get(child_id);
-                    
+
                     if let (Some(source), Some(target)) = (source_mem, target_mem) {
                         let is_later = target.created_at > source.created_at;
                         let direction_str = if is_later { "later" } else { "earlier" };
@@ -456,12 +473,17 @@ fn print_tree_node(
                         "[temporal]".color(CliColors::info()).to_string()
                     }
                 } else {
-                    format!("[{}]", rel_type).color(CliColors::info()).to_string()
+                    format!("[{}]", rel_type)
+                        .color(CliColors::info())
+                        .to_string()
                 }
             } else {
-                "[via entities]".color(CliColors::muted()).dimmed().to_string()
+                "[via entities]"
+                    .color(CliColors::muted())
+                    .dimmed()
+                    .to_string()
             };
-            
+
             println!(
                 "{}{} {}",
                 new_prefix.color(CliColors::muted()),
@@ -489,7 +511,9 @@ fn print_tree_node(
                     new_prefix.color(CliColors::muted()),
                     connector.color(CliColors::muted()),
                     "↻".color(CliColors::warning()),
-                    format!("(cycle: {})", &child_id[..8]).color(CliColors::muted()).dimmed()
+                    format!("(cycle: {})", &child_id[..8])
+                        .color(CliColors::muted())
+                        .dimmed()
                 );
             }
         }

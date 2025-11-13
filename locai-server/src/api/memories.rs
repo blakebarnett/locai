@@ -709,11 +709,11 @@ pub struct SearchParams {
     pub limit: Option<usize>,
 
     /// Search mode: text (default), vector (semantic), or hybrid (recommended when ML service available)
-    /// 
+    ///
     /// - `text`: BM25 keyword search - always available, fast
     /// - `vector`: Vector similarity search - finds related concepts, requires ML service
     /// - `hybrid`: Combines text and semantic search - recommended when ML service available
-    /// 
+    ///
     /// Default: `text` (for backward compatibility)
     /// Recommended: `hybrid` (when ML service configured)
     pub mode: Option<SearchMode>,

@@ -8,11 +8,82 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  prepare-deps:
-    name: Prepare Dependencies
+  # Detect which files changed to conditionally run jobs
+  detect-changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.set-outputs.outputs.rust }}
+      docker: ${{ steps.set-outputs.outputs.docker }}
+      docs: ${{ steps.set-outputs.outputs.docs }}
+      all: ${{ steps.set-outputs.outputs.all }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for change detection
+
+      - name: Detect Rust file changes
+        uses: tj-actions/changed-files@v46
+        id: rust-files
+        with:
+          files: |
+            **/*.rs
+            **/Cargo.toml
+            **/Cargo.lock
+            **/build.rs
+            **/rustfmt.toml
+            **/clippy.toml
+            **/.cargo/**
+
+      - name: Detect Docker file changes
+        uses: tj-actions/changed-files@v46
+        id: docker-files
+        with:
+          files: |
+            **/Dockerfile*
+            **/docker-compose*.yml
+            **/.dockerignore
+
+      - name: Detect docs changes
+        uses: tj-actions/changed-files@v46
+        id: docs-files
+        with:
+          files: |
+            **/*.md
+            **/docs/**
+
+      - name: Set outputs
+        id: set-outputs
+        run: |
+          # Always run on push to main, or if Rust files changed
+          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "all=true" >> $GITHUB_OUTPUT
+            echo "rust=true" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.rust-files.outputs.any_changed }}" == "true" ]; then
+            echo "rust=true" >> $GITHUB_OUTPUT
+          else
+            echo "rust=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "docker=${{ steps.docker-files.outputs.any_changed }}" >> $GITHUB_OUTPUT
+          echo "docs=${{ steps.docs-files.outputs.any_changed }}" >> $GITHUB_OUTPUT
+          
+          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "all=true" >> $GITHUB_OUTPUT
+          else
+            echo "all=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Setup job that other jobs can depend on
+  setup:
+    name: Setup Rust Environment
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: detect-changes
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -24,58 +95,32 @@ jobs:
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
+          # Create minimal config without LLD rustflags to override repo config
           cat > .cargo/config.toml << 'EOF'
-          [target.x86_64-unknown-linux-gnu.librocksdb-sys]
-          rustflags = []
+          [target.x86_64-unknown-linux-gnu.env]
+          ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
 
-      - name: Build dependencies
-        env:
-          RUSTC_WRAPPER: ""
-        run: cargo build --workspace --all-features
-
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    needs: prepare-deps
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lld build-essential pkg-config libssl-dev
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Override cargo config to disable LLD
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << 'EOF'
-          [target.x86_64-unknown-linux-gnu.librocksdb-sys]
-          rustflags = []
-          EOF
-
-      - name: Run cargo test
-        env:
-          RUSTC_WRAPPER: ""
-        run: cargo test --all-features --workspace
-
+  # Format check - runs independently and fast
   fmt:
-    name: Rustfmt
+    name: Rustfmt Check
     runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: detect-changes
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -88,10 +133,12 @@ jobs:
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
 
+  # Clippy linting
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    needs: prepare-deps
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: [detect-changes, setup]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -108,13 +155,19 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
+          # Create minimal config without LLD rustflags to override repo config
           cat > .cargo/config.toml << 'EOF'
-          [target.x86_64-unknown-linux-gnu.librocksdb-sys]
-          rustflags = []
+          [target.x86_64-unknown-linux-gnu.env]
+          ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
 
       - name: Run cargo clippy
@@ -122,42 +175,12 @@ jobs:
           RUSTC_WRAPPER: ""
         run: cargo clippy --all-features --workspace -- -D warnings
 
+  # Cargo check - quick compilation check
   check:
-    name: Check
+    name: Cargo Check
     runs-on: ubuntu-latest
-    needs: prepare-deps
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lld build-essential pkg-config libssl-dev
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies  
-        uses: Swatinem/rust-cache@v2
-
-      - name: Override cargo config to disable LLD
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << 'EOF'
-          [target.x86_64-unknown-linux-gnu.librocksdb-sys]
-          rustflags = []
-          EOF
-
-      - name: Run cargo check
-        env:
-          RUSTC_WRAPPER: ""
-        run: cargo check --all-features --workspace
-
-  examples:
-    name: Examples
-    runs-on: ubuntu-latest
-    needs: prepare-deps
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: [detect-changes, setup]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -172,16 +195,193 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
+          # Create minimal config without LLD rustflags to override repo config
           cat > .cargo/config.toml << 'EOF'
-          [target.x86_64-unknown-linux-gnu.librocksdb-sys]
-          rustflags = []
+          [target.x86_64-unknown-linux-gnu.env]
+          ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
+          EOF
+
+      - name: Run cargo check
+        env:
+          RUSTC_WRAPPER: ""
+        run: cargo check --all-features --workspace
+
+  # Test suite - comprehensive testing
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: [detect-changes, setup]
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [locai, locai-server, locai-cli]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld build-essential pkg-config libssl-dev
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
+
+      - name: Override cargo config to disable LLD
+        run: |
+          mkdir -p .cargo
+          # Create minimal config without LLD rustflags to override repo config
+          cat > .cargo/config.toml << 'EOF'
+          [target.x86_64-unknown-linux-gnu.env]
+          ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
+          EOF
+
+      - name: Run tests for ${{ matrix.package }}
+        env:
+          RUSTC_WRAPPER: ""
+          RUST_BACKTRACE: 1
+        run: cargo test --package ${{ matrix.package }} --all-features --workspace
+
+  # Integration tests
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: [detect-changes, setup]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld build-essential pkg-config libssl-dev
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
+
+      - name: Override cargo config to disable LLD
+        run: |
+          mkdir -p .cargo
+          # Create minimal config without LLD rustflags to override repo config
+          cat > .cargo/config.toml << 'EOF'
+          [target.x86_64-unknown-linux-gnu.env]
+          ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
+          EOF
+
+      - name: Run integration tests
+        env:
+          RUSTC_WRAPPER: ""
+          RUST_BACKTRACE: 1
+        run: cargo test --package locai-server --test integration_tests --all-features
+
+  # Examples compilation check
+  examples:
+    name: Examples Check
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: [detect-changes, setup]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld build-essential pkg-config libssl-dev
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
+
+      - name: Override cargo config to disable LLD
+        run: |
+          mkdir -p .cargo
+          # Create minimal config without LLD rustflags to override repo config
+          cat > .cargo/config.toml << 'EOF'
+          [target.x86_64-unknown-linux-gnu.env]
+          ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
 
       - name: Check examples compile
         env:
           RUSTC_WRAPPER: ""
         run: cargo check --examples --all-features
+
+  # Security audit
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true'
+    needs: detect-changes
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit --deny warnings
+
+  # Documentation check
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.all == 'true' || needs.detect-changes.outputs.docs == 'true'
+    needs: detect-changes
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
+
+      - name: Check documentation
+        env:
+          RUSTC_WRAPPER: ""
+        run: cargo doc --workspace --no-deps --document-private-items

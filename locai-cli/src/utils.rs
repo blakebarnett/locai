@@ -1,6 +1,6 @@
+use crate::context::LocaiCliContext;
 use locai::LocaiError;
 use locai::models::{MemoryPriority, MemoryType};
-use crate::context::LocaiCliContext;
 
 pub fn parse_memory_type(type_str: &str) -> locai::Result<MemoryType> {
     match type_str {
@@ -32,10 +32,7 @@ pub fn parse_priority(priority_str: &str) -> locai::Result<MemoryPriority> {
     }
 }
 
-pub async fn resolve_memory_id(
-    ctx: &LocaiCliContext,
-    id: &str,
-) -> locai::Result<String> {
+pub async fn resolve_memory_id(ctx: &LocaiCliContext, id: &str) -> locai::Result<String> {
     if ctx.memory_manager.get_memory(id).await?.is_some() {
         return Ok(id.to_string());
     }
@@ -76,6 +73,3 @@ pub async fn resolve_memory_id(
         }
     }
 }
-
-
-

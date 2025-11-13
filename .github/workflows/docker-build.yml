@@ -18,8 +18,71 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  # Detect if Docker-related files changed
+  detect-changes:
+    name: Detect Docker Changes
     runs-on: ubuntu-latest
+    outputs:
+      docker: ${{ steps.set-outputs.outputs.docker }}
+      rust: ${{ steps.set-outputs.outputs.rust }}
+      should-build: ${{ steps.set-outputs.outputs.should-build }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Docker file changes
+        uses: tj-actions/changed-files@v46
+        id: docker-files
+        with:
+          files: |
+            **/Dockerfile*
+            **/docker-compose*.yml
+            **/.dockerignore
+            **/docker-*.sh
+
+      - name: Detect Rust source changes
+        uses: tj-actions/changed-files@v46
+        id: rust-files
+        with:
+          files: |
+            **/*.rs
+            **/Cargo.toml
+            **/Cargo.lock
+
+      - name: Set outputs
+        id: set-outputs
+        run: |
+          # Always build on tags, workflow_dispatch, or push to main
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "docker=true" >> $GITHUB_OUTPUT
+            echo "rust=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "docker=true" >> $GITHUB_OUTPUT
+            echo "rust=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "docker=true" >> $GITHUB_OUTPUT
+            echo "rust=true" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.docker-files.outputs.any_changed }}" == "true" ] || \
+               [ "${{ steps.rust-files.outputs.any_changed }}" == "true" ]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "docker=${{ steps.docker-files.outputs.any_changed }}" >> $GITHUB_OUTPUT
+            echo "rust=${{ steps.rust-files.outputs.any_changed }}" >> $GITHUB_OUTPUT
+          else
+            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "docker=false" >> $GITHUB_OUTPUT
+            echo "rust=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should-build == 'true'
     permissions:
       contents: read
       packages: write
@@ -55,6 +118,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -71,13 +135,16 @@ jobs:
       - name: Test Docker image (amd64 only)
         if: github.event_name == 'pull_request'
         run: |
+          # Extract the image tag from metadata
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1 | tr -d ' ')
+          docker run --rm -d --name test-locai -p 3000:3000 "$IMAGE_TAG" || \
           docker run --rm -d --name test-locai -p 3000:3000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
           sleep 10
           curl -f http://localhost:3000/api/health || exit 1
-          docker stop test-locai
+          docker stop test-locai || true
 
       - name: Generate artifact attestation
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.build.outputs.digest != ''
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -85,9 +152,10 @@ jobs:
           push-to-registry: true
 
   scan:
+    name: Security Scan
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && needs.build-and-push.result == 'success'
     
     steps:
       - name: Run Trivy vulnerability scanner
@@ -96,11 +164,11 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: 'sarif'
           output: 'trivy-results.sarif'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
-
-

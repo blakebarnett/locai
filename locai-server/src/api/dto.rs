@@ -449,7 +449,7 @@ pub struct SearchRequest {
     pub limit: usize,
 
     /// Search mode: text (default), vector (semantic), or hybrid (recommended when ML service available)
-    /// 
+    ///
     /// - `text`: BM25 keyword search - always available
     /// - `vector`: Vector similarity search - requires ML service
     /// - `hybrid`: Combines text and semantic search - recommended when ML service available
@@ -510,7 +510,7 @@ pub struct SearchResultDto {
     pub score: Option<f32>,
 
     /// Method that found this result (when using hybrid mode)
-    /// 
+    ///
     /// Values: "text", "semantic", or "both"
     /// Only present when using hybrid search mode
     #[schema(example = "both")]

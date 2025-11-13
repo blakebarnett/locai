@@ -56,7 +56,7 @@ impl From<SurrealEntity> for Entity {
             .and_then(|s| s.strip_suffix('⟩'))
             .unwrap_or(&key_string)
             .to_string();
-        
+
         Self {
             id: clean_id,
             entity_type: surreal_entity.entity_type,
@@ -147,7 +147,6 @@ where
 
     /// Delete an entity by its ID
     async fn delete_entity(&self, id: &str) -> Result<bool, StorageError> {
-
         // Use the SDK's delete method for the entity record
         // Note: SurrealDB will handle cascade deletion of related records automatically if configured
         let deleted: Option<SurrealEntity> = self

@@ -142,10 +142,9 @@ where
             }
 
             // First, check for direct memory-to-memory relationships
-            let direct_relationships = self.get_direct_memory_relationships(
-                &current_memory_id,
-                relationship_type,
-            ).await?;
+            let direct_relationships = self
+                .get_direct_memory_relationships(&current_memory_id, relationship_type)
+                .await?;
 
             for rel in direct_relationships {
                 let target_id = if rel.source_id == current_memory_id {
@@ -338,20 +337,16 @@ where
             query_builder = query_builder.bind(("relationship_type", rel_type.to_string()));
         }
 
-        let mut response = query_builder
-            .await
-            .map_err(|e| {
-                StorageError::Query(format!("Failed to get direct memory relationships: {}", e))
-            })?;
+        let mut response = query_builder.await.map_err(|e| {
+            StorageError::Query(format!("Failed to get direct memory relationships: {}", e))
+        })?;
 
         // Deserialize as SurrealRelationship first (with RecordId), then convert to Relationship
         use crate::storage::shared_storage::relationship::SurrealRelationship;
-        let surreal_relationships: Vec<SurrealRelationship> = response
-            .take(0)
-            .map_err(|e| {
-                StorageError::Query(format!("Failed to extract memory relationships: {}", e))
-            })?;
-        
+        let surreal_relationships: Vec<SurrealRelationship> = response.take(0).map_err(|e| {
+            StorageError::Query(format!("Failed to extract memory relationships: {}", e))
+        })?;
+
         let relationships: Vec<Relationship> = surreal_relationships
             .into_iter()
             .map(Relationship::from)
@@ -362,7 +357,7 @@ where
         for rel in relationships {
             let source_is_memory = self.get_memory(&rel.source_id).await?.is_some();
             let target_is_memory = self.get_memory(&rel.target_id).await?.is_some();
-            
+
             if source_is_memory && target_is_memory {
                 memory_to_memory.push(rel);
             }

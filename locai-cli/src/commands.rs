@@ -2,8 +2,8 @@
 //!
 //! This module contains all CLI command enums that define the command structure.
 
-use clap::Subcommand;
 use crate::args::*;
+use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub enum Commands {
@@ -349,4 +349,3 @@ pub enum RelationshipTypeCommands {
     /// Seed common relationship types
     Seed,
 }
-

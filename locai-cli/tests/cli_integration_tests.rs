@@ -152,8 +152,8 @@ impl TestCliContext {
 }
 
 fn parse_memory_type(type_str: &str) -> locai::Result<locai::models::MemoryType> {
-    use locai::models::MemoryType;
     use locai::LocaiError;
+    use locai::models::MemoryType;
 
     match type_str {
         "fact" => Ok(MemoryType::Fact),
@@ -164,20 +164,26 @@ fn parse_memory_type(type_str: &str) -> locai::Result<locai::models::MemoryType>
         "world" => Ok(MemoryType::World),
         "action" => Ok(MemoryType::Action),
         "event" => Ok(MemoryType::Event),
-        _ => Err(LocaiError::Other(format!("Invalid memory type: {}", type_str))),
+        _ => Err(LocaiError::Other(format!(
+            "Invalid memory type: {}",
+            type_str
+        ))),
     }
 }
 
 fn parse_priority(priority_str: &str) -> locai::Result<locai::models::MemoryPriority> {
-    use locai::models::MemoryPriority;
     use locai::LocaiError;
+    use locai::models::MemoryPriority;
 
     match priority_str {
         "low" => Ok(MemoryPriority::Low),
         "normal" => Ok(MemoryPriority::Normal),
         "high" => Ok(MemoryPriority::High),
         "critical" => Ok(MemoryPriority::Critical),
-        _ => Err(LocaiError::Other(format!("Invalid priority: {}", priority_str))),
+        _ => Err(LocaiError::Other(format!(
+            "Invalid priority: {}",
+            priority_str
+        ))),
     }
 }
 
@@ -298,7 +304,7 @@ async fn test_entity_update() {
     // already knows the table name. The ID is just the key part.
     use locai::storage::models::Entity;
     let entity = Entity {
-        id: "test:123".to_string(),  // Just the key, not "entity:test:123"
+        id: "test:123".to_string(), // Just the key, not "entity:test:123"
         entity_type: "Person".to_string(),
         properties: serde_json::json!({"name": "John"}),
         created_at: chrono::Utc::now(),
@@ -321,11 +327,7 @@ async fn test_entity_update() {
 
     // Update properties
     let updated = ctx
-        .handle_entity_update(
-            &created.id,
-            None,
-            Some(r#"{"name": "Jane", "age": 30}"#),
-        )
+        .handle_entity_update(&created.id, None, Some(r#"{"name": "Jane", "age": 30}"#))
         .await
         .expect("Failed to update entity properties");
 
@@ -341,7 +343,7 @@ async fn test_relationship_update() {
     // Note: Entity IDs should NOT include the "entity:" prefix
     use locai::storage::models::Entity;
     let entity1 = Entity {
-        id: "test:1".to_string(),  // Just the key part
+        id: "test:1".to_string(), // Just the key part
         entity_type: "Test".to_string(),
         properties: serde_json::json!({"name": "Entity 1"}),
         created_at: chrono::Utc::now(),
@@ -349,7 +351,7 @@ async fn test_relationship_update() {
     };
 
     let entity2 = Entity {
-        id: "test:2".to_string(),  // Just the key part
+        id: "test:2".to_string(), // Just the key part
         entity_type: "Test".to_string(),
         properties: serde_json::json!({"name": "Entity 2"}),
         created_at: chrono::Utc::now(),
@@ -448,15 +450,17 @@ async fn test_batch_execute_create_memories() {
         ]
     });
 
-    fs::write(&batch_file, serde_json::to_string_pretty(&batch_content).unwrap())
-        .expect("Failed to write batch file");
+    fs::write(
+        &batch_file,
+        serde_json::to_string_pretty(&batch_content).unwrap(),
+    )
+    .expect("Failed to write batch file");
 
     // Execute batch
     use locai::batch::{BatchExecutor, BatchExecutorConfig, BatchOperation};
 
     let file_contents = fs::read_to_string(&batch_file).expect("Failed to read batch file");
-    let batch_obj: serde_json::Value =
-        serde_json::from_str(&file_contents).expect("Invalid JSON");
+    let batch_obj: serde_json::Value = serde_json::from_str(&file_contents).expect("Invalid JSON");
 
     let operations: Vec<BatchOperation> = batch_obj
         .get("operations")
@@ -520,15 +524,17 @@ async fn test_batch_execute_update_memories() {
         ]
     });
 
-    fs::write(&batch_file, serde_json::to_string_pretty(&batch_content).unwrap())
-        .expect("Failed to write batch file");
+    fs::write(
+        &batch_file,
+        serde_json::to_string_pretty(&batch_content).unwrap(),
+    )
+    .expect("Failed to write batch file");
 
     // Execute batch
     use locai::batch::{BatchExecutor, BatchExecutorConfig, BatchOperation};
 
     let file_contents = fs::read_to_string(&batch_file).expect("Failed to read batch file");
-    let batch_obj: serde_json::Value =
-        serde_json::from_str(&file_contents).expect("Invalid JSON");
+    let batch_obj: serde_json::Value = serde_json::from_str(&file_contents).expect("Invalid JSON");
 
     let operations: Vec<BatchOperation> = batch_obj
         .get("operations")
@@ -583,10 +589,7 @@ async fn test_relationship_type_register() {
         .await
         .expect("Failed to register type");
 
-    let retrieved = ctx
-        .relationship_type_registry
-        .get("knows")
-        .await;
+    let retrieved = ctx.relationship_type_registry.get("knows").await;
 
     assert!(retrieved.is_some());
     let retrieved = retrieved.unwrap();
@@ -599,7 +602,9 @@ async fn test_relationship_type_list() {
     let (ctx, _temp_dir) = create_test_context().await;
 
     // Register a few types
-    let type1 = RelationshipTypeDef::new("knows".to_string()).unwrap().symmetric();
+    let type1 = RelationshipTypeDef::new("knows".to_string())
+        .unwrap()
+        .symmetric();
     let type2 = RelationshipTypeDef::new("parent".to_string())
         .unwrap()
         .with_inverse("child".to_string());
@@ -632,7 +637,12 @@ async fn test_relationship_type_delete() {
         .expect("Failed to register type");
 
     // Verify it exists
-    assert!(ctx.relationship_type_registry.get("test_type").await.is_some());
+    assert!(
+        ctx.relationship_type_registry
+            .get("test_type")
+            .await
+            .is_some()
+    );
 
     // Delete it
     ctx.relationship_type_registry
@@ -641,7 +651,12 @@ async fn test_relationship_type_delete() {
         .expect("Failed to delete type");
 
     // Verify it's gone
-    assert!(ctx.relationship_type_registry.get("test_type").await.is_none());
+    assert!(
+        ctx.relationship_type_registry
+            .get("test_type")
+            .await
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -670,7 +685,7 @@ async fn test_graph_connected_with_relationship_type() {
     // Note: Entity IDs should NOT include the "entity:" prefix
     use locai::storage::models::Entity;
     let alice = Entity {
-        id: "person:alice".to_string(),  // Just the key part
+        id: "person:alice".to_string(), // Just the key part
         entity_type: "Person".to_string(),
         properties: serde_json::json!({"name": "Alice"}),
         created_at: chrono::Utc::now(),
@@ -678,7 +693,7 @@ async fn test_graph_connected_with_relationship_type() {
     };
 
     let bob = Entity {
-        id: "person:bob".to_string(),  // Just the key part
+        id: "person:bob".to_string(), // Just the key part
         entity_type: "Person".to_string(),
         properties: serde_json::json!({"name": "Bob"}),
         created_at: chrono::Utc::now(),
@@ -724,7 +739,9 @@ async fn test_graph_connected_with_relationship_type() {
 
     // Should have the knows relationship from alice to bob
     assert!(
-        relationships.iter().any(|r| r.source_id == created_alice.id && r.target_id == created_bob.id && r.relationship_type == "knows"),
+        relationships.iter().any(|r| r.source_id == created_alice.id
+            && r.target_id == created_bob.id
+            && r.relationship_type == "knows"),
         "Should find knows relationship from alice to bob"
     );
 }
@@ -737,7 +754,7 @@ async fn test_graph_connected_all_types() {
     // Note: Entity IDs should NOT include the "entity:" prefix
     use locai::storage::models::Entity;
     let entity1 = Entity {
-        id: "test:1".to_string(),  // Just the key part
+        id: "test:1".to_string(), // Just the key part
         entity_type: "Test".to_string(),
         properties: serde_json::json!({"name": "Entity 1"}),
         created_at: chrono::Utc::now(),
@@ -745,7 +762,7 @@ async fn test_graph_connected_all_types() {
     };
 
     let entity2 = Entity {
-        id: "test:2".to_string(),  // Just the key part
+        id: "test:2".to_string(), // Just the key part
         entity_type: "Test".to_string(),
         properties: serde_json::json!({"name": "Entity 2"}),
         created_at: chrono::Utc::now(),
@@ -792,7 +809,9 @@ async fn test_graph_connected_all_types() {
 
     // Should find the relationship regardless of type
     assert!(
-        relationships.iter().any(|r| r.source_id == created_entity1.id && r.target_id == created_entity2.id),
+        relationships
+            .iter()
+            .any(|r| r.source_id == created_entity1.id && r.target_id == created_entity2.id),
         "Should find relationship when querying all types"
     );
 }
@@ -823,14 +842,16 @@ async fn test_batch_execute_transaction_mode() {
         "transaction": true
     });
 
-    fs::write(&batch_file, serde_json::to_string_pretty(&batch_content).unwrap())
-        .expect("Failed to write batch file");
+    fs::write(
+        &batch_file,
+        serde_json::to_string_pretty(&batch_content).unwrap(),
+    )
+    .expect("Failed to write batch file");
 
     use locai::batch::{BatchExecutor, BatchExecutorConfig, BatchOperation};
 
     let file_contents = fs::read_to_string(&batch_file).expect("Failed to read batch file");
-    let batch_obj: serde_json::Value =
-        serde_json::from_str(&file_contents).expect("Invalid JSON");
+    let batch_obj: serde_json::Value = serde_json::from_str(&file_contents).expect("Invalid JSON");
 
     let operations: Vec<BatchOperation> = batch_obj
         .get("operations")
@@ -847,7 +868,7 @@ async fn test_batch_execute_transaction_mode() {
     // In transaction mode, if one fails, the whole transaction should fail
     // This will return an error instead of a response with errors
     let result = executor.execute(operations, true).await;
-    
+
     // Transaction mode should return an error when a transaction fails
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();
@@ -887,17 +908,29 @@ async fn test_relationship_type_metrics() {
 
     // Register various types
     ctx.relationship_type_registry
-        .register(RelationshipTypeDef::new("symmetric1".to_string()).unwrap().symmetric())
+        .register(
+            RelationshipTypeDef::new("symmetric1".to_string())
+                .unwrap()
+                .symmetric(),
+        )
         .await
         .unwrap();
 
     ctx.relationship_type_registry
-        .register(RelationshipTypeDef::new("symmetric2".to_string()).unwrap().symmetric())
+        .register(
+            RelationshipTypeDef::new("symmetric2".to_string())
+                .unwrap()
+                .symmetric(),
+        )
         .await
         .unwrap();
 
     ctx.relationship_type_registry
-        .register(RelationshipTypeDef::new("transitive1".to_string()).unwrap().transitive())
+        .register(
+            RelationshipTypeDef::new("transitive1".to_string())
+                .unwrap()
+                .transitive(),
+        )
         .await
         .unwrap();
 
@@ -951,7 +984,7 @@ async fn test_semantic_search_with_mock_embeddings() {
             for val in &mut embedding {
                 *val /= norm;
             }
-            
+
             memory.embedding = Some(embedding);
             ctx.memory_manager
                 .update_memory(memory)
@@ -959,7 +992,7 @@ async fn test_semantic_search_with_mock_embeddings() {
                 .expect("Failed to update memory with embedding");
         }
     }
-    
+
     // Create a mock query embedding (simulating what the CLI does)
     let mut query_embedding = vec![0.0; 1024];
     for i in 0..1024 {
@@ -970,7 +1003,7 @@ async fn test_semantic_search_with_mock_embeddings() {
     for val in &mut query_embedding {
         *val /= norm;
     }
-    
+
     // Search with semantic mode using search_with_embedding (like the CLI does)
     let results = ctx
         .memory_manager
@@ -987,7 +1020,10 @@ async fn test_semantic_search_with_mock_embeddings() {
     assert!(results.is_ok(), "Semantic search should not error");
     let search_results = results.unwrap();
     // Should find at least one result since we added embeddings
-    assert!(!search_results.is_empty(), "Should find memories with embeddings");
+    assert!(
+        !search_results.is_empty(),
+        "Should find memories with embeddings"
+    );
 }
 
 #[tokio::test]
@@ -1013,7 +1049,7 @@ async fn test_vector_search_deserialization() {
         for val in &mut embedding {
             *val /= norm;
         }
-        
+
         memory.embedding = Some(embedding);
         ctx.memory_manager
             .update_memory(memory)
@@ -1030,6 +1066,8 @@ async fn test_vector_search_deserialization() {
         .await;
 
     // Should not fail with serialization error
-    assert!(results.is_ok(), "Vector search should not fail with deserialization error");
+    assert!(
+        results.is_ok(),
+        "Vector search should not fail with deserialization error"
+    );
 }
-
