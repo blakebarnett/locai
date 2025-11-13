@@ -127,7 +127,6 @@ jobs:
             locai
             locai-server
             locai-cli
-          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build dependencies to populate cache
         env:
