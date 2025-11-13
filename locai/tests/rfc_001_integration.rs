@@ -217,6 +217,7 @@ fn test_batch_operations_with_transaction() {
             tags: None,
             source: None,
             properties: None,
+            embedding: None,
         },
         BatchOperation::CreateMemory {
             content: "Second memory".to_string(),
@@ -225,6 +226,7 @@ fn test_batch_operations_with_transaction() {
             tags: Some(vec!["important".to_string()]),
             source: None,
             properties: None,
+            embedding: None,
         },
         BatchOperation::CreateRelationship {
             source: "mem_1".to_string(),
@@ -484,6 +486,7 @@ fn test_batch_operation_serialization() {
             tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
             source: Some("test".to_string()),
             properties: Some(serde_json::json!({"custom": "value"})),
+            embedding: None,
         },
         BatchOperation::UpdateMemory {
             id: "mem_123".to_string(),
@@ -491,6 +494,7 @@ fn test_batch_operation_serialization() {
             priority: Some(2),
             tags: None,
             properties: None,
+            embedding: None,
         },
         BatchOperation::DeleteMemory {
             id: "mem_456".to_string(),

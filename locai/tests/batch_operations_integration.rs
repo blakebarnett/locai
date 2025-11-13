@@ -19,6 +19,7 @@ fn test_batch_operation_serialization() {
         tags: Some(vec!["important".to_string()]),
         source: Some("test".to_string()),
         properties: None,
+        embedding: None,
     };
 
     let json = serde_json::to_string(&op).expect("Should serialize");
@@ -141,6 +142,7 @@ fn test_batch_operations_complete_workflow() {
             tags: Some(vec!["test".to_string()]),
             source: None,
             properties: None,
+            embedding: None,
         },
         BatchOperation::CreateMemory {
             content: "Second memory".to_string(),
@@ -149,6 +151,7 @@ fn test_batch_operations_complete_workflow() {
             tags: None,
             source: Some("batch".to_string()),
             properties: None,
+            embedding: None,
         },
         BatchOperation::UpdateMetadata {
             memory_id: "id_1".to_string(),
@@ -254,6 +257,7 @@ fn test_batch_operation_all_types_serializable() {
             tags: None,
             source: None,
             properties: None,
+            embedding: None,
         },
         BatchOperation::UpdateMemory {
             id: "mem_1".to_string(),
@@ -261,6 +265,7 @@ fn test_batch_operation_all_types_serializable() {
             priority: Some(1),
             tags: None,
             properties: None,
+            embedding: None,
         },
         BatchOperation::DeleteMemory {
             id: "mem_2".to_string(),
@@ -353,6 +358,7 @@ fn test_batch_operation_with_complex_properties() {
         tags: Some(vec!["complex".to_string()]),
         source: None,
         properties: Some(complex_props.clone()),
+        embedding: None,
     };
 
     let json = serde_json::to_string(&op).expect("Should serialize");
