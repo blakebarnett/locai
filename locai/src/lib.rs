@@ -23,7 +23,8 @@
 //!     
 //!     // Add embeddings for hybrid search (BYOE approach)
 //!     // This example shows the concept - you would use your actual embedding provider
-//!     let embedding = vec![0.1, 0.2, 0.3]; // Mock embedding from your provider
+//!     // Note: Embeddings must be 1024 dimensions for SurrealDB storage
+//!     let embedding: Vec<f32> = (0..1024).map(|i| (i as f32 % 100.0) / 1000.0).collect(); // Mock 1024-dim embedding
 //!     let memory = MemoryBuilder::new_with_content("text")
 //!         .embedding(embedding)  // ← You provide the embedding
 //!         .build();
