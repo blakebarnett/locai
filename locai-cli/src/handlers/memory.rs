@@ -1,8 +1,8 @@
 //! Memory command handlers
 
-use crate::context::LocaiCliContext;
-use crate::commands::MemoryCommands;
 use crate::args::*;
+use crate::commands::MemoryCommands;
+use crate::context::LocaiCliContext;
 use crate::output::*;
 use crate::utils::*;
 use colored::Colorize;
@@ -10,18 +10,17 @@ use locai::LocaiError;
 use locai::memory::search_extensions::SearchMode;
 use locai::storage::filters::{MemoryFilter, RelationshipFilter, SemanticSearchFilter};
 use locai::storage::models::Relationship;
-use serde_json::{Value, json};
 use reqwest;
+use serde_json::{Value, json};
 
 /// Generate query embedding using Ollama if available, otherwise use mock embedding
 /// Checks OLLAMA_URL and OLLAMA_MODEL environment variables
 async fn generate_query_embedding(query: &str, dimensions: usize) -> Vec<f32> {
     // Try to get embedding from Ollama if configured
-    if let (Ok(ollama_url), Ok(model)) = (
-        std::env::var("OLLAMA_URL"),
-        std::env::var("OLLAMA_MODEL")
-    )
-        && let Ok(Some(embedding)) = generate_ollama_embedding(query, &model, &ollama_url).await {
+    if let (Ok(ollama_url), Ok(model)) =
+        (std::env::var("OLLAMA_URL"), std::env::var("OLLAMA_MODEL"))
+        && let Ok(Some(embedding)) = generate_ollama_embedding(query, &model, &ollama_url).await
+    {
         // Use Ollama embedding if dimensions match
         if embedding.len() == dimensions {
             return embedding;
@@ -33,33 +32,35 @@ async fn generate_query_embedding(query: &str, dimensions: usize) -> Vec<f32> {
             );
         }
     }
-    
+
     // Fall back to mock embedding
     generate_mock_query_embedding(query, dimensions)
 }
 
 /// Generate embedding using Ollama API
-async fn generate_ollama_embedding(text: &str, model: &str, ollama_url: &str) -> Result<Option<Vec<f32>>, Box<dyn std::error::Error>> {
+async fn generate_ollama_embedding(
+    text: &str,
+    model: &str,
+    ollama_url: &str,
+) -> Result<Option<Vec<f32>>, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let url = format!("{}/api/embeddings", ollama_url);
-    
+
     let payload = json!({
         "model": model,
         "prompt": text
     });
-    
+
     let response = client
         .post(&url)
         .json(&payload)
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await?;
-    
+
     if response.status().is_success() {
         let data: Value = response.json().await?;
-        if let Some(embedding) = data.get("embedding")
-            .and_then(|e| e.as_array())
-        {
+        if let Some(embedding) = data.get("embedding").and_then(|e| e.as_array()) {
             let vec: Vec<f32> = embedding
                 .iter()
                 .filter_map(|v| v.as_f64().map(|f| f as f32))
@@ -69,7 +70,7 @@ async fn generate_ollama_embedding(text: &str, model: &str, ollama_url: &str) ->
             }
         }
     }
-    
+
     Ok(None)
 }
 
@@ -78,20 +79,20 @@ async fn generate_ollama_embedding(text: &str, model: &str, ollama_url: &str) ->
 /// Uses the same algorithm as quickstart mock embeddings for consistency
 fn generate_mock_query_embedding(query: &str, dimensions: usize) -> Vec<f32> {
     let mut embedding = vec![0.0; dimensions];
-    
+
     // Create deterministic values based on query content
     for (i, c) in query.chars().enumerate() {
         let idx = i % dimensions;
         let char_val = c as u32 % 255;
         embedding[idx] += (char_val as f32 / 255.0) * 0.1;
     }
-    
+
     // Add some variation based on query length and hash
     let query_hash: u32 = query.chars().map(|c| c as u32).sum();
     for (i, val) in embedding.iter_mut().enumerate().take(dimensions) {
         *val += ((i as u32 + query_hash) % 100) as f32 / 1000.0;
     }
-    
+
     // Normalize to unit length (common for embeddings)
     let norm: f32 = embedding.iter().map(|&x| x * x).sum::<f32>().sqrt();
     if norm > 0.0 {
@@ -99,7 +100,7 @@ fn generate_mock_query_embedding(query: &str, dimensions: usize) -> Vec<f32> {
             *val /= norm;
         }
     }
-    
+
     embedding
 }
 
@@ -185,13 +186,17 @@ pub async fn handle_memory_command(
             // Parse temporal filters if provided
             if let Some(created_after_str) = args.created_after {
                 let created_after = chrono::DateTime::parse_from_rfc3339(&created_after_str)
-                    .map_err(|e| LocaiError::Other(format!("Invalid created_after timestamp: {}", e)))?
+                    .map_err(|e| {
+                        LocaiError::Other(format!("Invalid created_after timestamp: {}", e))
+                    })?
                     .with_timezone(&chrono::Utc);
                 mem_filter.created_after = Some(created_after);
             }
             if let Some(created_before_str) = args.created_before {
                 let created_before = chrono::DateTime::parse_from_rfc3339(&created_before_str)
-                    .map_err(|e| LocaiError::Other(format!("Invalid created_before timestamp: {}", e)))?
+                    .map_err(|e| {
+                        LocaiError::Other(format!("Invalid created_before timestamp: {}", e))
+                    })?
                     .with_timezone(&chrono::Utc);
                 mem_filter.created_before = Some(created_before);
             }
@@ -212,8 +217,9 @@ pub async fn handle_memory_command(
             };
 
             // Check if embeddings are available (Ollama configured)
-            let has_ollama = std::env::var("OLLAMA_URL").is_ok() && std::env::var("OLLAMA_MODEL").is_ok();
-            
+            let has_ollama =
+                std::env::var("OLLAMA_URL").is_ok() && std::env::var("OLLAMA_MODEL").is_ok();
+
             // Determine actual search mode with graceful fallback
             let (search_mode, use_hybrid_tagging) = if requested_mode == SearchMode::Hybrid {
                 if has_ollama {
@@ -239,8 +245,14 @@ pub async fn handle_memory_command(
             // Perform search with tagging if hybrid mode
             let tagged_results: Vec<TaggedResult> = if use_hybrid_tagging {
                 // Run both text and semantic searches separately for tagging
-                let text_results = match ctx.memory_manager
-                    .search(&args.query, Some(args.limit * 2), filter.clone(), SearchMode::Text)
+                let text_results = match ctx
+                    .memory_manager
+                    .search(
+                        &args.query,
+                        Some(args.limit * 2),
+                        filter.clone(),
+                        SearchMode::Text,
+                    )
                     .await
                 {
                     Ok(results) => results,
@@ -249,9 +261,10 @@ pub async fn handle_memory_command(
                         Vec::new()
                     }
                 };
-                
+
                 let query_embedding = generate_query_embedding(&args.query, 1024).await;
-                let semantic_results = match ctx.memory_manager
+                let semantic_results = match ctx
+                    .memory_manager
                     .search_with_embedding(
                         &args.query,
                         Some(&query_embedding),
@@ -289,18 +302,21 @@ pub async fn handle_memory_command(
                         // Already exists from text search - add semantic tag
                         existing.tags.push("semantic".to_string());
                         // Use higher score if semantic score is better
-                        if let Some(sem_score) = result.score {
-                            if existing.score.map_or(true, |text_score| sem_score > text_score) {
-                                existing.score = Some(sem_score);
-                            }
+                        if let Some(sem_score) = result.score
+                            && existing.score.is_none_or(|text_score| sem_score > text_score)
+                        {
+                            existing.score = Some(sem_score);
                         }
                     } else {
                         // New result from semantic search only
-                        result_map.insert(memory_id, TaggedResult {
-                            memory: result.memory,
-                            score: result.score,
-                            tags: vec!["semantic".to_string()],
-                        });
+                        result_map.insert(
+                            memory_id,
+                            TaggedResult {
+                                memory: result.memory,
+                                score: result.score,
+                                tags: vec!["semantic".to_string()],
+                            },
+                        );
                     }
                 }
 
@@ -309,7 +325,9 @@ pub async fn handle_memory_command(
                 results.sort_by(|a, b| {
                     let score_a = a.score.unwrap_or(0.0);
                     let score_b = b.score.unwrap_or(0.0);
-                    score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                    score_b
+                        .partial_cmp(&score_a)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
                 results.truncate(args.limit);
                 results
@@ -332,36 +350,50 @@ pub async fn handle_memory_command(
                         .await?
                 };
 
-                results.into_iter().map(|r| TaggedResult {
-                    memory: r.memory,
-                    score: r.score,
-                    tags: vec![if search_mode == SearchMode::Vector { "semantic" } else { "text" }.to_string()],
-                }).collect()
+                results
+                    .into_iter()
+                    .map(|r| TaggedResult {
+                        memory: r.memory,
+                        score: r.score,
+                        tags: vec![
+                            if search_mode == SearchMode::Vector {
+                                "semantic"
+                            } else {
+                                "text"
+                            }
+                            .to_string(),
+                        ],
+                    })
+                    .collect()
             };
 
             // Convert tagged results to regular results for JSON output
-            let results: Vec<locai::storage::models::SearchResult> = tagged_results.iter().map(|tr| {
-                locai::storage::models::SearchResult {
+            let results: Vec<locai::storage::models::SearchResult> = tagged_results
+                .iter()
+                .map(|tr| locai::storage::models::SearchResult {
                     memory: tr.memory.clone(),
                     score: tr.score,
-                }
-            }).collect();
-            
+                })
+                .collect();
+
             if output_format == "json" {
                 // Add tags to JSON output
-                let json_results: Vec<serde_json::Value> = tagged_results.iter().map(|tr| {
-                    let match_method = if tr.tags.len() > 1 {
-                        "both"
-                    } else {
-                        tr.tags.first().map(|s| s.as_str()).unwrap_or("text")
-                    };
-                    json!({
-                        "memory": tr.memory,
-                        "score": tr.score,
-                        "tags": tr.tags,
-                        "match_method": match_method
+                let json_results: Vec<serde_json::Value> = tagged_results
+                    .iter()
+                    .map(|tr| {
+                        let match_method = if tr.tags.len() > 1 {
+                            "both"
+                        } else {
+                            tr.tags.first().map(|s| s.as_str()).unwrap_or("text")
+                        };
+                        json!({
+                            "memory": tr.memory,
+                            "score": tr.score,
+                            "tags": tr.tags,
+                            "match_method": match_method
+                        })
                     })
-                }).collect();
+                    .collect();
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&json_results)
@@ -375,7 +407,7 @@ pub async fn handle_memory_command(
                         args.query.color(CliColors::accent())
                     ))
                 );
-                
+
                 // Provide helpful suggestions
                 if use_hybrid_tagging {
                     println!();
@@ -384,7 +416,10 @@ pub async fn handle_memory_command(
                     println!("  • Text search finds exact keyword matches");
                     println!("  • Semantic search finds related concepts (requires embeddings)");
                     if !has_ollama {
-                        println!("  • {} Semantic search unavailable - set OLLAMA_URL and OLLAMA_MODEL to enable", "⚠️".color(CliColors::warning()));
+                        println!(
+                            "  • {} Semantic search unavailable - set OLLAMA_URL and OLLAMA_MODEL to enable",
+                            "⚠️".color(CliColors::warning())
+                        );
                     }
                     println!("  • Try searching for different keywords or related concepts");
                 } else if search_mode == SearchMode::Vector {
@@ -394,25 +429,34 @@ pub async fn handle_memory_command(
                     if has_ollama {
                         println!("  • Using Ollama for query embeddings");
                     } else {
-                        println!("  • {} Using mock query embeddings - these don't capture semantic meaning!", "⚠️".color(CliColors::warning()));
+                        println!(
+                            "  • {} Using mock query embeddings - these don't capture semantic meaning!",
+                            "⚠️".color(CliColors::warning())
+                        );
                         println!("  • Set OLLAMA_URL and OLLAMA_MODEL for real semantic search");
                     }
                 } else {
                     println!();
                     println!("{}", "💡 Tips:".bold());
-                    println!("  • BM25 search looks for exact words - try searching for words that appear in your memories");
+                    println!(
+                        "  • BM25 search looks for exact words - try searching for words that appear in your memories"
+                    );
                     if has_ollama {
-                        println!("  • Use {} for semantic search or {} for hybrid (default)", "--mode semantic".color(CliColors::accent()), "--mode hybrid".color(CliColors::accent()));
+                        println!(
+                            "  • Use {} for semantic search or {} for hybrid (default)",
+                            "--mode semantic".color(CliColors::accent()),
+                            "--mode hybrid".color(CliColors::accent())
+                        );
                     }
                 }
             } else {
                 // Show search mode info
                 let mode_info = if use_hybrid_tagging {
-                    format!("[hybrid: text + semantic]")
+                    "[hybrid: text + semantic]"
                 } else if search_mode == SearchMode::Vector {
-                    format!("[semantic]")
+                    "[semantic]"
                 } else {
-                    format!("[text]")
+                    "[text]"
                 };
 
                 println!(
@@ -424,14 +468,23 @@ pub async fn handle_memory_command(
 
                 // Warn if using mock embeddings with semantic search
                 if !has_ollama && (use_hybrid_tagging || search_mode == SearchMode::Vector) {
-                    let avg_score: f32 = tagged_results.iter()
-                        .filter_map(|tr| tr.score)
-                        .sum::<f32>() / tagged_results.len().max(1) as f32;
-                    
+                    let avg_score: f32 =
+                        tagged_results.iter().filter_map(|tr| tr.score).sum::<f32>()
+                            / tagged_results.len().max(1) as f32;
+
                     if avg_score < 0.1 && !tagged_results.is_empty() {
                         println!();
-                        println!("{}", format!("⚠️  Warning: Very low similarity scores detected ({:.2} average)", avg_score).color(CliColors::warning()));
-                        println!("  This likely means you're using mock query embeddings with real stored embeddings.");
+                        println!(
+                            "{}",
+                            format!(
+                                "⚠️  Warning: Very low similarity scores detected ({:.2} average)",
+                                avg_score
+                            )
+                            .color(CliColors::warning())
+                        );
+                        println!(
+                            "  This likely means you're using mock query embeddings with real stored embeddings."
+                        );
                         println!("  Set OLLAMA_URL and OLLAMA_MODEL for real semantic search.");
                         println!();
                     }
@@ -440,11 +493,16 @@ pub async fn handle_memory_command(
                 // Show note if hybrid fell back to text-only
                 if requested_mode == SearchMode::Hybrid && !has_ollama {
                     println!();
-                    println!("{}", format_info("ℹ️  Hybrid search requested but semantic search unavailable (no embeddings). Using text search only."));
+                    println!(
+                        "{}",
+                        format_info(
+                            "ℹ️  Hybrid search requested but semantic search unavailable (no embeddings). Using text search only."
+                        )
+                    );
                     println!("  Set OLLAMA_URL and OLLAMA_MODEL to enable semantic search.");
                     println!();
                 }
-                
+
                 // Display results with tags
                 for (i, tagged_result) in tagged_results.iter().enumerate() {
                     let score = tagged_result.score.unwrap_or(0.0);
@@ -455,7 +513,7 @@ pub async fn handle_memory_command(
                         s if s > 0.0 => ("Weak", CliColors::muted()),
                         _ => ("Very Weak", CliColors::muted()),
                     };
-                    
+
                     // Build tag string
                     let tag_str = if tagged_result.tags.len() > 1 {
                         format!("[{}]", tagged_result.tags.join("+"))
@@ -464,7 +522,7 @@ pub async fn handle_memory_command(
                     } else {
                         "[text]".to_string()
                     };
-                    
+
                     println!(
                         "{}. {} {} {}",
                         format!("{}", i + 1).color(CliColors::muted()),
@@ -651,7 +709,10 @@ pub async fn handle_memory_command(
                             match serde_json::from_str::<Value>(&props) {
                                 Ok(props) => props,
                                 Err(e) => {
-                                    output_error(&format!("Invalid JSON properties: {}", e), output_format);
+                                    output_error(
+                                        &format!("Invalid JSON properties: {}", e),
+                                        output_format,
+                                    );
                                     return Ok(());
                                 }
                             }
@@ -659,11 +720,25 @@ pub async fn handle_memory_command(
                             Value::Null
                         };
 
-                        let is_memory = ctx.memory_manager.get_memory(&create_args.target).await?.is_some();
-                        let is_entity = ctx.memory_manager.get_entity(&create_args.target).await?.is_some();
+                        let is_memory = ctx
+                            .memory_manager
+                            .get_memory(&create_args.target)
+                            .await?
+                            .is_some();
+                        let is_entity = ctx
+                            .memory_manager
+                            .get_entity(&create_args.target)
+                            .await?
+                            .is_some();
 
                         if !is_memory && !is_entity {
-                            output_error(&format!("Target '{}' not found (not a memory or entity)", create_args.target), output_format);
+                            output_error(
+                                &format!(
+                                    "Target '{}' not found (not a memory or entity)",
+                                    create_args.target
+                                ),
+                                output_format,
+                            );
                             return Ok(());
                         }
 
@@ -678,10 +753,17 @@ pub async fn handle_memory_command(
                             updated_at: now,
                         };
 
-                        let created = ctx.memory_manager.create_relationship_entity(relationship).await?;
+                        let created = ctx
+                            .memory_manager
+                            .create_relationship_entity(relationship)
+                            .await?;
 
                         if output_format == "json" {
-                            println!("{}", serde_json::to_string_pretty(&created).unwrap_or_else(|_| "{}".to_string()));
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&created)
+                                    .unwrap_or_else(|_| "{}".to_string())
+                            );
                         } else {
                             println!(
                                 "{}",
@@ -727,17 +809,35 @@ pub async fn handle_memory_command(
                         "incoming": incoming,
                         "total": relationships.len() + incoming.len()
                     });
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
+                    );
                 } else {
-                    println!("{}", format_info(&format!("Memory Relationships: {}", args.id.color(CliColors::accent()))));
+                    println!(
+                        "{}",
+                        format_info(&format!(
+                            "Memory Relationships: {}",
+                            args.id.color(CliColors::accent())
+                        ))
+                    );
                     println!();
                     if !relationships.is_empty() {
-                        println!("{}", format_info(&format!("Outgoing Relationships ({}):", relationships.len())));
+                        println!(
+                            "{}",
+                            format_info(&format!(
+                                "Outgoing Relationships ({}):",
+                                relationships.len()
+                            ))
+                        );
                         print_relationship_list(&relationships);
                         println!();
                     }
                     if !incoming.is_empty() {
-                        println!("{}", format_info(&format!("Incoming Relationships ({}):", incoming.len())));
+                        println!(
+                            "{}",
+                            format_info(&format!("Incoming Relationships ({}):", incoming.len()))
+                        );
                         print_relationship_list(&incoming);
                     }
                     if relationships.is_empty() && incoming.is_empty() {
