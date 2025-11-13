@@ -299,8 +299,8 @@ impl EntityResolver {
         for i in 0..=len1 {
             matrix[i][0] = i;
         }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
+        for (j, item) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+            *item = j;
         }
 
         // Fill the matrix

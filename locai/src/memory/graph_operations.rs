@@ -89,7 +89,7 @@ impl GraphOperations {
     ///
     /// # Arguments
     /// * `id` - The ID of the memory to start from
-    /// * `relationship_type` - The type of relationship to follow
+    /// * `relationship_type` - The type of relationship to follow (None for all types)
     /// * `max_depth` - Maximum depth to traverse
     ///
     /// # Returns
@@ -97,7 +97,7 @@ impl GraphOperations {
     pub async fn find_connected_memories(
         &self,
         id: &str,
-        relationship_type: &str,
+        relationship_type: Option<&str>,
         max_depth: u8,
     ) -> Result<Vec<Memory>> {
         GraphTraversal::find_connected_memories(&*self.storage, id, relationship_type, max_depth)

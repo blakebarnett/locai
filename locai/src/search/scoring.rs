@@ -11,7 +11,7 @@ use std::fmt;
 ///
 /// These functions model how the importance of information decays over time.
 /// They are applied to calculate recency boosts for search results.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DecayFunction {
     /// No decay - all memories have equal recency weight
@@ -27,6 +27,7 @@ pub enum DecayFunction {
     /// Formula: `boost * exp(-decay_rate * age_hours)`
     ///
     /// This closely models human memory and forgetting curves.
+    #[default]
     Exponential,
 
     /// Logarithmic decay: importance decreases logarithmically with age
@@ -35,12 +36,6 @@ pub enum DecayFunction {
     ///
     /// Slower decay than exponential, useful for long-term memory.
     Logarithmic,
-}
-
-impl Default for DecayFunction {
-    fn default() -> Self {
-        Self::Exponential
-    }
 }
 
 impl fmt::Display for DecayFunction {

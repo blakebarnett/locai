@@ -439,7 +439,7 @@ impl MemoryManager {
     pub async fn find_connected_memories(
         &self,
         id: &str,
-        relationship_type: &str,
+        relationship_type: Option<&str>,
         max_depth: u8,
     ) -> Result<Vec<Memory>> {
         self.graph
@@ -752,7 +752,8 @@ impl MemoryManager {
             return Some(shared_storage.hook_registry());
         }
 
-        // Try remote storage
+        // Try remote storage (only if remote feature is enabled)
+        #[cfg(feature = "surrealdb-remote")]
         if let Some(shared_storage) =
             storage_any.downcast_ref::<Arc<SharedStorage<surrealdb::engine::remote::ws::Client>>>()
         {

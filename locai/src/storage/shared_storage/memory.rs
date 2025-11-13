@@ -11,6 +11,23 @@ use crate::storage::errors::StorageError;
 use crate::storage::filters::MemoryFilter;
 use crate::storage::traits::MemoryStore;
 
+/// Calculate cosine similarity between two vectors
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    if a.len() != b.len() {
+        return 0.0;
+    }
+
+    let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        0.0
+    } else {
+        dot_product / (norm_a * norm_b)
+    }
+}
+
 /// Internal representation of a Memory record for SurrealDB (matching working implementation exactly)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct SurrealMemory {
@@ -567,6 +584,8 @@ where
         let limit = limit.unwrap_or(10);
 
         // Search memories that have embeddings using SurrealDB KNN vector similarity
+        // Note: Uses M-Tree index on embedding field (defined in schema) for exact nearest neighbor search
+        // Explicitly filter out NULL embeddings to ensure KNN operator works correctly
         let vector_query = format!(
             r#"
                 SELECT *, 
@@ -574,7 +593,7 @@ where
                        (1.0 - vector::distance::knn()) AS similarity_score
                 FROM memory 
                 WHERE embedding IS NOT NULL
-                  AND embedding <|{},COSINE|> $query_vector
+                  AND embedding <|{}|> $query_vector
                 ORDER BY similarity_score DESC
                 LIMIT {}
             "#,
@@ -582,36 +601,85 @@ where
         );
 
         let query_vector_owned: Vec<f32> = query_vector.to_vec();
+        
+        // Log query for debugging
+        tracing::debug!("Vector search query: {}", vector_query);
+        tracing::debug!("Query vector dimensions: {}", query_vector_owned.len());
+        
+        // Debug: Check how many memories have embeddings
+        let count_query = "SELECT VALUE count() FROM memory WHERE embedding IS NOT NULL";
+        if let Ok(mut count_result) = self.client.query(count_query).await
+            && let Ok(counts) = count_result.take::<Vec<u64>>(0)
+            && let Some(count) = counts.first()
+        {
+            tracing::debug!("Memories with embeddings: {}", count);
+        }
+        
         let mut result = self
             .client
             .query(&vector_query)
             .bind(("query_vector", query_vector_owned))
             .await
             .map_err(|e| {
-                StorageError::Query(format!(
-                    "Failed to perform vector search on memories: {}",
-                    e
-                ))
+                let error_msg = format!(
+                    "Failed to perform vector search on memories: {}. Query: {}",
+                    e, vector_query
+                );
+                tracing::error!("{}", error_msg);
+                StorageError::Query(error_msg)
             })?;
 
+        // Define result struct explicitly (like BM25 search) - don't use flatten with RecordId
         #[derive(serde::Deserialize)]
         struct VectorSearchResult {
-            #[serde(flatten)]
-            memory: SurrealMemory,
-            _vector_distance: f32,
+            id: RecordId,
+            content: String,
+            metadata: Value,
+            embedding: Option<Vec<f32>>,
+            importance: Option<f32>,
+            owner: RecordId,
+            shared_with: Option<Vec<RecordId>>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
             similarity_score: f32,
+            #[allow(dead_code)]
+            vector_distance: f32,
         }
 
-        let results: Vec<VectorSearchResult> = result.take(0).map_err(|e| {
-            StorageError::Query(format!("Failed to extract vector search results: {}", e))
-        })?;
+        let results: Vec<VectorSearchResult> = match result.take(0) {
+            Ok(r) => r,
+            Err(e) => {
+                let error_msg = format!("Failed to extract vector search results: {}", e);
+                tracing::debug!("{}", error_msg);
+                tracing::debug!("Falling back to brute-force search");
+                return self.brute_force_vector_search(query_vector, limit).await;
+            }
+        };
+        
+        tracing::debug!("Vector search returned {} results", results.len());
 
-        // Convert to format expected by SearchExtensions (using similarity score and empty highlight)
+        if results.is_empty() {
+            tracing::debug!("M-Tree index search returned 0 results, falling back to brute-force search");
+            return self.brute_force_vector_search(query_vector, limit).await;
+        }
+
+        // Convert VectorSearchResult to SurrealMemory then to Memory
         Ok(results
             .into_iter()
             .map(|r| {
+                let memory = SurrealMemory {
+                    id: r.id,
+                    content: r.content,
+                    metadata: r.metadata,
+                    embedding: r.embedding,
+                    importance: r.importance,
+                    owner: r.owner,
+                    shared_with: r.shared_with,
+                    created_at: r.created_at,
+                    updated_at: r.updated_at,
+                };
                 (
-                    Memory::from(r.memory),
+                    Memory::from(memory),
                     r.similarity_score,
                     String::new(), // No highlighting for vector search
                 )
@@ -895,6 +963,8 @@ where
         let limit = limit.unwrap_or(10);
 
         // Search memories that have embeddings using SurrealDB KNN vector similarity
+        // Note: Uses M-Tree index on embedding field (defined in schema) for exact nearest neighbor search
+        // Explicitly filter out NULL embeddings to ensure KNN operator works correctly
         let vector_query = format!(
             r#"
                 SELECT *, 
@@ -902,7 +972,7 @@ where
                        (1.0 - vector::distance::knn()) AS similarity_score
                 FROM memory 
                 WHERE embedding IS NOT NULL
-                  AND embedding <|{},COSINE|> $query_vector
+                  AND embedding <|{}|> $query_vector
                 ORDER BY similarity_score DESC
                 LIMIT {}
             "#,
@@ -910,40 +980,148 @@ where
         );
 
         let query_vector_owned: Vec<f32> = query_vector.to_vec();
+        
+        // Log query for debugging
+        tracing::debug!("Vector search query: {}", vector_query);
+        tracing::debug!("Query vector dimensions: {}", query_vector_owned.len());
+        
+        // Debug: Check how many memories have embeddings
+        let count_query = "SELECT VALUE count() FROM memory WHERE embedding IS NOT NULL";
+        if let Ok(mut count_result) = self.client.query(count_query).await
+            && let Ok(counts) = count_result.take::<Vec<u64>>(0)
+            && let Some(count) = counts.first()
+        {
+            tracing::debug!("Memories with embeddings: {}", count);
+        }
+        
         let mut result = self
             .client
             .query(&vector_query)
             .bind(("query_vector", query_vector_owned))
             .await
             .map_err(|e| {
-                StorageError::Query(format!(
-                    "Failed to perform vector search on memories: {}",
-                    e
-                ))
+                let error_msg = format!(
+                    "Failed to perform vector search on memories: {}. Query: {}",
+                    e, vector_query
+                );
+                tracing::error!("{}", error_msg);
+                StorageError::Query(error_msg)
             })?;
 
+        // Define result struct explicitly (like BM25 search) - don't use flatten with RecordId
         #[derive(serde::Deserialize)]
         struct VectorSearchResult {
-            #[serde(flatten)]
-            memory: SurrealMemory,
-            _vector_distance: f32,
+            id: RecordId,
+            content: String,
+            metadata: Value,
+            embedding: Option<Vec<f32>>,
+            importance: Option<f32>,
+            owner: RecordId,
+            shared_with: Option<Vec<RecordId>>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
             similarity_score: f32,
+            #[allow(dead_code)]
+            vector_distance: f32,
         }
 
-        let results: Vec<VectorSearchResult> = result.take(0).map_err(|e| {
-            StorageError::Query(format!("Failed to extract vector search results: {}", e))
-        })?;
+        let results: Vec<VectorSearchResult> = match result.take(0) {
+            Ok(r) => r,
+            Err(e) => {
+                let error_msg = format!("Failed to extract vector search results: {}", e);
+                tracing::debug!("{}", error_msg);
+                tracing::debug!("Falling back to brute-force search");
+                return self.brute_force_vector_search(query_vector, limit).await;
+            }
+        };
+        
+        tracing::debug!("Vector search returned {} results", results.len());
 
-        // Convert to format expected by SearchExtensions (using similarity score and empty highlight)
+        if results.is_empty() {
+            tracing::debug!("M-Tree index search returned 0 results, falling back to brute-force search");
+            return self.brute_force_vector_search(query_vector, limit).await;
+        }
+
+        // Convert VectorSearchResult to SurrealMemory then to Memory
         Ok(results
             .into_iter()
             .map(|r| {
+                let memory = SurrealMemory {
+                    id: r.id,
+                    content: r.content,
+                    metadata: r.metadata,
+                    embedding: r.embedding,
+                    importance: r.importance,
+                    owner: r.owner,
+                    shared_with: r.shared_with,
+                    created_at: r.created_at,
+                    updated_at: r.updated_at,
+                };
                 (
-                    Memory::from(r.memory),
+                    Memory::from(memory),
                     r.similarity_score,
-                    String::new(), // No highlighting for vector search
+                    String::new(),
                 )
             })
+            .collect())
+    }
+
+    /// Brute-force vector search using cosine similarity
+    /// This is a fallback when M-Tree index doesn't work (e.g., with optional fields)
+    async fn brute_force_vector_search(
+        &self,
+        query_vector: &[f32],
+        limit: usize,
+    ) -> Result<Vec<(Memory, f32, String)>, StorageError> {
+        tracing::debug!("Performing brute-force vector search");
+        
+        // Get all memories with embeddings
+        let all_memories_query = "SELECT * FROM memory WHERE embedding IS NOT NULL";
+        let mut result = self
+            .client
+            .query(all_memories_query)
+            .await
+            .map_err(|e| StorageError::Query(format!("Failed to fetch memories for brute-force search: {}", e)))?;
+
+        let memories: Vec<SurrealMemory> = result.take(0).map_err(|e| {
+            StorageError::Query(format!("Failed to extract memories: {}", e))
+        })?;
+
+        tracing::debug!("Found {} memories with embeddings for brute-force search", memories.len());
+
+        // Calculate cosine similarity for each memory
+        let mut scored_memories: Vec<(Memory, f32)> = memories
+            .into_iter()
+            .filter_map(|surreal_mem| {
+                let mem = Memory::from(surreal_mem.clone());
+                if let Some(embedding) = &mem.embedding {
+                    if embedding.len() == query_vector.len() {
+                        let similarity = cosine_similarity(query_vector, embedding);
+                        Some((mem, similarity))
+                    } else {
+                        tracing::debug!(
+                            "Skipping memory {}: embedding dimension mismatch ({} vs {})",
+                            mem.id,
+                            embedding.len(),
+                            query_vector.len()
+                        );
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by similarity (descending) and take top results
+        scored_memories.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored_memories.truncate(limit);
+
+        tracing::debug!("Brute-force search found {} results", scored_memories.len());
+
+        Ok(scored_memories
+            .into_iter()
+            .map(|(mem, similarity)| (mem, similarity, String::new()))
             .collect())
     }
 

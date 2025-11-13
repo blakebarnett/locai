@@ -13,7 +13,7 @@ use crate::storage::traits::{EntityStore, MemoryStore, RelationshipStore};
 
 /// Internal representation of a Relationship record for SurrealDB
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct SurrealRelationship {
+pub(crate) struct SurrealRelationship {
     id: RecordId,
     relationship_type: String,
     source_id: String,
@@ -136,106 +136,118 @@ where
             .map(Relationship::from)
             .ok_or_else(|| StorageError::Internal("No relationship created".to_string()))?;
 
-        // Create appropriate edge table entries based on relationship type
-        match relationship.relationship_type.as_str() {
-            "contains" | "mentions" | "references_entity" | "has_entity" => {
-                // Create memory->contains->entity edge
-                let edge_query = r#"
-                    RELATE $source_memory->contains->$target_entity CONTENT {
-                        relationship_type: $relationship_type,
-                        properties: $properties,
-                        confidence: 1.0
+        // Create appropriate edge table entries based on relationship type and node types
+        // Check if both source and target are memories (for direct memory-to-memory relationships)
+        let target_is_memory = self.get_memory(&relationship.target_id).await?.is_some();
+        
+        if source_is_memory && target_is_memory {
+            // Memory-to-memory relationships are stored in the relationship table only
+            // No edge table entry needed - graph traversal will query the relationship table directly
+        } else {
+            // Create edge table entries based on relationship type
+            match relationship.relationship_type.as_str() {
+                "contains" | "mentions" | "references_entity" | "has_entity" => {
+                    // Create memory->contains->entity edge
+                    let edge_query = r#"
+                        RELATE $source_memory->contains->$target_entity CONTENT {
+                            relationship_type: $relationship_type,
+                            properties: $properties,
+                            confidence: 1.0
+                        }
+                    "#;
+
+                    let source_id = relationship.source_id.clone();
+                    let target_id = relationship.target_id.clone();
+                    let rel_type = relationship.relationship_type.clone();
+                    let props = relationship.properties.clone();
+
+                    let _edge_result = self
+                        .client
+                        .query(edge_query)
+                        .bind((
+                            "source_memory",
+                            RecordId::from(("memory", source_id.as_str())),
+                        ))
+                        .bind((
+                            "target_entity",
+                            RecordId::from(("entity", target_id.as_str())),
+                        ))
+                        .bind(("relationship_type", rel_type))
+                        .bind(("properties", props))
+                        .await
+                        .map_err(|e| {
+                            StorageError::Query(format!("Failed to create contains edge: {}", e))
+                        })?;
+                }
+                "references" => {
+                    // Create memory->references->relationship edge
+                    let edge_query = r#"
+                        RELATE $source_memory->references->$target_relationship CONTENT {
+                            relationship_type: $relationship_type,
+                            properties: $properties,
+                            confidence: 1.0
+                        }
+                    "#;
+
+                    let source_id = relationship.source_id.clone();
+                    let target_id = relationship.target_id.clone();
+                    let rel_type = relationship.relationship_type.clone();
+                    let props = relationship.properties.clone();
+
+                    let _edge_result = self
+                        .client
+                        .query(edge_query)
+                        .bind((
+                            "source_memory",
+                            RecordId::from(("memory", source_id.as_str())),
+                        ))
+                        .bind((
+                            "target_relationship",
+                            RecordId::from(("relationship", target_id.as_str())),
+                        ))
+                        .bind(("relationship_type", rel_type))
+                        .bind(("properties", props))
+                        .await
+                        .map_err(|e| {
+                            StorageError::Query(format!("Failed to create references edge: {}", e))
+                        })?;
+                }
+                _ => {
+                    // Create entity->relates->entity edge for entity-to-entity relationships
+                    // Only create edge if both are entities
+                    if !source_is_memory && !target_is_memory {
+                        let edge_query = r#"
+                            RELATE $source_entity->relates->$target_entity CONTENT {
+                                relationship_type: $relationship_type,
+                                properties: $properties,
+                                confidence: 1.0
+                            }
+                        "#;
+
+                        let source_id = relationship.source_id.clone();
+                        let target_id = relationship.target_id.clone();
+                        let rel_type = relationship.relationship_type.clone();
+                        let props = relationship.properties.clone();
+
+                        let _edge_result = self
+                            .client
+                            .query(edge_query)
+                            .bind((
+                                "source_entity",
+                                RecordId::from(("entity", source_id.as_str())),
+                            ))
+                            .bind((
+                                "target_entity",
+                                RecordId::from(("entity", target_id.as_str())),
+                            ))
+                            .bind(("relationship_type", rel_type))
+                            .bind(("properties", props))
+                            .await
+                            .map_err(|e| {
+                                StorageError::Query(format!("Failed to create relates edge: {}", e))
+                            })?;
                     }
-                "#;
-
-                let source_id = relationship.source_id.clone();
-                let target_id = relationship.target_id.clone();
-                let rel_type = relationship.relationship_type.clone();
-                let props = relationship.properties.clone();
-
-                let _edge_result = self
-                    .client
-                    .query(edge_query)
-                    .bind((
-                        "source_memory",
-                        RecordId::from(("memory", source_id.as_str())),
-                    ))
-                    .bind((
-                        "target_entity",
-                        RecordId::from(("entity", target_id.as_str())),
-                    ))
-                    .bind(("relationship_type", rel_type))
-                    .bind(("properties", props))
-                    .await
-                    .map_err(|e| {
-                        StorageError::Query(format!("Failed to create contains edge: {}", e))
-                    })?;
-            }
-            "references" => {
-                // Create memory->references->relationship edge
-                let edge_query = r#"
-                    RELATE $source_memory->references->$target_relationship CONTENT {
-                        relationship_type: $relationship_type,
-                        properties: $properties,
-                        confidence: 1.0
-                    }
-                "#;
-
-                let source_id = relationship.source_id.clone();
-                let target_id = relationship.target_id.clone();
-                let rel_type = relationship.relationship_type.clone();
-                let props = relationship.properties.clone();
-
-                let _edge_result = self
-                    .client
-                    .query(edge_query)
-                    .bind((
-                        "source_memory",
-                        RecordId::from(("memory", source_id.as_str())),
-                    ))
-                    .bind((
-                        "target_relationship",
-                        RecordId::from(("relationship", target_id.as_str())),
-                    ))
-                    .bind(("relationship_type", rel_type))
-                    .bind(("properties", props))
-                    .await
-                    .map_err(|e| {
-                        StorageError::Query(format!("Failed to create references edge: {}", e))
-                    })?;
-            }
-            _ => {
-                // Create entity->relates->entity edge for other relationship types
-                let edge_query = r#"
-                    RELATE $source_entity->relates->$target_entity CONTENT {
-                        relationship_type: $relationship_type,
-                        properties: $properties,
-                        confidence: 1.0
-                    }
-                "#;
-
-                let source_id = relationship.source_id.clone();
-                let target_id = relationship.target_id.clone();
-                let rel_type = relationship.relationship_type.clone();
-                let props = relationship.properties.clone();
-
-                let _edge_result = self
-                    .client
-                    .query(edge_query)
-                    .bind((
-                        "source_entity",
-                        RecordId::from(("entity", source_id.as_str())),
-                    ))
-                    .bind((
-                        "target_entity",
-                        RecordId::from(("entity", target_id.as_str())),
-                    ))
-                    .bind(("relationship_type", rel_type))
-                    .bind(("properties", props))
-                    .await
-                    .map_err(|e| {
-                        StorageError::Query(format!("Failed to create relates edge: {}", e))
-                    })?;
+                }
             }
         }
 

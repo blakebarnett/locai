@@ -118,7 +118,7 @@ where
     async fn find_connected_memories(
         &self,
         memory_id: &str,
-        relationship_type: &str,
+        relationship_type: Option<&str>,
         max_depth: u8,
     ) -> Result<Vec<Memory>, StorageError> {
         // Verify the source memory exists
@@ -141,7 +141,36 @@ where
                 continue;
             }
 
-            // Get entities contained in this memory
+            // First, check for direct memory-to-memory relationships
+            let direct_relationships = self.get_direct_memory_relationships(
+                &current_memory_id,
+                relationship_type,
+            ).await?;
+
+            for rel in direct_relationships {
+                let target_id = if rel.source_id == current_memory_id {
+                    rel.target_id
+                } else {
+                    rel.source_id
+                };
+
+                // Verify target is a memory (not an entity)
+                if let Some(target_memory) = self.get_memory(&target_id).await?
+                    && !visited_memories.contains(&target_memory.id)
+                {
+                    visited_memories.insert(target_memory.id.clone());
+
+                    // Don't include the source memory in results
+                    if target_memory.id != memory_id {
+                        connected_memories.push(target_memory.clone());
+                    }
+
+                    // Add to queue for further traversal
+                    queue.push_back((target_memory.id, current_depth + 1));
+                }
+            }
+
+            // Also traverse through entities (entity-mediated relationships)
             let entities = self.get_entities_from_memory(&current_memory_id).await?;
 
             for entity in entities {
@@ -150,11 +179,11 @@ where
                 }
                 visited_entities.insert(entity.id.clone());
 
-                // Find related entities through the specified relationship type
+                // Find related entities through the specified relationship type (None = all types)
                 let related_entities = self
                     .find_related_entities(
                         &entity.id,
-                        Some(relationship_type.to_string()),
+                        relationship_type.map(|s| s.to_string()),
                         Some("both".to_string()),
                     )
                     .await?;
@@ -283,6 +312,64 @@ impl<C> SharedStorage<C>
 where
     C: Connection + Clone + Send + Sync + std::fmt::Debug + 'static,
 {
+    /// Get direct memory-to-memory relationships from the relationship table
+    async fn get_direct_memory_relationships(
+        &self,
+        memory_id: &str,
+        relationship_type: Option<&str>,
+    ) -> Result<Vec<Relationship>, StorageError> {
+        let mut query = r#"
+            SELECT * FROM relationship 
+            WHERE (source_id = $memory_id OR target_id = $memory_id)
+        "#
+        .to_string();
+
+        if relationship_type.is_some() {
+            query.push_str(" AND relationship_type = $relationship_type");
+        }
+
+        let memory_id_owned = memory_id.to_string();
+        let mut query_builder = self
+            .client
+            .query(&query)
+            .bind(("memory_id", memory_id_owned));
+
+        if let Some(rel_type) = relationship_type {
+            query_builder = query_builder.bind(("relationship_type", rel_type.to_string()));
+        }
+
+        let mut response = query_builder
+            .await
+            .map_err(|e| {
+                StorageError::Query(format!("Failed to get direct memory relationships: {}", e))
+            })?;
+
+        // Deserialize as SurrealRelationship first (with RecordId), then convert to Relationship
+        use crate::storage::shared_storage::relationship::SurrealRelationship;
+        let surreal_relationships: Vec<SurrealRelationship> = response
+            .take(0)
+            .map_err(|e| {
+                StorageError::Query(format!("Failed to extract memory relationships: {}", e))
+            })?;
+        
+        let relationships: Vec<Relationship> = surreal_relationships
+            .into_iter()
+            .map(Relationship::from)
+            .collect();
+
+        // Filter to only return relationships where both source and target are memories
+        let mut memory_to_memory = Vec::new();
+        for rel in relationships {
+            let source_is_memory = self.get_memory(&rel.source_id).await?.is_some();
+            let target_is_memory = self.get_memory(&rel.target_id).await?.is_some();
+            
+            if source_is_memory && target_is_memory {
+                memory_to_memory.push(rel);
+            }
+        }
+
+        Ok(memory_to_memory)
+    }
     /// Recursively collect memory subgraph using depth-limited traversal
     async fn collect_memory_subgraph_recursive(
         &self,

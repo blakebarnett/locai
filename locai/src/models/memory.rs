@@ -6,12 +6,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Memory priority levels
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum MemoryPriority {
     /// Low importance memory
     Low = 0,
 
     /// Normal importance memory
+    #[default]
     Normal = 1,
 
     /// High importance memory
@@ -21,18 +22,13 @@ pub enum MemoryPriority {
     Critical = 3,
 }
 
-impl Default for MemoryPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
 /// Types of memories
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub enum MemoryType {
     /// Conversation or dialogue memory
     Conversation,
     /// Factual knowledge memory
+    #[default]
     Fact,
     /// Procedural/skill memory
     Procedural,
@@ -50,12 +46,6 @@ pub enum MemoryType {
     Wisdom,
     /// Custom memory type
     Custom(String),
-}
-
-impl Default for MemoryType {
-    fn default() -> Self {
-        Self::Fact
-    }
 }
 
 impl std::fmt::Display for MemoryType {

@@ -9,21 +9,22 @@ where
     C: Connection,
 {
     // Define custom search analyzers for different content types
+    // Use IF NOT EXISTS to make schema creation idempotent
     let analyzers_query = r#"
         -- General content analyzer for memories and entities
-        DEFINE ANALYZER memory_analyzer 
+        DEFINE ANALYZER IF NOT EXISTS memory_analyzer 
             TOKENIZERS class, blank, punct 
             FILTERS lowercase, ascii, snowball(english)
             COMMENT "Analyzer for memory content with stemming and normalization";
         
         -- Entity-focused analyzer with less aggressive stemming
-        DEFINE ANALYZER entity_analyzer
+        DEFINE ANALYZER IF NOT EXISTS entity_analyzer
             TOKENIZERS class, blank
             FILTERS lowercase, ascii
             COMMENT "Analyzer for entity names and properties";
         
         -- Fuzzy search analyzer for typo tolerance
-        DEFINE ANALYZER fuzzy_analyzer
+        DEFINE ANALYZER IF NOT EXISTS fuzzy_analyzer
             TOKENIZERS class, blank, punct
             FILTERS lowercase, ascii
             COMMENT "Basic analyzer for fuzzy matching operations";
@@ -48,38 +49,48 @@ where
     "#;
 
     // Create the memory table with owner field and full-text search capabilities
+    // Use IF NOT EXISTS to make schema creation idempotent
     let memory_table_query = r#"
-        DEFINE TABLE memory SCHEMALESS
+        DEFINE TABLE IF NOT EXISTS memory SCHEMALESS
         COMMENT "Stores memory records for AI agents";
         
-        DEFINE FIELD id ON memory TYPE record<memory>;
-        DEFINE FIELD content ON memory TYPE string;
-        DEFINE FIELD metadata ON memory TYPE object DEFAULT {};
-        DEFINE FIELD embedding ON memory TYPE option<array<float>>;
-        DEFINE FIELD importance ON memory TYPE option<float>;
-        DEFINE FIELD owner ON memory TYPE record<user>;
-        DEFINE FIELD shared_with ON memory TYPE option<set<record<user>>> DEFAULT NONE;
-        DEFINE FIELD created_at ON memory TYPE datetime DEFAULT time::now();
-        DEFINE FIELD updated_at ON memory TYPE datetime VALUE time::now();
+        DEFINE FIELD IF NOT EXISTS id ON memory TYPE record<memory>;
+        DEFINE FIELD IF NOT EXISTS content ON memory TYPE string;
+        DEFINE FIELD IF NOT EXISTS metadata ON memory TYPE object DEFAULT {};
+        DEFINE FIELD IF NOT EXISTS embedding ON memory TYPE option<array<float>>;
+        DEFINE FIELD IF NOT EXISTS importance ON memory TYPE option<float>;
+        DEFINE FIELD IF NOT EXISTS owner ON memory TYPE record<user>;
+        DEFINE FIELD IF NOT EXISTS shared_with ON memory TYPE option<set<record<user>>> DEFAULT NONE;
+        DEFINE FIELD IF NOT EXISTS created_at ON memory TYPE datetime DEFAULT time::now();
+        DEFINE FIELD IF NOT EXISTS updated_at ON memory TYPE datetime VALUE time::now();
         
-        DEFINE INDEX memory_created_at_idx ON memory FIELDS created_at;
-        DEFINE INDEX memory_importance_idx ON memory FIELDS importance;
-        DEFINE INDEX memory_owner_idx ON memory FIELDS owner;
-        DEFINE INDEX memory_shared_idx ON memory FIELDS shared_with;
-        DEFINE INDEX memory_type_idx ON memory FIELDS metadata.memory_type;
-        DEFINE INDEX memory_priority_idx ON memory FIELDS metadata.priority;
+        DEFINE INDEX IF NOT EXISTS memory_created_at_idx ON memory FIELDS created_at;
+        DEFINE INDEX IF NOT EXISTS memory_importance_idx ON memory FIELDS importance;
+        DEFINE INDEX IF NOT EXISTS memory_owner_idx ON memory FIELDS owner;
+        DEFINE INDEX IF NOT EXISTS memory_shared_idx ON memory FIELDS shared_with;
+        DEFINE INDEX IF NOT EXISTS memory_type_idx ON memory FIELDS metadata.memory_type;
+        DEFINE INDEX IF NOT EXISTS memory_priority_idx ON memory FIELDS metadata.priority;
         
         -- Full-text search indexes for memory content with BM25 scoring and highlighting
-        DEFINE INDEX memory_content_ft ON memory 
+        DEFINE INDEX IF NOT EXISTS memory_content_ft ON memory 
             FIELDS content 
             SEARCH ANALYZER memory_analyzer BM25 HIGHLIGHTS
             COMMENT "Full-text search on memory content with BM25 scoring";
         
         -- Full-text search for memory metadata fields
-        DEFINE INDEX memory_metadata_ft ON memory 
+        DEFINE INDEX IF NOT EXISTS memory_metadata_ft ON memory 
             FIELDS metadata.tags, metadata.source, metadata.summary
             SEARCH ANALYZER memory_analyzer
             COMMENT "Full-text search on memory metadata fields";
+        
+        -- Vector index for embedding field (required for KNN vector search)
+        -- Using M-Tree for exact nearest neighbor search (works better with optional fields)
+        -- M-Tree provides exact results, which is better for semantic search accuracy
+        -- For high-dimensional vectors (1024), M-Tree is slower but more reliable than HNSW
+        DEFINE INDEX IF NOT EXISTS memory_embedding_mtree_idx ON memory 
+            FIELDS embedding 
+            MTREE DIMENSION 1024 DIST COSINE TYPE F32
+            COMMENT "M-Tree vector index for 1024-dimensional embeddings (exact nearest neighbor, BGE-M3 compatible)";
     "#;
 
     // Create the vector table for embeddings storage
@@ -288,10 +299,26 @@ async fn execute_schema_query<C>(
 where
     C: Connection,
 {
-    client
+    let result = client
         .query(query)
         .await
         .map_err(|e| StorageError::Query(format!("Failed to create {}: {}", description, e)))?;
+
+    // Check for errors in the result, but ignore "already exists" errors
+    if let Err(e) = result.check() {
+        let error_str = e.to_string();
+        // Allow "already exists" errors for idempotent schema creation
+        if error_str.contains("already exists") || error_str.contains("already defined") {
+            tracing::debug!("{} already exists, skipping", description);
+            return Ok(());
+        }
+        
+        // For other errors, log and fail
+        let error_msg = format!("Schema creation failed for {}: {}", description, e);
+        tracing::error!("{}", error_msg);
+        tracing::error!("Query was: {}", query);
+        return Err(StorageError::Query(error_msg));
+    }
 
     tracing::debug!("Created {} successfully", description);
     Ok(())

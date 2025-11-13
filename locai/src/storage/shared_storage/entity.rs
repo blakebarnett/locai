@@ -45,8 +45,20 @@ impl From<Entity> for SurrealEntity {
 
 impl From<SurrealEntity> for Entity {
     fn from(surreal_entity: SurrealEntity) -> Self {
+        // Extract the key string from RecordId
+        // RecordId::key() returns a RecordId, and to_string() includes brackets ⟨⟩
+        // We need to extract just the key part without brackets
+        let key_record = surreal_entity.id.key();
+        let key_string = key_record.to_string();
+        // Remove angle brackets if present: ⟨key⟩ -> key
+        let clean_id = key_string
+            .strip_prefix('⟨')
+            .and_then(|s| s.strip_suffix('⟩'))
+            .unwrap_or(&key_string)
+            .to_string();
+        
         Self {
-            id: surreal_entity.id.key().to_string(),
+            id: clean_id,
             entity_type: surreal_entity.entity_type,
             properties: surreal_entity.properties,
             created_at: surreal_entity.created_at,
@@ -72,17 +84,20 @@ where
             owner: RecordId::from(("user", "system")),
         };
 
-        println!("DEBUG: Creating entity, letting SurrealDB generate ID");
-
-        // Let SurrealDB auto-generate the ID by not specifying one
-        let created: Option<SurrealEntity> = self
-            .client
-            .create("entity")
-            .content(create_entity)
-            .await
-            .map_err(|e| StorageError::Query(format!("Failed to create entity: {}", e)))?;
-
-        println!("DEBUG: Created entity: {:?}", created);
+        // Use the provided ID if available, otherwise let SurrealDB generate one
+        let created: Option<SurrealEntity> = if !entity.id.is_empty() {
+            self.client
+                .create(("entity", entity.id.as_str()))
+                .content(create_entity)
+                .await
+                .map_err(|e| StorageError::Query(format!("Failed to create entity: {}", e)))?
+        } else {
+            self.client
+                .create("entity")
+                .content(create_entity)
+                .await
+                .map_err(|e| StorageError::Query(format!("Failed to create entity: {}", e)))?
+        };
 
         created
             .map(Entity::from)
@@ -91,8 +106,6 @@ where
 
     /// Get an entity by its ID
     async fn get_entity(&self, id: &str) -> Result<Option<Entity>, StorageError> {
-        println!("DEBUG: Getting entity with ID: {}", id);
-
         // Use the SDK's select method
         let entity: Option<SurrealEntity> = self
             .client
@@ -100,40 +113,32 @@ where
             .await
             .map_err(|e| StorageError::Query(format!("Failed to get entity: {}", e)))?;
 
-        println!("DEBUG: Retrieved entity: {:?}", entity);
-
         Ok(entity.map(Entity::from))
     }
 
     /// Update an existing entity
     async fn update_entity(&self, entity: Entity) -> Result<Entity, StorageError> {
-        println!("DEBUG: Updating entity with ID: {}", entity.id);
-
-        // Use MERGE to update specific fields while preserving created_at
-        let merge_query = r#"
+        // Use a query to update, letting SurrealDB handle updated_at automatically
+        let update_query = r#"
             UPDATE $record_id MERGE {
                 entity_type: $entity_type,
                 properties: $properties,
-                owner: $owner,
                 updated_at: time::now()
             }
         "#;
 
         let mut response = self
             .client
-            .query(merge_query)
+            .query(update_query)
             .bind(("record_id", RecordId::from(("entity", entity.id.as_str()))))
             .bind(("entity_type", entity.entity_type.clone()))
             .bind(("properties", entity.properties.clone()))
-            .bind(("owner", RecordId::from(("user", "system"))))
             .await
             .map_err(|e| StorageError::Query(format!("Failed to update entity: {}", e)))?;
 
         let updated: Option<SurrealEntity> = response
             .take(0)
             .map_err(|e| StorageError::Query(format!("Failed to extract updated entity: {}", e)))?;
-
-        println!("DEBUG: Updated entity: {:?}", updated);
 
         updated.map(Entity::from).ok_or_else(|| {
             StorageError::NotFound(format!("Entity with id {} not found", entity.id))
@@ -142,7 +147,6 @@ where
 
     /// Delete an entity by its ID
     async fn delete_entity(&self, id: &str) -> Result<bool, StorageError> {
-        println!("DEBUG: Deleting entity with ID: {}", id);
 
         // Use the SDK's delete method for the entity record
         // Note: SurrealDB will handle cascade deletion of related records automatically if configured
@@ -151,8 +155,6 @@ where
             .delete(("entity", id))
             .await
             .map_err(|e| StorageError::Query(format!("Failed to delete entity: {}", e)))?;
-
-        println!("DEBUG: Delete result: {:?}", deleted);
 
         Ok(deleted.is_some())
     }

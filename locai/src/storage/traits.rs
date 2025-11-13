@@ -352,7 +352,7 @@ pub trait GraphTraversal: Send + Sync + 'static {
     ///
     /// # Arguments
     /// * `memory_id` - The ID of the starting memory
-    /// * `relationship_type` - The relationship type to follow
+    /// * `relationship_type` - The relationship type to follow (None for all types)
     /// * `max_depth` - Maximum traversal depth
     ///
     /// # Returns
@@ -360,7 +360,7 @@ pub trait GraphTraversal: Send + Sync + 'static {
     async fn find_connected_memories(
         &self,
         memory_id: &str,
-        relationship_type: &str,
+        relationship_type: Option<&str>,
         max_depth: u8,
     ) -> std::result::Result<Vec<Memory>, StorageError>;
 
