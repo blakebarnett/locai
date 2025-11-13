@@ -98,12 +98,14 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Override cargo config to disable LLD
+      - name: Override cargo config to disable LLD and sccache
         run: |
           mkdir -p .cargo
-          # Create minimal config without LLD rustflags to override repo config
-          # This replaces the repo's .cargo/config.toml which has LLD rustflags
+          # Create minimal config without LLD rustflags and without sccache wrapper
+          # This replaces the repo's .cargo/config.toml which has LLD rustflags and sccache
           cat > .cargo/config.toml << 'EOF'
+          [build]
+          rustc-wrapper = ""
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
@@ -167,12 +169,14 @@ jobs:
         with:
           components: clippy
 
-      - name: Override cargo config to disable LLD
+      - name: Override cargo config to disable LLD and sccache
         run: |
           mkdir -p .cargo
-          # Create minimal config without LLD rustflags to override repo config
-          # This replaces the repo's .cargo/config.toml which has LLD rustflags
+          # Create minimal config without LLD rustflags and without sccache wrapper
+          # This replaces the repo's .cargo/config.toml which has LLD rustflags and sccache
           cat > .cargo/config.toml << 'EOF'
+          [build]
+          rustc-wrapper = ""
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
@@ -219,12 +223,14 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Override cargo config to disable LLD
+      - name: Override cargo config to disable LLD and sccache
         run: |
           mkdir -p .cargo
-          # Create minimal config without LLD rustflags to override repo config
-          # This replaces the repo's .cargo/config.toml which has LLD rustflags
+          # Create minimal config without LLD rustflags and without sccache wrapper
+          # This replaces the repo's .cargo/config.toml which has LLD rustflags and sccache
           cat > .cargo/config.toml << 'EOF'
+          [build]
+          rustc-wrapper = ""
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
@@ -268,12 +274,14 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Override cargo config to disable LLD
+      - name: Override cargo config to disable LLD and sccache
         run: |
           mkdir -p .cargo
-          # Create minimal config without LLD rustflags to override repo config
-          # This replaces the repo's .cargo/config.toml which has LLD rustflags
+          # Create minimal config without LLD rustflags and without sccache wrapper
+          # This replaces the repo's .cargo/config.toml which has LLD rustflags and sccache
           cat > .cargo/config.toml << 'EOF'
+          [build]
+          rustc-wrapper = ""
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
@@ -317,12 +325,14 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Override cargo config to disable LLD
+      - name: Override cargo config to disable LLD and sccache
         run: |
           mkdir -p .cargo
-          # Create minimal config without LLD rustflags to override repo config
-          # This replaces the repo's .cargo/config.toml which has LLD rustflags
+          # Create minimal config without LLD rustflags and without sccache wrapper
+          # This replaces the repo's .cargo/config.toml which has LLD rustflags and sccache
           cat > .cargo/config.toml << 'EOF'
+          [build]
+          rustc-wrapper = ""
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
@@ -389,12 +399,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lld build-essential pkg-config libssl-dev
 
-      - name: Override cargo config to disable LLD
+      - name: Override cargo config to disable LLD and sccache
         run: |
           mkdir -p .cargo
-          # Create minimal config without LLD rustflags to override repo config
-          # This replaces the repo's .cargo/config.toml which has LLD rustflags
+          # Create minimal config without LLD rustflags and without sccache wrapper
+          # This replaces the repo's .cargo/config.toml which has LLD rustflags and sccache
           cat > .cargo/config.toml << 'EOF'
+          [build]
+          rustc-wrapper = ""
           [target.x86_64-unknown-linux-gnu.env]
           ROCKSDB_LIB_DIR = "/usr/lib/x86_64-linux-gnu"
           EOF
