@@ -110,6 +110,15 @@ jobs:
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
 
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -118,6 +127,7 @@ jobs:
             locai
             locai-server
             locai-cli
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build dependencies to populate cache
         env:
@@ -174,6 +184,14 @@ jobs:
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
 
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -222,6 +240,14 @@ jobs:
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
 
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -267,6 +293,14 @@ jobs:
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
 
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -311,6 +345,14 @@ jobs:
           EOF
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -383,6 +425,14 @@ jobs:
           EOF
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
