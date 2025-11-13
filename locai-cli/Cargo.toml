@@ -27,7 +27,16 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 clap = { version = "4.5.1", features = ["derive"] }
+clap_complete = "4.5"
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { version = "0.4.39", features = ["serde"] }
-colored = "2.1" 
+colored = "2.1"
+uuid = { version = "1.10", features = ["v4"] }
+atty = "0.2"
+indicatif = "0.18"
+reqwest = { version = "0.12", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3.10"
+uuid = { version = "1.10", features = ["v4"] } 
