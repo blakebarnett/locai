@@ -248,7 +248,7 @@ jobs:
         env:
           RUSTC_WRAPPER: ""
           RUST_BACKTRACE: 1
-        run: cargo test --package ${{ matrix.package }} --all-features --workspace
+        run: cargo test --package ${{ matrix.package }} --all-features
 
   # Integration tests
   test-integration:
