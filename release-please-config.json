@@ -2,11 +2,6 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "rust",
   "packages": {
-    ".": {
-      "package-name": "locai-workspace",
-      "release-type": "rust",
-      "component": "locai"
-    },
     "locai": {
       "package-name": "locai",
       "release-type": "rust",
@@ -21,17 +16,12 @@
       "package-name": "locai-cli",
       "release-type": "rust",
       "component": "locai-cli"
-    },
-    "examples/entity_extraction/modernbert": {
-      "package-name": "locai_modernbert_extractor",
-      "release-type": "rust",
-      "component": "modernbert"
     }
   },
   "extra-files": [
     "README.md"
   ],
-  "separate-pull-requests": true,
+  "separate-pull-requests": false,
   "group-pull-request-title-pattern": "chore: release ${version}",
   "release-search-depth": 400,
   "commit-search-depth": 500
