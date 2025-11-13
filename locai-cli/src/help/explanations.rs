@@ -140,9 +140,9 @@ fn show_search_explanation() -> locai::Result<()> {
     println!("query, not just exact keyword matches.");
     println!();
     println!("{}", "Search Types:".bold());
-    println!("  • Semantic - Finds memories by meaning (default)");
-    println!("  • Keyword - Exact text matching");
-    println!("  • Hybrid - Combines semantic and keyword search");
+    println!("  • Hybrid (default) - Automatically combines text and semantic search");
+    println!("  • Text - BM25 keyword search - always available, fast");
+    println!("  • Semantic - Vector similarity search - finds related concepts");
     println!();
     println!("{}", "Search Features:".bold());
     println!("  • Understands synonyms and related concepts");
@@ -151,9 +151,11 @@ fn show_search_explanation() -> locai::Result<()> {
     println!("  • Supports time-based filtering");
     println!();
     println!("{}", "Common Commands:".bold());
-    println!("  locai-cli memory search \"query\"     # Semantic search");
-    println!("  locai-cli memory search \"query\" --type fact");
-    println!("  locai-cli memory search \"query\" --tags tag1,tag2");
+    println!("  locai-cli memory search \"query\"     # Hybrid search (default)");
+    println!("  locai-cli memory search \"query\" --mode text     # Text search only");
+    println!("  locai-cli memory search \"query\" --mode semantic  # Semantic search only");
+    println!("  locai-cli memory search \"query\" --type fact     # Filter by type");
+    println!("  locai-cli memory search \"query\" --tags tag1,tag2 # Filter by tags");
     println!();
     Ok(())
 }

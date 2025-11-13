@@ -133,28 +133,37 @@ RELATED COMMANDS:
 Search for memories using text search, semantic search, or hybrid search.
 
 SEARCH MODES:
-  • text (default) - BM25 keyword search - fast, works without embeddings
-  • semantic - Vector similarity search - finds related concepts, requires embeddings
-  • hybrid - Combines text and semantic search for best results
+  • hybrid (default) - Automatically combines text and semantic search when available
+    - Results are tagged with [text], [semantic], or [text+semantic]
+    - Falls back to text-only if embeddings unavailable
+  • text - BM25 keyword search only - fast, works without embeddings
+  • semantic - Vector similarity search only - finds related concepts, requires embeddings
+
+HOW IT WORKS:
+By default, hybrid search runs both text and semantic searches automatically:
+  • Text search finds exact keyword matches (always works)
+  • Semantic search finds related concepts (requires embeddings)
+  • Results show which method found them: [text], [semantic], or [text+semantic]
 
 SEMANTIC SEARCH:
 Semantic search finds memories based on meaning, not just keywords. For example,
 searching for "battle" will find memories about "war" and "warrior" even if they
 don't contain the word "battle".
 
-To use semantic search, you need:
-  1. Memories with embeddings (quickstart creates some, or use --mode semantic when adding)
-  2. Query embeddings (set OLLAMA_URL and OLLAMA_MODEL environment variables)
+To enable semantic search:
+  1. Set OLLAMA_URL and OLLAMA_MODEL environment variables
+  2. Memories with embeddings (quickstart creates some)
 
 EXAMPLES:
-  # Text search (default)
+  # Hybrid search (default) - automatically combines both methods
   locai-cli memory search "warrior"
+  # Results tagged: [text], [semantic], or [text+semantic]
   
-  # Semantic search
+  # Text search only
+  locai-cli memory search "warrior" --mode text
+  
+  # Semantic search only
   locai-cli memory search "battle" --mode semantic
-  
-  # Hybrid search (best of both)
-  locai-cli memory search "character" --mode hybrid
   
   # Filter by type
   locai-cli memory search "meeting" --memory-type episodic
