@@ -123,10 +123,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Build dependencies to populate cache
         env:
@@ -195,10 +191,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Run cargo clippy
         env:
@@ -251,10 +243,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Run tests for ${{ matrix.package }}
         env:
@@ -304,10 +292,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Run integration tests
         env:
@@ -357,10 +341,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Check examples compile
         env:
@@ -384,10 +364,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
@@ -437,10 +413,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
 
       - name: Check documentation
         env:
