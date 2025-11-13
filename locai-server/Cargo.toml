@@ -16,7 +16,7 @@ name = "locai-server"
 path = "src/main.rs"
 
 [build-dependencies]
-which = "6.0.3"
+which = "8"
 
 [dependencies]
 locai = { path = "../locai", features = ["surrealdb-embedded"] }
@@ -34,14 +34,14 @@ thiserror = "2.0.3"
 anyhow = "1.0.93"
 async-trait = "0.1.77"
 futures = "0.3.31"
-tokio-tungstenite = "0.27.0"
+tokio-tungstenite = "0.28"
 utoipa = { version = "5.1.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 headers = "0.4.0"
 http = "1.1.0"
 dashmap = "6.1.0"
 # JWT and Authentication dependencies
-jsonwebtoken = "9.3.0"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 bcrypt = "0.17.0"
 rand = "0.9.1"
 # SurrealDB for direct client access
@@ -50,7 +50,7 @@ clap = { version = "4.5.21", features = ["derive"] }
 
 [dev-dependencies]
 tokio-test = "0.4.4"
-axum-test = "17.3.0"
+axum-test = "18"
 serde_json = { workspace = true }
 tempfile = "3.19.1"
 

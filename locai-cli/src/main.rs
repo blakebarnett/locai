@@ -1,5 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
+use is_terminal::IsTerminal;
 use tracing::{Level, error, info};
 
 mod args;
@@ -107,7 +108,7 @@ async fn main() {
 
     let output_format_str = if cli_args.machine {
         "json".to_string()
-    } else if atty::isnt(atty::Stream::Stdout) {
+    } else if !std::io::stdout().is_terminal() {
         // Auto-detect: if stdout is not a TTY (piped/redirected), default to JSON
         "json".to_string()
     } else {
@@ -287,7 +288,7 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                         &mut std::io::stdout(),
                     );
                     // Show installation instructions on stderr (only if stderr is a TTY)
-                    if atty::is(atty::Stream::Stderr) {
+                    if std::io::stderr().is_terminal() {
                         eprintln!(
                             "\n{}",
                             format_info("Bash completion script generated. Installation options:")
@@ -312,7 +313,7 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                         "locai-cli",
                         &mut std::io::stdout(),
                     );
-                    if atty::is(atty::Stream::Stderr) {
+                    if std::io::stderr().is_terminal() {
                         eprintln!(
                             "\n{}",
                             format_info("Zsh completion script generated. To install:")
@@ -330,7 +331,7 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                         "locai-cli",
                         &mut std::io::stdout(),
                     );
-                    if atty::is(atty::Stream::Stderr) {
+                    if std::io::stderr().is_terminal() {
                         eprintln!(
                             "\n{}",
                             format_info("Fish completion script generated. To install:")
@@ -349,7 +350,7 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                         "locai-cli",
                         &mut std::io::stdout(),
                     );
-                    if atty::is(atty::Stream::Stderr) {
+                    if std::io::stderr().is_terminal() {
                         eprintln!(
                             "\n{}",
                             format_info("PowerShell completion script generated. To install:")
@@ -367,7 +368,7 @@ async fn run(cli_args: Cli, output_format: &str) -> locai::Result<()> {
                         "locai-cli",
                         &mut std::io::stdout(),
                     );
-                    if atty::is(atty::Stream::Stderr) {
+                    if std::io::stderr().is_terminal() {
                         eprintln!(
                             "\n{}",
                             format_info("Elvish completion script generated. To install:")

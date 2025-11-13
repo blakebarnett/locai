@@ -31,9 +31,9 @@ clap_complete = "4.5"
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { version = "0.4.39", features = ["serde"] }
-colored = "2.1"
+colored = "3"
 uuid = { version = "1.10", features = ["v4"] }
-atty = "0.2"
+is-terminal = "0.4"
 indicatif = "0.18"
 reqwest = { version = "0.12", features = ["json"] }
 

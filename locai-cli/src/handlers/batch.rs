@@ -3,9 +3,9 @@
 use crate::commands::BatchCommands;
 use crate::context::LocaiCliContext;
 use crate::output::*;
-use atty;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
+use is_terminal::IsTerminal;
 use locai::LocaiError;
 use locai::batch::{BatchExecutor, BatchExecutorConfig, BatchOperation, BatchResult};
 use std::fs;
@@ -68,7 +68,7 @@ pub async fn handle_batch_command(
             let transaction = args.transaction || file_transaction.unwrap_or(false);
 
             // Create progress bar if stdout is a TTY and not JSON output
-            let pb = if atty::is(atty::Stream::Stdout)
+            let pb = if std::io::stdout().is_terminal()
                 && output_format != "json"
                 && operations.len() > 5
             {
