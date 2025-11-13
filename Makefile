@@ -126,7 +126,7 @@ test-docker: ## Test Docker build locally
 	@echo "Docker test passed!"
 
 lint: ## Run linter
-	cargo clippy --workspace -- -D warnings
+	cargo clippy --all-features --workspace -- -D warnings
 
 fmt: ## Format code
 	cargo fmt --all

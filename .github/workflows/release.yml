@@ -49,8 +49,6 @@ jobs:
       - name: Cache Rust dependencies
         if: ${{ matrix.package.released }}
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Verify package builds
         if: ${{ matrix.package.released }}
@@ -84,8 +82,6 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "rust-deps-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Verify locai package builds
         env:
