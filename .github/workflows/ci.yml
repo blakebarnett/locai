@@ -110,6 +110,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server
@@ -161,6 +162,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server
@@ -205,6 +207,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server
@@ -246,6 +249,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server
@@ -287,6 +291,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server
@@ -322,6 +327,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server
@@ -363,6 +369,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             locai
             locai-server

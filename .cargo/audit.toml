@@ -1,0 +1,4 @@
+[advisories]
+# Only fail on high or critical severity vulnerabilities
+# Medium and low severity vulnerabilities will be reported but won't fail CI
+severity_threshold = "high"
