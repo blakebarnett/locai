@@ -493,21 +493,16 @@ fn default_limit() -> usize {
 }
 
 /// Search mode
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchMode {
     /// BM25 full-text search (always available)
+    #[default]
     Text,
     /// Vector similarity search (requires ML service configuration)
     Vector,
     /// Hybrid BM25 + vector search (requires ML service configuration)
     Hybrid,
-}
-
-impl Default for SearchMode {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 /// Search result DTO
@@ -614,17 +609,12 @@ fn default_page_size() -> usize {
 }
 
 /// Sort direction
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SortDirection {
     Asc,
+    #[default]
     Desc,
-}
-
-impl Default for SortDirection {
-    fn default() -> Self {
-        Self::Desc
-    }
 }
 
 /// Error response DTO

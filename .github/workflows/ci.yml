@@ -162,15 +162,6 @@ jobs:
         with:
           components: clippy
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
-
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
@@ -182,6 +173,15 @@ jobs:
           EOF
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Run cargo clippy
         env:
@@ -210,15 +210,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
-
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
@@ -230,6 +221,15 @@ jobs:
           EOF
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Run tests for ${{ matrix.package }}
         env:
@@ -255,15 +255,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
-
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
@@ -275,6 +266,15 @@ jobs:
           EOF
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Run integration tests
         env:
@@ -300,15 +300,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            locai
-            locai-server
-            locai-cli
-
       - name: Override cargo config to disable LLD
         run: |
           mkdir -p .cargo
@@ -320,6 +311,15 @@ jobs:
           EOF
           # Set environment variable to prevent build.rs from using LLD
           echo "DISABLE_LLD=1" >> $GITHUB_ENV
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          workspaces: |
+            locai
+            locai-server
+            locai-cli
 
       - name: Check examples compile
         env:
