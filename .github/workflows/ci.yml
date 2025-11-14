@@ -124,6 +124,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build dependencies to populate cache
@@ -194,6 +195,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run cargo clippy
@@ -248,6 +250,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests for ${{ matrix.package }}
@@ -299,6 +302,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run integration tests
@@ -350,6 +354,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check examples compile
@@ -373,6 +378,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cargo-audit
@@ -424,6 +430,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check documentation

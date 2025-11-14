@@ -78,8 +78,8 @@ jobs:
             echo "rust=false" >> $GITHUB_OUTPUT
           fi
 
-  build-and-push:
-    name: Build and Push Docker Image
+  build-amd64:
+    name: Build and Push Docker Image (AMD64)
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.should-build == 'true'
@@ -88,6 +88,10 @@ jobs:
       contents: write
       packages: write
       id-token: write
+      attestations: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout repository
@@ -109,7 +113,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           # Use same shared-key as CI workflow to share cache across workflows
-          # This should match: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          # Cargo.lock should be committed for reproducible builds (workspace contains applications)
           shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
@@ -240,23 +244,13 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Set build platforms
-        id: platforms
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
-          else
-            echo "platforms=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build and push Docker image
+      - name: Build and push Docker image (AMD64)
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.ci
-          # Build only amd64 for PRs to speed up CI, both platforms for releases
-          platforms: ${{ steps.platforms.outputs.platforms }}
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -265,6 +259,7 @@ jobs:
           build-args: |
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
+          outputs: type=image,push=true
 
       - name: Test Docker image (amd64 only)
         if: github.event_name == 'pull_request'
@@ -277,7 +272,7 @@ jobs:
           curl -f http://localhost:3000/api/health || exit 1
           docker stop test-locai || true
 
-      - name: Generate artifact attestation
+      - name: Generate artifact attestation (AMD64)
         if: github.event_name != 'pull_request' && steps.build.outputs.digest != ''
         uses: actions/attest-build-provenance@v1
         with:
@@ -285,11 +280,168 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
+  build-arm64:
+    name: Build and Push Docker Image (ARM64)
+    runs-on: ubuntu-24.04-arm
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should-build == 'true' && github.event_name != 'pull_request'
+    timeout-minutes: 180
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Show cache key info
+        run: |
+          echo "=== Cache Key Information ==="
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Computed shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}"
+          echo "Cargo.lock hash: ${{ hashFiles('**/Cargo.lock') }}"
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          cache-on-failure: true
+
+      - name: Prepare rust-cache for Docker
+        id: rust-cache-prep
+        run: |
+          mkdir -p .rust-cache-cargo .rust-cache-target
+          CARGO_EXISTS=false
+          TARGET_EXISTS=false
+          
+          if [ -d "$HOME/.cargo" ] && [ "$(ls -A $HOME/.cargo 2>/dev/null)" ]; then
+            cp -r "$HOME/.cargo"/* .rust-cache-cargo/ 2>/dev/null || true
+            CARGO_EXISTS=true
+          fi
+          
+          if [ -d "target" ] && [ "$(ls -A target 2>/dev/null)" ]; then
+            cp -r target/* .rust-cache-target/ 2>/dev/null || true
+            TARGET_EXISTS=true
+          fi
+          
+          if [ ! -f .rust-cache-cargo/.keep ]; then
+            echo "# rust-cache placeholder" > .rust-cache-cargo/.keep
+          fi
+          if [ ! -f .rust-cache-target/.keep ]; then
+            echo "# rust-cache placeholder" > .rust-cache-target/.keep
+          fi
+          
+          echo "Cargo cache: $CARGO_EXISTS, Target cache: $TARGET_EXISTS"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image (ARM64)
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.ci
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+          outputs: type=image,push=true
+
+      - name: Generate artifact attestation (ARM64)
+        if: steps.build.outputs.digest != ''
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  create-manifest:
+    name: Create Multi-Platform Manifest
+    runs-on: ubuntu-latest
+    needs: [build-amd64, build-arm64]
+    if: github.event_name != 'pull_request' && needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Create and push multi-platform manifest
+        run: |
+          # Create manifest list from both architectures
+          # Get image digests (format: sha256:...)
+          AMD64_DIGEST="${{ needs.build-amd64.outputs.image-digest }}"
+          ARM64_DIGEST="${{ needs.build-arm64.outputs.image-digest }}"
+          
+          # Create manifest list for each tag
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            tag=$(echo "$tag" | tr -d ' ')
+            if [ -n "$tag" ]; then
+              echo "Creating multi-platform manifest for $tag"
+              docker buildx imagetools create --tag "$tag" \
+                "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}" \
+                "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}"
+            fi
+          done
+
   scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.event_name != 'pull_request' && needs.build-and-push.result == 'success'
+    needs: [build-amd64, build-arm64, create-manifest]
+    if: github.event_name != 'pull_request' && needs.build-amd64.result == 'success' && (needs.create-manifest.result == 'success' || needs.create-manifest.result == 'skipped')
     
     steps:
       - name: Run Trivy vulnerability scanner

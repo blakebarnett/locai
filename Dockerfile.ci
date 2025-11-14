@@ -5,6 +5,10 @@
 #
 # Note: Uses Rust nightly because Locai requires edition 2024
 
+# BuildKit automatically provides TARGETARCH, but we need to declare it as ARG to use it
+ARG TARGETARCH
+ARG TARGETPLATFORM
+
 # ============================================================================
 # Stage 1: Build dependencies and cache them
 # ============================================================================
@@ -23,6 +27,7 @@ FROM chef AS planner
 # Copy only the packages needed for locai-server (locai core + locai-server)
 # This reduces the build context and avoids building unnecessary dependencies
 COPY Cargo.toml ./
+COPY Cargo.lock* ./
 COPY locai ./locai
 COPY locai-server ./locai-server
 
@@ -30,8 +35,13 @@ COPY locai-server ./locai-server
 # This prevents cargo from looking for locai-cli which we don't copy
 RUN sed -i '/locai-cli/d' Cargo.toml
 
-# Generate Cargo.lock if it doesn't exist (it's gitignored but needed for reproducible builds)
-RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile; fi
+# Cargo.lock should be committed for reproducible builds
+# Generate it only if missing (fallback for edge cases)
+RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile || echo "Warning: Failed to generate Cargo.lock"; fi
+
+# Verify workspace resolution before preparing recipe
+# This ensures versions are correctly resolved after modifying Cargo.toml
+RUN cargo metadata --format-version 1 > /dev/null 2>&1 || cargo generate-lockfile
 
 # Analyze dependencies (will only include locai and locai-server since that's all we copied)
 RUN cargo chef prepare --recipe-path recipe.json
@@ -40,6 +50,9 @@ RUN cargo chef prepare --recipe-path recipe.json
 # Stage 3: Build dependencies (cached layer)
 # ============================================================================
 FROM chef AS dependencies
+
+# Redeclare ARG for this stage
+ARG TARGETARCH
 
 # Install build dependencies for native libraries (RocksDB, etc.)
 RUN apt-get update && apt-get install -y \
@@ -65,21 +78,41 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=bind,source=.rust-cache-target,target=/tmp/rust-cache-target,readonly \
     bash -c '\
     if [ -d /tmp/rust-cache-cargo ] && [ "$(ls -A /tmp/rust-cache-cargo 2>/dev/null | grep -v .keep)" ]; then \
-      echo "Using rust-cache cargo from GitHub Actions..." && \
-      cp -r /tmp/rust-cache-cargo/* /usr/local/cargo/ 2>/dev/null || true; \
+      echo "Using rust-cache cargo registry/git from GitHub Actions (architecture-independent)..." && \
+      # Only copy registry and git (architecture-independent), skip bin (architecture-specific) \
+      if [ -d /tmp/rust-cache-cargo/registry ]; then \
+        cp -r /tmp/rust-cache-cargo/registry /usr/local/cargo/ 2>/dev/null || true; \
+      fi && \
+      if [ -d /tmp/rust-cache-cargo/git ]; then \
+        cp -r /tmp/rust-cache-cargo/git /usr/local/cargo/ 2>/dev/null || true; \
+      fi; \
     fi && \
-    if [ -d /tmp/rust-cache-target ] && [ "$(ls -A /tmp/rust-cache-target 2>/dev/null | grep -v .keep)" ]; then \
-      echo "Using rust-cache target from GitHub Actions..." && \
+    # Skip target cache for cross-architecture builds (target contains compiled artifacts) \
+    # Only use target cache if building for same architecture as runner (amd64) \
+    # Detect architecture: if we're in qemu emulator, we're cross-compiling \
+    if [ ! -f /dev/.buildkit_qemu_emulator ] && [ -d /tmp/rust-cache-target ] && [ "$(ls -A /tmp/rust-cache-target 2>/dev/null | grep -v .keep)" ]; then \
+      echo "Using rust-cache target from GitHub Actions (native amd64 build)..." && \
       cp -r /tmp/rust-cache-target/* /app/target/ 2>/dev/null || true; \
+    elif [ -f /dev/.buildkit_qemu_emulator ]; then \
+      echo "Skipping rust-cache target (cross-architecture build detected)"; \
     fi && \
     cargo chef cook --profile ci --recipe-path recipe.json && \
     mkdir -p /app/deps-target && \
-    cp -r /app/target/* /app/deps-target/ 2>/dev/null || true'
+    if [ -d /app/target ] && [ "$(ls -A /app/target 2>/dev/null)" ]; then \
+      cp -r /app/target/* /app/deps-target/ 2>/dev/null || true; \
+    fi && \
+    touch /app/deps-target/.keep || true'
+
+# Ensure deps-target directory exists even if empty (required for COPY in next stage)
+RUN mkdir -p /app/deps-target && touch /app/deps-target/.keep
 
 # ============================================================================
 # Stage 4: Build the application
 # ============================================================================
 FROM chef AS builder
+
+# Redeclare ARG for this stage
+ARG TARGETARCH
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -93,11 +126,13 @@ RUN apt-get update && apt-get install -y \
 
 # Copy cargo registry and compiled dependencies from previous stage
 COPY --from=dependencies /usr/local/cargo /usr/local/cargo
+# Copy dependencies target (may be empty on first build, but directory always exists)
 COPY --from=dependencies /app/deps-target /app/target
 
 # Copy only the source code needed for locai-server
 # Note: We don't copy .cargo/config.toml since it references sccache which we don't use in CI
 COPY Cargo.toml ./
+COPY Cargo.lock* ./
 COPY locai ./locai
 COPY locai-server ./locai-server
 
@@ -105,8 +140,13 @@ COPY locai-server ./locai-server
 # This prevents cargo from looking for locai-cli which we don't copy
 RUN sed -i '/locai-cli/d' Cargo.toml
 
-# Generate Cargo.lock if it doesn't exist (it's gitignored but needed for reproducible builds)
-RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile; fi
+# Cargo.lock should be committed for reproducible builds
+# Generate it only if missing (fallback for edge cases)
+RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile || echo "Warning: Failed to generate Cargo.lock"; fi
+
+# Verify workspace resolution after modifying Cargo.toml
+# This ensures versions are correctly resolved (fixes version showing as 0.0.1)
+RUN cargo metadata --format-version 1 > /dev/null 2>&1 || cargo generate-lockfile
 
 # Build only the locai-server binary (BuildKit will cache this layer)
 # Use CI profile for faster builds, cache target directory for incremental builds
@@ -120,12 +160,23 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     bash -c '\
     set -e && \
     if [ -d /tmp/rust-cache-cargo ] && [ "$(ls -A /tmp/rust-cache-cargo 2>/dev/null | grep -v .keep)" ]; then \
-      echo "Using rust-cache cargo from GitHub Actions..." && \
-      cp -r /tmp/rust-cache-cargo/* /usr/local/cargo/ 2>/dev/null || true; \
+      echo "Using rust-cache cargo registry/git from GitHub Actions (architecture-independent)..." && \
+      # Only copy registry and git (architecture-independent), skip bin (architecture-specific) \
+      if [ -d /tmp/rust-cache-cargo/registry ]; then \
+        cp -r /tmp/rust-cache-cargo/registry /usr/local/cargo/ 2>/dev/null || true; \
+      fi && \
+      if [ -d /tmp/rust-cache-cargo/git ]; then \
+        cp -r /tmp/rust-cache-cargo/git /usr/local/cargo/ 2>/dev/null || true; \
+      fi; \
     fi && \
-    if [ -d /tmp/rust-cache-target ] && [ "$(ls -A /tmp/rust-cache-target 2>/dev/null | grep -v .keep)" ]; then \
-      echo "Using rust-cache target from GitHub Actions..." && \
+    # Skip target cache for cross-architecture builds (target contains compiled artifacts) \
+    # Only use target cache if building for same architecture as runner (amd64) \
+    # Detect architecture: if we're in qemu emulator, we're cross-compiling \
+    if [ ! -f /dev/.buildkit_qemu_emulator ] && [ -d /tmp/rust-cache-target ] && [ "$(ls -A /tmp/rust-cache-target 2>/dev/null | grep -v .keep)" ]; then \
+      echo "Using rust-cache target from GitHub Actions (native amd64 build)..." && \
       cp -r /tmp/rust-cache-target/* /app/target/ 2>/dev/null || true; \
+    elif [ -f /dev/.buildkit_qemu_emulator ]; then \
+      echo "Skipping rust-cache target (cross-architecture build detected)"; \
     fi && \
     cargo build --profile ci --bin locai-server && \
     mkdir -p /app/bin && \
