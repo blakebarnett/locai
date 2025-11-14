@@ -25,6 +25,7 @@ async fn create_test_storage() -> Result<TestStorage, Box<dyn std::error::Error>
         namespace: "test".to_string(),
         database: "locai_test".to_string(),
         lifecycle_tracking: Default::default(),
+        versioning: Default::default(),
     };
 
     let client = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(()).await?;

@@ -17,6 +17,7 @@ async fn create_test_store() -> SharedStorage<surrealdb::engine::local::Db> {
         namespace: "test_version".to_string(),
         database: "test_version".to_string(),
         lifecycle_tracking: Default::default(),
+        versioning: Default::default(),
     };
 
     let client = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
