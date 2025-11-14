@@ -190,7 +190,8 @@ where
                 importance: $importance,
                 owner: $owner,
                 shared_with: $shared_with,
-                created_at: type::datetime($created_at)
+                created_at: type::datetime($created_at),
+                version_count: 0
             }
         "#;
 
@@ -216,6 +217,20 @@ where
             .next()
             .map(Memory::from)
             .ok_or_else(|| StorageError::Internal("No memory created".to_string()))?;
+
+        // Create initial version automatically
+        use crate::storage::traits::MemoryVersionStore;
+        if let Err(e) = self
+            .create_memory_version(&created_memory.id, &created_memory.content, None)
+            .await
+        {
+            tracing::warn!(
+                "Failed to create initial version for memory {}: {}",
+                created_memory.id,
+                e
+            );
+            // Don't fail memory creation if versioning fails
+        }
 
         // Execute on_memory_created hooks (non-blocking, fire-and-forget)
         let hooks = self.hook_registry.clone();

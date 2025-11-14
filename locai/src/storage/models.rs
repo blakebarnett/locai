@@ -277,3 +277,191 @@ pub struct SearchResult {
     // TODO: Consider adding other metadata, e.g., distance if different from score,
     // or explainability features if supported.
 }
+
+// Memory Versioning Models
+
+/// Information about a memory version
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryVersionInfo {
+    /// Unique version identifier
+    pub version_id: String,
+    /// Memory ID this version belongs to
+    pub memory_id: String,
+    /// When this version was created
+    pub created_at: DateTime<Utc>,
+    /// Preview of version content (first 100 chars)
+    pub content_preview: String,
+    /// Size of version in bytes
+    pub size_bytes: usize,
+    /// Whether this version is stored as a delta
+    pub is_delta: bool,
+    /// Parent version ID (for delta versions)
+    pub parent_version_id: Option<String>,
+}
+
+/// Diff between two memory versions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryDiff {
+    /// Memory ID
+    pub memory_id: String,
+    /// Old version ID
+    pub old_version_id: String,
+    /// New version ID
+    pub new_version_id: String,
+    /// List of changes
+    pub changes: Vec<Change>,
+    /// Type of diff
+    pub diff_type: DiffType,
+}
+
+/// A single change in a memory version
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Change {
+    /// Content was changed
+    ContentChanged {
+        /// Old content
+        old_content: String,
+        /// New content
+        new_content: String,
+        /// Diff hunks showing the changes
+        diff_hunks: Vec<DiffHunk>,
+    },
+    /// Metadata was changed
+    MetadataChanged {
+        /// Key that changed
+        key: String,
+        /// Old value (None if added)
+        old_value: Option<serde_json::Value>,
+        /// New value (None if removed)
+        new_value: Option<serde_json::Value>,
+    },
+    /// Memory was deleted
+    Deleted,
+    /// Memory was created
+    Created,
+}
+
+/// A hunk of diff lines
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffHunk {
+    /// Starting line in old version
+    pub old_start_line: usize,
+    /// Number of lines in old version
+    pub old_line_count: usize,
+    /// Starting line in new version
+    pub new_start_line: usize,
+    /// Number of lines in new version
+    pub new_line_count: usize,
+    /// Lines in this hunk
+    pub lines: Vec<DiffLine>,
+}
+
+/// A single line in a diff
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DiffLine {
+    /// Unchanged context line
+    Context(String),
+    /// Removed line
+    Removed(String),
+    /// Added line
+    Added(String),
+}
+
+/// Type of diff
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DiffType {
+    /// Full diff (complete content)
+    Full,
+    /// Delta diff (only changes)
+    Delta,
+}
+
+/// Snapshot of memory state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemorySnapshot {
+    /// Unique snapshot identifier
+    pub snapshot_id: String,
+    /// When snapshot was created
+    pub created_at: DateTime<Utc>,
+    /// Number of memories in snapshot
+    pub memory_count: usize,
+    /// List of memory IDs in snapshot
+    pub memory_ids: Vec<String>,
+    /// Map from memory_id to version_id
+    pub version_map: HashMap<String, String>,
+    /// Snapshot metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+    /// Size of snapshot in bytes
+    pub size_bytes: usize,
+}
+
+/// Mode for restoring snapshots
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RestoreMode {
+    /// Overwrite existing memories
+    Overwrite,
+    /// Skip existing memories
+    SkipExisting,
+    /// Create new versions instead of overwriting
+    CreateVersions,
+}
+
+/// Versioning statistics for a memory or all memories
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersioningStats {
+    /// Total number of versions
+    pub total_versions: usize,
+    /// Number of delta versions
+    pub total_delta_versions: usize,
+    /// Number of full copy versions
+    pub total_full_versions: usize,
+    /// Total storage size in bytes
+    pub storage_size_bytes: usize,
+    /// Storage savings from deltas in bytes
+    pub storage_savings_bytes: usize,
+    /// Number of compressed versions
+    pub compressed_versions: usize,
+    /// Average versions per memory
+    pub average_versions_per_memory: f64,
+    /// Memory ID (if stats for specific memory)
+    pub memory_id: Option<String>,
+}
+
+/// Version integrity issue found during validation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionIntegrityIssue {
+    /// Memory ID
+    pub memory_id: String,
+    /// Version ID (if specific version)
+    pub version_id: Option<String>,
+    /// Issue type
+    pub issue_type: IntegrityIssueType,
+    /// Issue description
+    pub description: String,
+}
+
+/// Type of integrity issue
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum IntegrityIssueType {
+    /// Missing parent version
+    MissingParent,
+    /// Broken delta chain
+    BrokenDeltaChain,
+    /// Corrupted delta data
+    CorruptedDelta,
+    /// Missing base version
+    MissingBase,
+    /// Orphaned version (no parent chain to base)
+    OrphanedVersion,
+}
+
+/// Repair report from version repair operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepairReport {
+    /// Number of versions repaired
+    pub versions_repaired: usize,
+    /// Number of versions that could not be repaired
+    pub versions_failed: usize,
+    /// Details of repairs
+    pub repair_details: Vec<String>,
+}

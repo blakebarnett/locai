@@ -91,6 +91,11 @@ where
             FIELDS embedding 
             MTREE DIMENSION 1024 DIST COSINE TYPE F32
             COMMENT "M-Tree vector index for 1024-dimensional embeddings (exact nearest neighbor, BGE-M3 compatible)";
+        
+        -- Version tracking fields (not defined in schema since table is SCHEMALESS)
+        -- These fields are handled in application code and will be created automatically
+        -- when memories are created or versions are added
+        -- Index created separately after schema initialization to avoid validation errors
     "#;
 
     // Vector table removed - standardizing on M-Tree index in memory table
@@ -185,6 +190,52 @@ where
             COMMENT "Full-text search on version descriptions";
     "#;
 
+    // Create the memory_version table for per-memory versioning
+    let memory_version_table_query = r#"
+        DEFINE TABLE IF NOT EXISTS memory_version SCHEMALESS
+        COMMENT "Stores versions of individual memories";
+        
+        DEFINE FIELD IF NOT EXISTS id ON memory_version TYPE record<memory_version>;
+        DEFINE FIELD IF NOT EXISTS memory_id ON memory_version TYPE string;
+        DEFINE FIELD IF NOT EXISTS version_id ON memory_version TYPE string;
+        DEFINE FIELD IF NOT EXISTS content ON memory_version TYPE string;
+        DEFINE FIELD IF NOT EXISTS metadata ON memory_version TYPE object DEFAULT {};
+        DEFINE FIELD IF NOT EXISTS created_at ON memory_version TYPE datetime DEFAULT time::now();
+        DEFINE FIELD IF NOT EXISTS parent_version_id ON memory_version TYPE option<string>;
+        DEFINE FIELD IF NOT EXISTS diff_data ON memory_version TYPE option<object>;
+        DEFINE FIELD IF NOT EXISTS is_delta ON memory_version TYPE bool DEFAULT false;
+        DEFINE FIELD IF NOT EXISTS is_compressed ON memory_version TYPE bool DEFAULT false;
+        DEFINE FIELD IF NOT EXISTS size_bytes ON memory_version TYPE number;
+        
+        DEFINE INDEX IF NOT EXISTS memory_version_memory_id_idx ON memory_version FIELDS memory_id;
+        DEFINE INDEX IF NOT EXISTS memory_version_version_id_idx ON memory_version FIELDS version_id UNIQUE;
+        DEFINE INDEX IF NOT EXISTS memory_version_created_at_idx ON memory_version FIELDS created_at;
+        DEFINE INDEX IF NOT EXISTS memory_version_memory_created_idx ON memory_version FIELDS memory_id, created_at;
+        
+        -- Full-text search on version content
+        DEFINE INDEX IF NOT EXISTS memory_version_content_ft ON memory_version
+            FIELDS content
+            SEARCH ANALYZER memory_analyzer BM25 HIGHLIGHTS;
+    "#;
+
+    // Create the memory_snapshot table for memory state snapshots
+    let memory_snapshot_table_query = r#"
+        DEFINE TABLE IF NOT EXISTS memory_snapshot SCHEMALESS
+        COMMENT "Stores snapshots of memory state";
+        
+        DEFINE FIELD IF NOT EXISTS id ON memory_snapshot TYPE record<memory_snapshot>;
+        DEFINE FIELD IF NOT EXISTS snapshot_id ON memory_snapshot TYPE string;
+        DEFINE FIELD IF NOT EXISTS created_at ON memory_snapshot TYPE datetime DEFAULT time::now();
+        DEFINE FIELD IF NOT EXISTS memory_count ON memory_snapshot TYPE number;
+        DEFINE FIELD IF NOT EXISTS memory_ids ON memory_snapshot TYPE array<string>;
+        DEFINE FIELD IF NOT EXISTS version_map ON memory_snapshot TYPE object;
+        DEFINE FIELD IF NOT EXISTS metadata ON memory_snapshot TYPE object DEFAULT {};
+        DEFINE FIELD IF NOT EXISTS size_bytes ON memory_snapshot TYPE number;
+        
+        DEFINE INDEX IF NOT EXISTS memory_snapshot_snapshot_id_idx ON memory_snapshot FIELDS snapshot_id UNIQUE;
+        DEFINE INDEX IF NOT EXISTS memory_snapshot_created_at_idx ON memory_snapshot FIELDS created_at;
+    "#;
+
     // Create edge tables for graph relationships
     let memory_entity_edge_query = r#"
         DEFINE TABLE contains SCHEMAFULL TYPE RELATION
@@ -241,6 +292,8 @@ where
     execute_schema_query(client, entity_table_query, "entity table").await?;
     execute_schema_query(client, relationship_table_query, "relationship table").await?;
     execute_schema_query(client, version_table_query, "version table").await?;
+    execute_schema_query(client, memory_version_table_query, "memory_version table").await?;
+    execute_schema_query(client, memory_snapshot_table_query, "memory_snapshot table").await?;
     execute_schema_query(client, memory_entity_edge_query, "memory-entity edge").await?;
     execute_schema_query(client, entity_relationship_edge_query, "entity-entity edge").await?;
     execute_schema_query(
@@ -279,6 +332,19 @@ where
             return Ok(());
         }
 
+        // Allow field type mismatches for SCHEMALESS tables (existing records may have different types)
+        // This is expected when adding new fields to existing SCHEMALESS tables
+        if error_str.contains("Found NONE") && error_str.contains("but expected") {
+            tracing::warn!(
+                "Schema field type mismatch for {} (existing records may have different types): {}",
+                description,
+                e
+            );
+            tracing::debug!("This is expected for SCHEMALESS tables with existing data");
+            // Continue - the field will be created for new records
+            return Ok(());
+        }
+
         // For other errors, log and fail
         let error_msg = format!("Schema creation failed for {}: {}", description, e);
         tracing::error!("{}", error_msg);
@@ -299,6 +365,8 @@ where
         "REMOVE TABLE IF EXISTS references;",
         "REMOVE TABLE IF EXISTS relates;",
         "REMOVE TABLE IF EXISTS contains;",
+        "REMOVE TABLE IF EXISTS memory_snapshot;",
+        "REMOVE TABLE IF EXISTS memory_version;",
         "REMOVE TABLE IF EXISTS version;",
         "REMOVE TABLE IF EXISTS relationship;",
         "REMOVE TABLE IF EXISTS entity;",

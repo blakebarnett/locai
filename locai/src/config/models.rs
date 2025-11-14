@@ -26,6 +26,9 @@ pub struct LocaiConfig {
 
     /// Memory lifecycle tracking configuration
     pub lifecycle_tracking: LifecycleTrackingConfig,
+
+    /// Memory versioning configuration
+    pub versioning: VersioningConfig,
 }
 
 /// Configuration for automatic memory lifecycle tracking.
@@ -358,4 +361,88 @@ pub enum LogFormat {
 
     /// Pretty format
     Pretty,
+}
+
+/// Configuration for memory versioning.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VersioningConfig {
+    /// Whether versioning is enabled
+    pub enabled: bool,
+
+    /// Number of most recent versions to keep as full copies (before converting to deltas)
+    pub delta_threshold: usize,
+
+    /// Maximum delta chain length before promoting to full copy
+    pub max_delta_chain_length: usize,
+
+    /// Promotion: Access count threshold for auto-promotion
+    pub promotion_access_threshold: u32,
+
+    /// Promotion: Time window in hours for access tracking
+    pub promotion_time_window_hours: u64,
+
+    /// Promotion: Cost threshold in milliseconds (promote if reconstruction slower)
+    pub promotion_cost_threshold_ms: u64,
+
+    /// Cache size (max cached versions)
+    pub cache_size: usize,
+
+    /// Cache TTL in seconds (server mode only)
+    pub cache_ttl_seconds: u64,
+
+    /// Cache strategy (auto-detect, server, or embedded)
+    pub cache_strategy: CacheStrategy,
+
+    /// Enable auto-promotion based on heuristics
+    pub enable_auto_promotion: bool,
+
+    /// Enable reconstruction cache
+    pub enable_reconstruction_cache: bool,
+
+    /// Override server mode detection (None = auto-detect)
+    pub server_mode: Option<bool>,
+
+    /// Enable compression for old versions
+    pub enable_compression: bool,
+
+    /// Compression threshold: compress versions older than N days
+    pub compression_threshold_days: u64,
+
+    /// Maximum versions per memory (None = unlimited)
+    pub max_versions_per_memory: Option<usize>,
+}
+
+impl Default for VersioningConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            delta_threshold: 10,
+            max_delta_chain_length: 50,
+            promotion_access_threshold: 5,
+            promotion_time_window_hours: 24,
+            promotion_cost_threshold_ms: 50,
+            cache_size: 1000,
+            cache_ttl_seconds: 3600,
+            cache_strategy: CacheStrategy::Auto,
+            enable_auto_promotion: true,
+            enable_reconstruction_cache: true,
+            server_mode: None,
+            enable_compression: true,
+            compression_threshold_days: 30,
+            max_versions_per_memory: None,
+        }
+    }
+}
+
+/// Cache strategy for version reconstruction.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheStrategy {
+    /// Auto-detect based on runtime context
+    Auto,
+    /// Force server mode (LRU cache)
+    Server,
+    /// Force embedded mode (simple cache)
+    Embedded,
 }

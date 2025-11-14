@@ -23,10 +23,13 @@ pub mod graph;
 pub mod intelligence;
 pub mod live_query;
 pub mod memory;
+pub mod memory_version;
 pub mod relationship;
 pub mod schema;
 pub mod vector;
 pub mod version;
+pub mod version_access;
+pub mod version_cache;
 
 pub use base::*;
 pub use config::*;
@@ -66,6 +69,7 @@ pub async fn create_shared_store(
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))
@@ -85,6 +89,7 @@ pub async fn create_shared_store(
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))
@@ -110,6 +115,7 @@ pub async fn create_shared_store(
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))
@@ -139,6 +145,7 @@ pub async fn create_shared_store(
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
             let store = SharedStorage::new(client, shared_config).await?;
             Ok(Box::new(store))

@@ -7,8 +7,11 @@ use crate::models::Memory;
 use crate::storage::errors::StorageError;
 use crate::storage::filters::{EntityFilter, MemoryFilter, RelationshipFilter, VectorFilter};
 use crate::storage::models::{
-    Entity, MemoryGraph, MemoryPath, Relationship, Vector, VectorSearchParams, Version,
+    Entity, MemoryDiff, MemoryGraph, MemoryPath, MemorySnapshot, MemoryVersionInfo, Relationship,
+    RestoreMode, Vector, VectorSearchParams, Version,
 };
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 /// Base trait for all storage implementations
 #[async_trait]
@@ -399,4 +402,230 @@ pub trait GraphTraversal: Send + Sync + 'static {
         &self,
         entity_id: &str,
     ) -> std::result::Result<Vec<Relationship>, StorageError>;
+}
+
+/// Trait for memory versioning operations
+#[async_trait]
+pub trait MemoryVersionStore: BaseStore {
+    /// Create a new version of a memory
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory to version
+    /// * `content` - The new content for this version
+    /// * `metadata` - Optional metadata for this version
+    ///
+    /// # Returns
+    /// The version ID of the created version
+    async fn create_memory_version(
+        &self,
+        memory_id: &str,
+        content: &str,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+    ) -> std::result::Result<String, StorageError>;
+
+    /// Get a specific version of a memory
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory
+    /// * `version_id` - The ID of the version to retrieve
+    ///
+    /// # Returns
+    /// The memory at the specified version, or None if not found
+    async fn get_memory_version(
+        &self,
+        memory_id: &str,
+        version_id: &str,
+    ) -> std::result::Result<Option<Memory>, StorageError>;
+
+    /// Get the current (latest) version of a memory
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory
+    ///
+    /// # Returns
+    /// The current version of the memory, or None if not found
+    async fn get_memory_current_version(
+        &self,
+        memory_id: &str,
+    ) -> std::result::Result<Option<Memory>, StorageError>;
+
+    /// List all versions of a memory
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory
+    ///
+    /// # Returns
+    /// A list of version information, ordered by creation time
+    async fn list_memory_versions(
+        &self,
+        memory_id: &str,
+    ) -> std::result::Result<Vec<MemoryVersionInfo>, StorageError>;
+
+    /// Get memory as it existed at a specific time
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory
+    /// * `at_time` - The timestamp to query
+    ///
+    /// # Returns
+    /// The memory as it existed at that time, or None if not found
+    async fn get_memory_at_time(
+        &self,
+        memory_id: &str,
+        at_time: DateTime<Utc>,
+    ) -> std::result::Result<Option<Memory>, StorageError>;
+
+    /// Delete a specific version (or all versions if version_id is None)
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory
+    /// * `version_id` - The ID of the version to delete, or None to delete all versions
+    ///
+    /// # Returns
+    /// Ok(()) on success
+    async fn delete_memory_version(
+        &self,
+        memory_id: &str,
+        version_id: Option<&str>,
+    ) -> std::result::Result<(), StorageError>;
+
+    /// Compute diff between two versions
+    ///
+    /// # Arguments
+    /// * `memory_id` - The ID of the memory
+    /// * `old_version_id` - The ID of the old version
+    /// * `new_version_id` - The ID of the new version
+    ///
+    /// # Returns
+    /// A diff structure showing the changes
+    async fn diff_memory_versions(
+        &self,
+        memory_id: &str,
+        old_version_id: &str,
+        new_version_id: &str,
+    ) -> std::result::Result<MemoryDiff, StorageError>;
+
+    /// Create a snapshot
+    ///
+    /// # Arguments
+    /// * `memory_ids` - Optional list of memory IDs to include (None = all memories)
+    /// * `metadata` - Optional metadata for the snapshot
+    ///
+    /// # Returns
+    /// The created snapshot
+    async fn create_snapshot(
+        &self,
+        memory_ids: Option<&[String]>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
+    ) -> std::result::Result<MemorySnapshot, StorageError>;
+
+    /// Restore from snapshot
+    ///
+    /// # Arguments
+    /// * `snapshot` - The snapshot to restore
+    /// * `restore_mode` - How to handle existing memories
+    ///
+    /// # Returns
+    /// Ok(()) on success
+    async fn restore_snapshot(
+        &self,
+        snapshot: &MemorySnapshot,
+        restore_mode: RestoreMode,
+    ) -> std::result::Result<(), StorageError>;
+
+    /// Search memories in a snapshot state
+    ///
+    /// # Arguments
+    /// * `snapshot` - The snapshot to search
+    /// * `query` - The search query
+    /// * `limit` - Maximum number of results
+    ///
+    /// # Returns
+    /// A list of memories matching the query as they existed in the snapshot
+    async fn search_snapshot(
+        &self,
+        snapshot: &MemorySnapshot,
+        query: &str,
+        limit: Option<usize>,
+    ) -> std::result::Result<Vec<Memory>, StorageError>;
+
+    /// Get a memory from a snapshot
+    ///
+    /// # Arguments
+    /// * `snapshot` - The snapshot
+    /// * `memory_id` - The ID of the memory to retrieve
+    ///
+    /// # Returns
+    /// The memory as it existed in the snapshot, or None if not found
+    async fn get_memory_from_snapshot(
+        &self,
+        snapshot: &MemorySnapshot,
+        memory_id: &str,
+    ) -> std::result::Result<Option<Memory>, StorageError>;
+
+    /// Get versioning statistics
+    ///
+    /// # Arguments
+    /// * `memory_id` - Optional memory ID to get stats for (None = all memories)
+    ///
+    /// # Returns
+    /// Versioning statistics
+    async fn get_versioning_stats(
+        &self,
+        memory_id: Option<&str>,
+    ) -> std::result::Result<crate::storage::models::VersioningStats, StorageError>;
+
+    /// Compact versions by removing old versions
+    ///
+    /// # Arguments
+    /// * `memory_id` - Optional memory ID to compact (None = all memories)
+    /// * `keep_count` - Number of most recent versions to keep
+    /// * `older_than_days` - Remove versions older than this many days
+    ///
+    /// # Returns
+    /// Number of versions removed
+    async fn compact_versions(
+        &self,
+        memory_id: Option<&str>,
+        keep_count: Option<usize>,
+        older_than_days: Option<u64>,
+    ) -> std::result::Result<usize, StorageError>;
+
+    /// Validate version integrity
+    ///
+    /// # Arguments
+    /// * `memory_id` - Optional memory ID to validate (None = all memories)
+    ///
+    /// # Returns
+    /// List of integrity issues found
+    async fn validate_versions(
+        &self,
+        memory_id: Option<&str>,
+    ) -> std::result::Result<Vec<crate::storage::models::VersionIntegrityIssue>, StorageError>;
+
+    /// Repair corrupted versions
+    ///
+    /// # Arguments
+    /// * `memory_id` - Optional memory ID to repair (None = all memories)
+    ///
+    /// # Returns
+    /// Repair report
+    async fn repair_versions(
+        &self,
+        memory_id: Option<&str>,
+    ) -> std::result::Result<crate::storage::models::RepairReport, StorageError>;
+
+    /// Promote a delta version to full copy
+    ///
+    /// # Arguments
+    /// * `memory_id` - The memory ID
+    /// * `version_id` - The version ID to promote
+    ///
+    /// # Returns
+    /// Ok(()) on success
+    async fn promote_version_to_full_copy(
+        &self,
+        memory_id: &str,
+        version_id: &str,
+    ) -> std::result::Result<(), StorageError>;
 }

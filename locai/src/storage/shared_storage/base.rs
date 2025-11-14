@@ -10,6 +10,8 @@ use super::config::SharedStorageConfig;
 use super::intelligence::{
     IntelligentSearch, IntelligentSearchResult, QueryAnalysis, SearchIntelligence, SearchSuggestion,
 };
+use super::version_access::VersionAccessTracker;
+use super::version_cache::VersionCache;
 use crate::hooks::HookRegistry;
 use crate::storage::errors::StorageError;
 use crate::storage::lifecycle::{LifecycleUpdate, LifecycleUpdateQueue};
@@ -27,6 +29,8 @@ where
     pub(crate) lifecycle_queue: LifecycleUpdateQueue,
     pub(crate) hook_registry: Arc<HookRegistry>,
     pub(crate) shutdown: Arc<Notify>,
+    pub(crate) version_cache: VersionCache,
+    pub(crate) version_access_tracker: VersionAccessTracker,
 }
 
 impl<C> SharedStorage<C>
@@ -53,6 +57,10 @@ where
         let shutdown = Arc::new(Notify::new());
         let lifecycle_queue = LifecycleUpdateQueue::new(1000);
 
+        // Initialize versioning cache and access tracker
+        let version_cache = VersionCache::new(&config.versioning);
+        let version_access_tracker = VersionAccessTracker::new();
+
         let storage = Self {
             client: client.clone(),
             config: config.clone(),
@@ -60,6 +68,8 @@ where
             lifecycle_queue: lifecycle_queue.clone(),
             hook_registry: Arc::new(HookRegistry::new()),
             shutdown: shutdown.clone(),
+            version_cache,
+            version_access_tracker,
         };
 
         // Initialize schema

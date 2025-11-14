@@ -257,6 +257,7 @@ pub async fn create_graph_storage(
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
 
             match config.engine {
@@ -312,6 +313,7 @@ pub async fn create_graph_storage(
                 namespace: "memory".to_string(),
                 database: "main".to_string(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
             let client = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
                 .await
@@ -342,6 +344,7 @@ pub async fn create_vector_storage(
                 namespace: config.namespace.clone(),
                 database: config.database.clone(),
                 lifecycle_tracking: Default::default(),
+                versioning: Default::default(),
             };
 
             match config.engine {
@@ -427,6 +430,7 @@ pub async fn create_storage_service(
         namespace: config.storage.graph.surrealdb.namespace.clone(),
         database: config.storage.graph.surrealdb.database.clone(),
         lifecycle_tracking: config.lifecycle_tracking.clone(),
+        versioning: config.versioning.clone(),
     };
 
     // Create SharedStorage based on engine type

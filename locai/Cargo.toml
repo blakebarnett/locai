@@ -62,6 +62,16 @@ surrealdb = { version = "2.3.10", optional = true, default-features = false, fea
 regex = "1.10.2"
 lazy_static = "1.4.0"
 
+# Diff computation for memory versioning
+similar = "2.5"
+
+# Caching for version reconstruction
+lru = "0.12"
+
+# Compression for old versions
+flate2 = "1.0"
+base64 = "0.22"
+
 # WebSocket dependencies for remote messaging
 tokio-tungstenite = "0.28"
 
