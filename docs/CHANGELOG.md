@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Memory Versioning
+- **Core versioning operations**: Create, retrieve, list, and delete memory versions
+- **Delta storage**: Automatic delta computation and storage for efficient version management (50-90% storage savings)
+- **Compression**: Automatic compression of old versions with transparent decompression
+- **Caching**: Context-aware caching for version reconstruction (LRU for server, HashMap for embedded)
+- **Time-based queries**: Retrieve memory state at specific timestamps with `get_memory_at_time()`
+- **Diff computation**: Compute diffs between versions using Myers algorithm
+- **Snapshots**: Create, restore, and search memory snapshots with multiple restore modes
+- **Management APIs**: Statistics, validation, repair, compaction, and promotion operations
+- **Configuration**: Comprehensive `VersioningConfig` for delta storage, compression, caching, and promotion settings
+- **Simple API integration**: All versioning features available through `Locai` simple API
+- Comprehensive example (`examples/memory_versioning.rs`) and test coverage
+
+### Fixed
+- Fixed `get_memory_at_time()` timing edge cases
+- Fixed simple API downcast issues for versioning operations
+
 ## [0.2.1] - 2025-11-01
 
 ### Added

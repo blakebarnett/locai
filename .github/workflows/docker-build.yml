@@ -84,7 +84,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.should-build == 'true'
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
 
