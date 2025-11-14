@@ -29,3 +29,11 @@ strip = true
 opt-level = 3
 panic = 'abort'
 codegen-units = 1
+
+# Faster CI build profile - less aggressive optimizations for faster builds
+[profile.ci]
+inherits = "release"
+lto = false
+opt-level = 2
+codegen-units = 16
+strip = false

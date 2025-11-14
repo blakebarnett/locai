@@ -55,8 +55,26 @@ RUN apt-get update && apt-get install -y \
 COPY --from=planner /app/recipe.json recipe.json
 
 # Build dependencies (only for packages in the recipe: locai + locai-server)
+# Use CI profile for faster builds, cache target directory for incremental builds
+# Mount rust-cache from GitHub Actions runner if available (for shared cache across CI runs)
+# Copy compiled dependencies out of cache mount to make them available for next stage
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo chef cook --release --recipe-path recipe.json
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    --mount=type=bind,source=.rust-cache-cargo,target=/tmp/rust-cache-cargo,readonly \
+    --mount=type=bind,source=.rust-cache-target,target=/tmp/rust-cache-target,readonly \
+    bash -c '\
+    if [ -d /tmp/rust-cache-cargo ] && [ "$(ls -A /tmp/rust-cache-cargo 2>/dev/null | grep -v .keep)" ]; then \
+      echo "Using rust-cache cargo from GitHub Actions..." && \
+      cp -r /tmp/rust-cache-cargo/* /usr/local/cargo/ 2>/dev/null || true; \
+    fi && \
+    if [ -d /tmp/rust-cache-target ] && [ "$(ls -A /tmp/rust-cache-target 2>/dev/null | grep -v .keep)" ]; then \
+      echo "Using rust-cache target from GitHub Actions..." && \
+      cp -r /tmp/rust-cache-target/* /app/target/ 2>/dev/null || true; \
+    fi && \
+    cargo chef cook --profile ci --recipe-path recipe.json && \
+    mkdir -p /app/deps-target && \
+    cp -r /app/target/* /app/deps-target/ 2>/dev/null || true'
 
 # ============================================================================
 # Stage 4: Build the application
@@ -73,9 +91,9 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy cached dependencies from previous stage
-COPY --from=dependencies /app/target target
+# Copy cargo registry and compiled dependencies from previous stage
 COPY --from=dependencies /usr/local/cargo /usr/local/cargo
+COPY --from=dependencies /app/deps-target /app/target
 
 # Copy only the source code needed for locai-server
 # Note: We don't copy .cargo/config.toml since it references sccache which we don't use in CI
@@ -91,13 +109,32 @@ RUN sed -i '/locai-cli/d' Cargo.toml
 RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile; fi
 
 # Build only the locai-server binary (BuildKit will cache this layer)
+# Use CI profile for faster builds, cache target directory for incremental builds
+# Mount rust-cache from GitHub Actions runner if available (for shared cache across CI runs)
+# Copy binary out of cache mount to make it available in the image layer
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --release --bin locai-server
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    --mount=type=bind,source=.rust-cache-cargo,target=/tmp/rust-cache-cargo,readonly \
+    --mount=type=bind,source=.rust-cache-target,target=/tmp/rust-cache-target,readonly \
+    bash -c '\
+    set -e && \
+    if [ -d /tmp/rust-cache-cargo ] && [ "$(ls -A /tmp/rust-cache-cargo 2>/dev/null | grep -v .keep)" ]; then \
+      echo "Using rust-cache cargo from GitHub Actions..." && \
+      cp -r /tmp/rust-cache-cargo/* /usr/local/cargo/ 2>/dev/null || true; \
+    fi && \
+    if [ -d /tmp/rust-cache-target ] && [ "$(ls -A /tmp/rust-cache-target 2>/dev/null | grep -v .keep)" ]; then \
+      echo "Using rust-cache target from GitHub Actions..." && \
+      cp -r /tmp/rust-cache-target/* /app/target/ 2>/dev/null || true; \
+    fi && \
+    cargo build --profile ci --bin locai-server && \
+    mkdir -p /app/bin && \
+    cp /app/target/ci/locai-server /app/bin/locai-server'
 
 # Verify the binary exists and is executable
-RUN ls -lh /app/target/release/locai-server && \
-    file /app/target/release/locai-server && \
-    /app/target/release/locai-server --help
+RUN ls -lh /app/bin/locai-server && \
+    file /app/bin/locai-server && \
+    /app/bin/locai-server --help
 
 # ============================================================================
 # Stage 5: Runtime image (final, minimal)
@@ -122,8 +159,8 @@ RUN groupadd -r locai && useradd -r -g locai -u 1000 locai
 # Create data directory with proper permissions
 RUN mkdir -p /data && chown -R locai:locai /data
 
-# Copy the compiled binary from builder
-COPY --from=builder /app/target/release/locai-server /usr/local/bin/locai-server
+# Copy the compiled binary from builder (copied out of cache mount to /app/bin/)
+COPY --from=builder /app/bin/locai-server /usr/local/bin/locai-server
 
 # Verify binary is executable
 RUN chmod +x /usr/local/bin/locai-server
