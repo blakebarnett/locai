@@ -35,6 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         namespace: "demo".to_string(),
         database: "locai_shared".to_string(),
         lifecycle_tracking: Default::default(),
+        versioning: Default::default(),
     };
 
     // Create a SurrealDB client with embedded RocksDB engine
