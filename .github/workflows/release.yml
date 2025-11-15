@@ -20,12 +20,18 @@ jobs:
       locai_server_released: ${{ steps.release.outputs['locai-server--release_created'] }}
       locai_cli_released: ${{ steps.release.outputs['locai-cli--release_created'] }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-locai:
     name: Publish locai (base crate)
