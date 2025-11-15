@@ -31,19 +31,29 @@ COPY Cargo.lock* ./
 COPY locai ./locai
 COPY locai-server ./locai-server
 
+# Verify versions are correct (helps catch cache issues)
+RUN echo "Verifying package versions:" && \
+    grep -E '^version\s*=' Cargo.toml locai/Cargo.toml locai-server/Cargo.toml || true
+
 # Modify Cargo.toml to only include the members we need (locai + locai-server)
 # This prevents cargo from looking for locai-cli which we don't copy
 RUN sed -i '/locai-cli/d' Cargo.toml
 
-# Cargo.lock should be committed for reproducible builds
-# Generate it only if missing (fallback for edge cases)
-RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile || echo "Warning: Failed to generate Cargo.lock"; fi
+# CRITICAL: Regenerate Cargo.lock BEFORE preparing recipe
+# cargo-chef uses Cargo.lock to determine what to include, so it must be up-to-date
+# This ensures versions are correct in the recipe.json
+RUN cargo generate-lockfile || echo "Warning: Failed to generate Cargo.lock"
 
-# Verify workspace resolution before preparing recipe
-# This ensures versions are correctly resolved after modifying Cargo.toml
-RUN cargo metadata --format-version 1 > /dev/null 2>&1 || cargo generate-lockfile
+# Verify workspace resolution and show actual versions being used
+RUN echo "=== Workspace Resolution Check (Planner Stage) ===" && \
+    cargo metadata --format-version 1 > /tmp/metadata.json 2>&1 && \
+    echo "Package versions from metadata:" && \
+    (cat /tmp/metadata.json | jq -r '.packages[] | select(.name | startswith("locai")) | "\(.name): \(.version)"' 2>/dev/null || \
+     cat /tmp/metadata.json | grep -A 2 '"name":"locai' | grep -E '"name"|"version"') || \
+    (echo "Failed to get metadata, regenerating lockfile..." && cargo generate-lockfile)
 
 # Analyze dependencies (will only include locai and locai-server since that's all we copied)
+# This recipe will be used by the dependencies stage, so versions must be correct here
 RUN cargo chef prepare --recipe-path recipe.json
 
 # ============================================================================
@@ -136,17 +146,24 @@ COPY Cargo.lock* ./
 COPY locai ./locai
 COPY locai-server ./locai-server
 
+# Verify versions are correct before building (helps catch cache issues)
+RUN echo "Verifying package versions in builder stage:" && \
+    grep -E '^version\s*=' Cargo.toml locai/Cargo.toml locai-server/Cargo.toml || true
+
 # Modify Cargo.toml to only include the members we need (locai + locai-server)
 # This prevents cargo from looking for locai-cli which we don't copy
 RUN sed -i '/locai-cli/d' Cargo.toml
 
-# Cargo.lock should be committed for reproducible builds
-# Generate it only if missing (fallback for edge cases)
-RUN if [ ! -f Cargo.lock ]; then cargo generate-lockfile || echo "Warning: Failed to generate Cargo.lock"; fi
+# Regenerate Cargo.lock after modifying workspace to ensure correct resolution
+# This is critical - Cargo.lock may have references to locai-cli that need to be removed
+RUN cargo generate-lockfile || echo "Warning: Failed to generate Cargo.lock"
 
-# Verify workspace resolution after modifying Cargo.toml
-# This ensures versions are correctly resolved (fixes version showing as 0.0.1)
-RUN cargo metadata --format-version 1 > /dev/null 2>&1 || cargo generate-lockfile
+# Verify workspace resolution and show actual versions being used
+RUN echo "=== Workspace Resolution Check (Builder Stage) ===" && \
+    cargo metadata --format-version 1 > /tmp/metadata.json 2>&1 && \
+    echo "Package versions from metadata:" && \
+    cat /tmp/metadata.json | grep -A 2 '"name":"locai' | grep -E '"name"|"version"' || \
+    (echo "Failed to get metadata, regenerating lockfile..." && cargo generate-lockfile)
 
 # Build only the locai-server binary (BuildKit will cache this layer)
 # Use CI profile for faster builds, cache target directory for incremental builds
