@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "rust",
+  "bootstrap-sha": "182c9644e0d8aa8b0a6a33f03b7dcfbf70f11eca",
   "packages": {
     "locai": {
       "package-name": "locai",
@@ -23,6 +24,6 @@
   ],
   "separate-pull-requests": false,
   "group-pull-request-title-pattern": "chore: release ${version}",
-  "release-search-depth": 400,
-  "commit-search-depth": 500
+  "release-search-depth": 50,
+  "commit-search-depth": 100
 } 
